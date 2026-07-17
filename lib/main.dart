@@ -1,0 +1,134 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'core/network/supabase_client.dart';
+import 'core/utils/notification_service.dart';
+import 'core/utils/sync_manager.dart';
+import 'data/repositories/energy_repository.dart';
+import 'data/repositories/meter_repository.dart';
+import 'presentation/auth_bloc/auth_bloc.dart';
+import 'presentation/auth_bloc/auth_event.dart';
+import 'presentation/auth_bloc/auth_state.dart';
+import 'presentation/bloc/energy_bloc.dart';
+import 'presentation/bloc/energy_event.dart';
+import 'presentation/pages/login_page.dart';
+import 'presentation/pages/main_navigation_hub.dart';
+import 'theme/power_theme.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await dotenv.load(fileName: '.env');
+
+  // Don't block startup — run Supabase init in background
+  Future(() async {
+    try {
+      await SupabaseClientManager.initialize();
+    } catch (_) {}
+  });
+
+  await NotificationService.instance.initialize();
+
+  final repository = EnergyRepository();
+
+  runApp(
+    EmsApp(repository: repository),
+  );
+}
+
+class EmsApp extends StatefulWidget {
+  final EnergyRepository repository;
+
+  const EmsApp({super.key, required this.repository});
+
+  @override
+  State<EmsApp> createState() => _EmsAppState();
+}
+
+class _EmsAppState extends State<EmsApp> {
+  ThemeMode _themeMode = ThemeMode.light;
+
+  void _toggleTheme() {
+    setState(() {
+      _themeMode =
+          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiRepositoryProvider(
+      providers: [
+        RepositoryProvider<EnergyRepository>.value(value: widget.repository),
+        RepositoryProvider<MeterRepository>(create: (_) => MeterRepository()),
+      ],
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<AuthBloc>(create: (_) => AuthBloc()),
+          BlocProvider<EnergyBloc>(
+            create: (_) => EnergyBloc(repository: widget.repository),
+          ),
+        ],
+        child: _AppEntry(themeMode: _themeMode, onToggleTheme: _toggleTheme),
+      ),
+    );
+  }
+}
+
+class _AppEntry extends StatefulWidget {
+  final ThemeMode themeMode;
+  final VoidCallback onToggleTheme;
+
+  const _AppEntry({
+    required this.themeMode,
+    required this.onToggleTheme,
+  });
+
+  @override
+  State<_AppEntry> createState() => _AppEntryState();
+}
+
+class _AppEntryState extends State<_AppEntry> {
+  late final SyncManager _syncManager;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Check session synchronously — no loading spinner
+    context.read<AuthBloc>().add(const AppAuthCheckRequested());
+
+    // Fire dashboard load and sync in background
+    final energyBloc = context.read<EnergyBloc>();
+    energyBloc.add(const LoadInitialDashboardData());
+    _syncManager = SyncManager();
+    _syncManager.start(energyBloc);
+  }
+
+  @override
+  void dispose() {
+    _syncManager.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Power — Energy Management System',
+      debugShowCheckedModeBanner: false,
+      theme: PowerTheme.theme,
+      darkTheme: PowerTheme.darkTheme,
+      themeMode: widget.themeMode,
+      home: BlocBuilder<AuthBloc, AppAuthState>(
+        builder: (context, state) {
+          return switch (state) {
+            // Never show loading spinner — default to login page
+            AppAuthInitial() || AppAuthLoading() || AppAuthUnauthenticated() || AppAuthError _ =>
+              const LoginPage(),
+            AppAuthAuthenticated() => const MainNavigationHub(),
+          };
+        },
+      ),
+    );
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "EMS (Mobile)",
+      "type": "flutter",
+      "request": "launch",
+      "flutterMode": "debug"
+    },
+    {
+      "name": "EMS (Profile)",
+      "type": "flutter",
+      "request": "launch",
+      "flutterMode": "profile"
+    },
+    {
+      "name": "EMS (Release)",
+      "type": "flutter",
+      "request": "launch",
+      "flutterMode": "release"
+    },
+    {
+      "name": "EMS (Web)",
+      "type": "flutter",
+      "request": "launch",
+      "deviceId": "chrome",
+      "flutterMode": "debug"
+    }
+  ]
+}
