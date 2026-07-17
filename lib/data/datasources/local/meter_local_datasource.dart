@@ -1,4 +1,5 @@
-import 'package:sembast_web/sembast_web.dart';
+import 'package:sembast/sembast.dart';
+import '../../../core/database/database_factory.dart';
 import '../../../core/error/exceptions.dart';
 import '../../models/meter_model.dart';
 
@@ -8,7 +9,7 @@ class MeterLocalDatasource {
 
   Future<Database> get _db async {
     if (_database != null) return _database!;
-    _database = await databaseFactoryWeb.openDatabase('ems_meters.db');
+    _database = await getDatabaseFactory().openDatabase('ems_meters.db');
     return _database!;
   }
 

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:sembast/sembast.dart';
-import 'database_factory_selector.dart';
+import 'database_factory.dart';
 import '../../models/site.dart';
 import '../../models/panel.dart';
 import '../../models/meter.dart';
