@@ -44,8 +44,8 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
       ));
     } on AppException catch (e) {
       emit(EnergyOperationFailure(e.message));
-    } catch (e) {
-      emit(EnergyOperationFailure('Failed to load dashboard: $e'));
+    } catch (_) {
+      emit(const EnergyOperationFailure('Failed to load dashboard. Check your connection and try again.'));
     }
   }
 
@@ -109,8 +109,8 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
       emit(EnergyValidationError(e.message));
     } on AppException catch (e) {
       emit(EnergyOperationFailure(e.message));
-    } catch (e) {
-      emit(EnergyOperationFailure('Failed to save reading: $e'));
+    } catch (_) {
+      emit(const EnergyOperationFailure('Failed to save reading. Please verify the values and try again.'));
     }
   }
 
@@ -140,7 +140,7 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
         maxDemandPeak:
             (dashboard.maxDemandPeak * 100).roundToDouble() / 100,
       ));
-    } on AppException catch (e) {
+    } on AppException catch (_) {
       // On sync failure, still emit success with current local data
       try {
         final dashboard = await _repository.getDashboardData();
@@ -157,10 +157,10 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
               (dashboard.maxDemandPeak * 100).roundToDouble() / 100,
         ));
       } catch (_) {
-        emit(EnergyOperationFailure(e.message));
+        emit(const EnergyOperationFailure('Sync failed. Data will sync automatically when connection is available.'));
       }
-    } catch (e) {
-      emit(EnergyOperationFailure('Failed to sync: $e'));
+    } catch (_) {
+      emit(const EnergyOperationFailure('Sync failed. Data will sync automatically when connection is available.'));
     }
   }
 

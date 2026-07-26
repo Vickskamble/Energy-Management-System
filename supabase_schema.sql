@@ -1,137 +1,208 @@
--- EMS - Supabase Schema
--- Run this in your Supabase SQL Editor to create the cloud tables
+-- ============================================================
+-- Energy Management System — Complete Supabase Schema
+-- Run this in Supabase SQL Editor (once)
+-- ============================================================
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Sites table
-CREATE TABLE sites (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id),
-  name TEXT NOT NULL,
-  location TEXT,
-  contract_demand_kva REAL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+-- 1. energy_logs — Main reading & bill breakdown table (Bloc flow)
+CREATE TABLE IF NOT EXISTS energy_logs (
+  id            UUID PRIMARY KEY,
+  meter_name    TEXT NOT NULL,
+  kwh           DOUBLE PRECISION DEFAULT 0,
+  kvah          DOUBLE PRECISION DEFAULT 0,
+  rkvarh_lag    DOUBLE PRECISION DEFAULT 0,
+  rkvarh_lead   DOUBLE PRECISION DEFAULT 0,
+  power_factor  DOUBLE PRECISION DEFAULT 0,
+  md_recorded   DOUBLE PRECISION DEFAULT 0,
+  contract_demand DOUBLE PRECISION DEFAULT 0,
+  estimated_bill DOUBLE PRECISION DEFAULT 0,
+  logged_at     TIMESTAMPTZ DEFAULT NOW(),
+  is_synced     BOOLEAN DEFAULT FALSE,
+  user_id       UUID,
+  -- Bill breakdown columns
+  energy_charges   DOUBLE PRECISION DEFAULT 0,
+  demand_charges   DOUBLE PRECISION DEFAULT 0,
+  fac_charges      DOUBLE PRECISION DEFAULT 0,
+  wheeling_charges DOUBLE PRECISION DEFAULT 0,
+  electricity_duty DOUBLE PRECISION DEFAULT 0,
+  taxes            DOUBLE PRECISION DEFAULT 0,
+  pf_rebate        DOUBLE PRECISION DEFAULT 0,
+  pf_surcharge     DOUBLE PRECISION DEFAULT 0,
+  subsidy          DOUBLE PRECISION DEFAULT 0,
+  net_bill         DOUBLE PRECISION DEFAULT 0,
+  billing_demand   DOUBLE PRECISION DEFAULT 0,
+  load_factor      DOUBLE PRECISION DEFAULT 0,
+  avg_unit_cost    DOUBLE PRECISION DEFAULT 0
 );
 
-ALTER TABLE sites ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_energy_logs_meter ON energy_logs(meter_name);
+CREATE INDEX IF NOT EXISTS idx_energy_logs_logged_at ON energy_logs(logged_at);
 
-CREATE POLICY "Users can manage their own sites"
-  ON sites FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+-- 2. sites — Site/master locations (EmsProvider flow)
+CREATE TABLE IF NOT EXISTS sites (
+  id                UUID PRIMARY KEY,
+  name              TEXT NOT NULL,
+  location          TEXT,
+  contract_demand_kva DOUBLE PRECISION,
+  user_id           UUID,
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ DEFAULT NOW()
+);
 
--- Panels table
-CREATE TABLE panels (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id),
-  site_id UUID REFERENCES sites(id) ON DELETE CASCADE NOT NULL,
-  name TEXT NOT NULL,
+-- 3. panels — Electrical panels under each site
+CREATE TABLE IF NOT EXISTS panels (
+  id         UUID PRIMARY KEY,
+  site_id    UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
   panel_type TEXT,
+  user_id    UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE panels ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_panels_site ON panels(site_id);
 
-CREATE POLICY "Users can manage their own panels"
-  ON panels FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- Meters table
-CREATE TABLE meters (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id),
-  panel_id UUID REFERENCES panels(id) ON DELETE CASCADE NOT NULL,
+-- 4. meters — Energy meters under each panel
+CREATE TABLE IF NOT EXISTS meters (
+  id           UUID PRIMARY KEY,
+  panel_id     UUID NOT NULL REFERENCES panels(id) ON DELETE CASCADE,
   meter_number TEXT NOT NULL,
-  meter_type TEXT,
-  ct_ratio REAL,
-  pt_ratio REAL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  meter_type   TEXT,
+  ct_ratio     DOUBLE PRECISION,
+  pt_ratio     DOUBLE PRECISION,
+  user_id      UUID,
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE meters ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_meters_panel ON meters(panel_id);
 
-CREATE POLICY "Users can manage their own meters"
-  ON meters FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- Readings table
-CREATE TABLE readings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id),
-  meter_id UUID REFERENCES meters(id) ON DELETE CASCADE NOT NULL,
+-- 5. readings — Detailed meter readings (EmsProvider flow)
+CREATE TABLE IF NOT EXISTS readings (
+  id           UUID PRIMARY KEY,
+  meter_id     UUID NOT NULL REFERENCES meters(id) ON DELETE CASCADE,
   reading_date DATE NOT NULL,
-  kwh_import REAL,
-  kwh_export REAL,
-  kvah_import REAL,
-  kvah_export REAL,
-  kw_demand REAL,
-  kva_demand REAL,
-  voltage_ln_avg REAL,
-  current_avg REAL,
-  power_factor REAL,
-  frequency REAL,
-  thd REAL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  kwh_import   DOUBLE PRECISION,
+  kwh_export   DOUBLE PRECISION,
+  kvah_import  DOUBLE PRECISION,
+  kvah_export  DOUBLE PRECISION,
+  kw_demand    DOUBLE PRECISION,
+  kva_demand   DOUBLE PRECISION,
+  voltage_ln_avg DOUBLE PRECISION,
+  current_avg  DOUBLE PRECISION,
+  power_factor DOUBLE PRECISION,
+  frequency    DOUBLE PRECISION,
+  thd          DOUBLE PRECISION,
+  user_id      UUID,
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE readings ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_readings_meter ON readings(meter_id);
+CREATE INDEX IF NOT EXISTS idx_readings_date ON readings(reading_date);
 
-CREATE POLICY "Users can manage their own readings"
-  ON readings FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE INDEX idx_readings_meter_date ON readings(meter_id, reading_date);
-CREATE INDEX idx_readings_user_date ON readings(user_id, reading_date);
-
--- Contract Demands table
-CREATE TABLE contract_demands (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id),
-  site_id UUID REFERENCES sites(id) ON DELETE CASCADE NOT NULL,
-  contract_demand_kva REAL NOT NULL,
-  effective_from DATE NOT NULL,
-  effective_to DATE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+-- 6. contract_demands — Contract demand history per site
+CREATE TABLE IF NOT EXISTS contract_demands (
+  id                 UUID PRIMARY KEY,
+  site_id            UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  contract_demand_kva DOUBLE PRECISION NOT NULL,
+  effective_from     DATE NOT NULL,
+  effective_to       DATE,
+  user_id            UUID,
+  created_at         TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE contract_demands ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_contract_demands_site ON contract_demands(site_id);
 
-CREATE POLICY "Users can manage their own contract demands"
-  ON contract_demands FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- Analysis Results table
-CREATE TABLE analysis_results (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id),
-  site_id UUID REFERENCES sites(id) ON DELETE CASCADE,
-  panel_id UUID REFERENCES panels(id) ON DELETE CASCADE,
-  meter_id UUID REFERENCES meters(id) ON DELETE CASCADE,
-  reading_id UUID REFERENCES readings(id) ON DELETE CASCADE,
-  type TEXT NOT NULL,
-  severity TEXT NOT NULL,
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
+-- 7. analysis_results — Analysis findings (rule-based)
+CREATE TABLE IF NOT EXISTS analysis_results (
+  id             UUID PRIMARY KEY,
+  site_id        UUID REFERENCES sites(id) ON DELETE CASCADE,
+  panel_id       UUID REFERENCES panels(id) ON DELETE CASCADE,
+  meter_id       UUID REFERENCES meters(id) ON DELETE CASCADE,
+  reading_id     UUID REFERENCES readings(id) ON DELETE CASCADE,
+  type           TEXT NOT NULL,
+  severity       TEXT NOT NULL,
+  title          TEXT NOT NULL,
+  description    TEXT,
   recommendation TEXT,
-  metrics JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  metrics        JSONB,
+  user_id        UUID,
+  created_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_analysis_site ON analysis_results(site_id);
+CREATE INDEX IF NOT EXISTS idx_analysis_severity ON analysis_results(severity);
+
+-- Enable Row Level Security
+ALTER TABLE energy_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE panels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE readings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contract_demands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analysis_results ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can manage their own analysis"
-  ON analysis_results FOR ALL
-  USING (auth.uid() = user_id)
+-- RLS: Users can only see their own data
+CREATE POLICY "Users can view own energy_logs"
+  ON energy_logs FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own energy_logs"
+  ON energy_logs FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
-CREATE INDEX idx_analysis_user_site ON analysis_results(user_id, site_id);
-CREATE INDEX idx_analysis_severity ON analysis_results(severity);
+CREATE POLICY "Users can update own energy_logs"
+  ON energy_logs FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own sites"
+  ON sites FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own sites"
+  ON sites FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own sites"
+  ON sites FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own sites"
+  ON sites FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own panels"
+  ON panels FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own panels"
+  ON panels FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own meters"
+  ON meters FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own meters"
+  ON meters FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own readings"
+  ON readings FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own readings"
+  ON readings FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own contract_demands"
+  ON contract_demands FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own contract_demands"
+  ON contract_demands FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own analysis_results"
+  ON analysis_results FOR SELECT
+  USING (auth.uid() = user_id);

@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/network/supabase_client.dart';
 import 'core/utils/notification_service.dart';
 import 'core/utils/sync_manager.dart';
+import 'core/theme/app_theme.dart';
 import 'data/repositories/energy_repository.dart';
 import 'data/repositories/meter_repository.dart';
 import 'presentation/auth_bloc/auth_bloc.dart';
@@ -13,19 +14,15 @@ import 'presentation/bloc/energy_bloc.dart';
 import 'presentation/bloc/energy_event.dart';
 import 'presentation/pages/login_page.dart';
 import 'presentation/pages/main_navigation_hub.dart';
-import 'theme/power_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await dotenv.load(fileName: '.env');
 
-  // Don't block startup — run Supabase init in background
-  Future(() async {
-    try {
-      await SupabaseClientManager.initialize();
-    } catch (_) {}
-  });
+  try {
+    await SupabaseClientManager.initialize();
+  } catch (_) {}
 
   await NotificationService.instance.initialize();
 
@@ -95,10 +92,8 @@ class _AppEntryState extends State<_AppEntry> {
   void initState() {
     super.initState();
 
-    // Check session synchronously — no loading spinner
     context.read<AuthBloc>().add(const AppAuthCheckRequested());
 
-    // Fire dashboard load and sync in background
     final energyBloc = context.read<EnergyBloc>();
     energyBloc.add(const LoadInitialDashboardData());
     _syncManager = SyncManager();
@@ -114,18 +109,20 @@ class _AppEntryState extends State<_AppEntry> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Power — Energy Management System',
+      title: 'PowerEMS — Energy Management System',
       debugShowCheckedModeBanner: false,
-      theme: PowerTheme.theme,
-      darkTheme: PowerTheme.darkTheme,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
       themeMode: widget.themeMode,
       home: BlocBuilder<AuthBloc, AppAuthState>(
         builder: (context, state) {
           return switch (state) {
-            // Never show loading spinner — default to login page
             AppAuthInitial() || AppAuthLoading() || AppAuthUnauthenticated() || AppAuthError _ =>
               const LoginPage(),
-            AppAuthAuthenticated() => const MainNavigationHub(),
+            AppAuthAuthenticated() => MainNavigationHub(
+                onToggleTheme: widget.onToggleTheme,
+                isDark: widget.themeMode == ThemeMode.dark,
+              ),
           };
         },
       ),

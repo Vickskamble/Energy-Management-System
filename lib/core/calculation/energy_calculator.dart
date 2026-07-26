@@ -1,26 +1,12 @@
 import 'dart:math';
-import 'package:decimal/decimal.dart';
 import '../constants/app_constants.dart';
 
-class CalculationEngine {
-  CalculationEngine._();
+class EnergyCalculator {
+  EnergyCalculator._();
 
   static double calculatePowerFactor(double kwh, double kvah) {
     if (kvah <= 0 || kwh <= 0) return 0.000;
     return (kwh / kvah).clamp(0.000, 1.000);
-  }
-
-  static double calculateEstimatedBill({
-    required double kwh,
-    double mdRecorded = 0,
-    double? powerFactor,
-    double energyRate = AppConstants.tariffPerUnit,
-    double demandRate = 0,
-    double pfThreshold = AppConstants.pfPenaltyThreshold,
-  }) {
-    final units = Decimal.fromInt((kwh * AppConstants.multiplyingFactor).round());
-    final total = units * Decimal.parse(energyRate.toStringAsFixed(2));
-    return total.toDouble();
   }
 
   static double calculateBillingDemand(double mdRecorded, double contractDemand) {
@@ -75,6 +61,50 @@ class CalculationEngine {
     return netBill / totalUnits;
   }
 
+  static double calculateTotalBill({
+    required double energyCharges,
+    required double demandCharges,
+    required double facCharges,
+    required double wheelingCharges,
+    required double electricityDuty,
+    required double taxes,
+    double pfRebate = 0,
+    double pfSurcharge = 0,
+    double subsidy = 0,
+  }) {
+    final subtotal = energyCharges + demandCharges + facCharges + wheelingCharges;
+    final duty = calculateElectricityDuty(subtotal, AppConstants.electricityDutyPercent);
+    final tax = calculateTaxes(subtotal + duty, AppConstants.taxPercent);
+    return (subtotal + duty + tax + pfSurcharge) - pfRebate - subsidy;
+  }
+
+  static double calculateBillHealthScore({
+    required double powerFactor,
+    required double loadFactor,
+    required double billingDemand,
+    required double contractDemand,
+    required double pfSurcharge,
+  }) {
+    double score = 100;
+    if (powerFactor < AppConstants.pfRebateThreshold) score -= (AppConstants.pfRebateThreshold - powerFactor) * 100;
+    if (loadFactor < AppConstants.loadFactorThresholdGood) score -= (AppConstants.loadFactorThresholdGood - loadFactor) * 50;
+    if (billingDemand > contractDemand) score -= ((billingDemand - contractDemand) / contractDemand) * 30;
+    if (pfSurcharge > 0) score -= 15;
+    return score.clamp(0, 100);
+  }
+
+  static double calculateEnergyScore({
+    required double powerFactor,
+    required double loadFactor,
+    required double averageUnitCost,
+  }) {
+    double score = 100;
+    if (powerFactor < AppConstants.pfRebateThreshold) score -= 20;
+    if (loadFactor < AppConstants.loadFactorThresholdGood) score -= 15;
+    score *= (1.0 / (1 + averageUnitCost * 0.001));
+    return score.clamp(0, 100);
+  }
+
   static double calculateDifference(double current, double previous) {
     return current - previous;
   }
@@ -82,27 +112,5 @@ class CalculationEngine {
   static double calculatePercentChange(double current, double previous) {
     if (previous == 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous.abs()) * 100;
-  }
-
-  static bool isNearContractDemandBreach(
-    double mdRecorded, {
-    double contractDemand = AppConstants.defaultContractDemandKva,
-    double threshold = AppConstants.mdWarningThresholdKva,
-  }) {
-    return mdRecorded >= threshold;
-  }
-
-  static bool hasReactivePenaltyRisk(double powerFactor) {
-    return powerFactor < AppConstants.pfPenaltyThreshold;
-  }
-
-  static String formatInr(double amount) {
-    final value = amount.round();
-    if (value >= 10000000) {
-      return '₹${(value / 10000000).toStringAsFixed(2)} Cr';
-    } else if (value >= 100000) {
-      return '₹${(value / 100000).toStringAsFixed(2)} L';
-    }
-    return '₹${value.toStringAsFixed(0)}';
   }
 }

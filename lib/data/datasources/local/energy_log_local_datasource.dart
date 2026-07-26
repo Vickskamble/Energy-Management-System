@@ -22,7 +22,7 @@ class EnergyLogLocalDatasource {
       final db = await _db;
       await _store.record(log.id).put(db, log.toMap());
     } catch (e) {
-      throw LocalStorageException('Failed to insert energy log: $e');
+      throw const LocalStorageException('Unable to save reading offline. Please try again.');
     }
   }
 
@@ -36,7 +36,7 @@ class EnergyLogLocalDatasource {
         }
       });
     } catch (e) {
-      throw LocalStorageException('Failed to bulk insert logs: $e');
+      throw const LocalStorageException('Unable to save readings offline.');
     }
   }
 
@@ -57,7 +57,7 @@ class EnergyLogLocalDatasource {
               r.value.cast<String, Object?>()))
           .toList();
     } catch (e) {
-      throw LocalStorageException('Failed to fetch energy logs: $e');
+      throw const LocalStorageException('Unable to load readings from storage.');
     }
   }
 
@@ -81,7 +81,7 @@ class EnergyLogLocalDatasource {
               r.value.cast<String, Object?>()))
           .toList();
     } catch (e) {
-      throw LocalStorageException('Failed to fetch logs by meter: $e');
+      throw const LocalStorageException('Unable to load readings for this meter.');
     }
   }
 
@@ -117,7 +117,7 @@ class EnergyLogLocalDatasource {
               r.value.cast<String, Object?>()))
           .toList();
     } catch (e) {
-      throw LocalStorageException('Failed to fetch logs in range: $e');
+      throw const LocalStorageException('Unable to load readings for selected date range.');
     }
   }
 
@@ -137,7 +137,7 @@ class EnergyLogLocalDatasource {
       return EnergyLogModel.fromMap(
           records.first.value.cast<String, Object?>());
     } catch (e) {
-      throw LocalStorageException('Failed to fetch latest log: $e');
+      throw const LocalStorageException('Unable to load previous reading.');
     }
   }
 
@@ -157,7 +157,7 @@ class EnergyLogLocalDatasource {
               r.value.cast<String, Object?>()))
           .toList();
     } catch (e) {
-      throw LocalStorageException('Failed to fetch unsynced logs: $e');
+      throw const LocalStorageException('Unable to load pending sync data.');
     }
   }
 
@@ -173,7 +173,7 @@ class EnergyLogLocalDatasource {
         await record.put(db, mutable);
       }
     } catch (e) {
-      throw LocalStorageException('Failed to mark log as synced: $e');
+      throw const LocalStorageException('Unable to update sync status.');
     }
   }
 
@@ -183,7 +183,7 @@ class EnergyLogLocalDatasource {
       final db = await _db;
       await _store.record(logId).delete(db);
     } catch (e) {
-      throw LocalStorageException('Failed to delete energy log: $e');
+      throw const LocalStorageException('Unable to delete reading.');
     }
   }
 
@@ -193,7 +193,7 @@ class EnergyLogLocalDatasource {
       final db = await _db;
       return await _store.count(db);
     } catch (e) {
-      throw LocalStorageException('Failed to count energy logs: $e');
+      throw const LocalStorageException('Unable to count readings.');
     }
   }
 }

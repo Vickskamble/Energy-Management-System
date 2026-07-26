@@ -13,6 +13,20 @@ class EnergyLogEntity {
   final bool isSynced;
   final String? userId;
 
+  final double energyCharges;
+  final double demandCharges;
+  final double facCharges;
+  final double wheelingCharges;
+  final double electricityDuty;
+  final double taxes;
+  final double pfRebate;
+  final double pfSurcharge;
+  final double subsidy;
+  final double netBill;
+  final double billingDemand;
+  final double loadFactor;
+  final double avgUnitCost;
+
   const EnergyLogEntity({
     required this.id,
     required this.meterName,
@@ -27,6 +41,19 @@ class EnergyLogEntity {
     required this.loggedAt,
     this.isSynced = false,
     this.userId,
+    this.energyCharges = 0,
+    this.demandCharges = 0,
+    this.facCharges = 0,
+    this.wheelingCharges = 0,
+    this.electricityDuty = 0,
+    this.taxes = 0,
+    this.pfRebate = 0,
+    this.pfSurcharge = 0,
+    this.subsidy = 0,
+    this.netBill = 0,
+    this.billingDemand = 0,
+    this.loadFactor = 0,
+    this.avgUnitCost = 0,
   });
 
   EnergyLogEntity copyWith({
@@ -43,6 +70,19 @@ class EnergyLogEntity {
     DateTime? loggedAt,
     bool? isSynced,
     String? userId,
+    double? energyCharges,
+    double? demandCharges,
+    double? facCharges,
+    double? wheelingCharges,
+    double? electricityDuty,
+    double? taxes,
+    double? pfRebate,
+    double? pfSurcharge,
+    double? subsidy,
+    double? netBill,
+    double? billingDemand,
+    double? loadFactor,
+    double? avgUnitCost,
   }) {
     return EnergyLogEntity(
       id: id ?? this.id,
@@ -58,6 +98,19 @@ class EnergyLogEntity {
       loggedAt: loggedAt ?? this.loggedAt,
       isSynced: isSynced ?? this.isSynced,
       userId: userId ?? this.userId,
+      energyCharges: energyCharges ?? this.energyCharges,
+      demandCharges: demandCharges ?? this.demandCharges,
+      facCharges: facCharges ?? this.facCharges,
+      wheelingCharges: wheelingCharges ?? this.wheelingCharges,
+      electricityDuty: electricityDuty ?? this.electricityDuty,
+      taxes: taxes ?? this.taxes,
+      pfRebate: pfRebate ?? this.pfRebate,
+      pfSurcharge: pfSurcharge ?? this.pfSurcharge,
+      subsidy: subsidy ?? this.subsidy,
+      netBill: netBill ?? this.netBill,
+      billingDemand: billingDemand ?? this.billingDemand,
+      loadFactor: loadFactor ?? this.loadFactor,
+      avgUnitCost: avgUnitCost ?? this.avgUnitCost,
     );
   }
 

@@ -17,7 +17,7 @@ class EnergyLogRemoteDatasource {
           .single();
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
-      throw RemoteStorageException('Network error pushing log: $e');
+      throw const RemoteStorageException('Unable to sync data. Check your connection and try again.');
     }
   }
 
@@ -31,7 +31,7 @@ class EnergyLogRemoteDatasource {
           .select();
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
-      throw RemoteStorageException('Network error pushing logs: $e');
+      throw const RemoteStorageException('Unable to sync data. Check your connection and try again.');
     }
   }
 
@@ -69,7 +69,7 @@ class EnergyLogRemoteDatasource {
           .toList();
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
-      throw RemoteStorageException('Network error fetching logs: $e');
+      throw const RemoteStorageException('Unable to fetch data from server. Check your connection.');
     }
   }
 
@@ -86,7 +86,7 @@ class EnergyLogRemoteDatasource {
       return EnergyLogModel.fromJson(data);
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
-      throw RemoteStorageException('Network error fetching log: $e');
+      throw const RemoteStorageException('Unable to fetch log from server.');
     }
   }
 
@@ -99,7 +99,7 @@ class EnergyLogRemoteDatasource {
           .eq('id', id);
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
-      throw RemoteStorageException('Network error deleting log: $e');
+      throw const RemoteStorageException('Unable to delete log from server.');
     }
   }
 

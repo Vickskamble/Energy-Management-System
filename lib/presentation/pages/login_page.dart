@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_button.dart';
 import '../auth_bloc/auth_bloc.dart';
 import '../auth_bloc/auth_event.dart';
 import '../auth_bloc/auth_state.dart';
@@ -12,15 +14,28 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  bool _obscurePass = true;
+  bool _rememberMe = false;
+  late AnimationController _animCtrl;
+  late Animation<double> _fadeIn;
+
+  @override
+  void initState() {
+    super.initState();
+    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _fadeIn = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic);
+    _animCtrl.forward();
+  }
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passCtrl.dispose();
+    _animCtrl.dispose();
     super.dispose();
   }
 
@@ -37,93 +52,223 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: BlocListener<AuthBloc, AppAuthState>(
-        listener: (context, state) {
-          if (state is AppAuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message), backgroundColor: Colors.red),
-            );
-          }
-        },
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Icon(Icons.bolt, size: 64, color: Theme.of(context).primaryColor),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Power EMS',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+      body: Row(
+        children: [
+          Expanded(
+            flex: 5,
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF1E3A5F), Color(0xFF0F172A)],
+                ),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(48),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryLight]),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 24),
                           ),
-                    ),
-                    const SizedBox(height: 32),
-                    TextFormField(
-                      controller: _emailCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.email_outlined),
+                          const SizedBox(width: 12),
+                          const Text('PowerEMS', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white)),
+                        ],
                       ),
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Email required';
-                        if (!v.contains('@')) return 'Invalid email';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.lock_outlined),
+                      const Spacer(),
+                      FadeTransition(
+                        opacity: _fadeIn,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Enterprise Energy\nManagement System',
+                              style: TextStyle(fontSize: 36, fontWeight: FontWeight.w700, color: Colors.white, height: 1.2),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Monitor, analyze, and optimize your energy consumption\nwith real-time data and AI-powered insights.',
+                              style: TextStyle(fontSize: 16, color: Colors.white.withValues(alpha: 0.7), height: 1.5),
+                            ),
+                            const SizedBox(height: 48),
+                            Row(
+                              children: [
+                                _featureBadge(Icons.analytics_rounded, 'Real-time Monitoring'),
+                                const SizedBox(width: 24),
+                                _featureBadge(Icons.auto_awesome_rounded, 'AI Insights'),
+                                const SizedBox(width: 24),
+                                _featureBadge(Icons.savings_rounded, 'Cost Optimization'),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      obscureText: true,
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Password required';
-                        if (v.length < 6) return 'Min 6 characters';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    BlocBuilder<AuthBloc, AppAuthState>(
-                      builder: (context, state) {
-                        final loading = state is AppAuthLoading;
-                        return FilledButton(
-                          onPressed: loading ? null : _submit,
-                          child: loading
-                              ? const SizedBox(
-                                  height: 20, width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Text('Sign In'),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const RegisterPage()),
+                      const Spacer(),
+                      Text(
+                        '© 2026 PowerEMS. All rights reserved.',
+                        style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.4)),
                       ),
-                      child: const Text("Don't have an account? Register"),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+          Expanded(
+            flex: 4,
+            child: SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(48),
+                  child: FadeTransition(
+                    opacity: _fadeIn,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text('Welcome back', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        const SizedBox(height: 8),
+                        const Text('Sign in to your account to continue', style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
+                        const SizedBox(height: 40),
+                        Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              TextFormField(
+                                controller: _emailCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Email address',
+                                  hintText: 'you@company.com',
+                                  prefixIcon: Icon(Icons.email_outlined),
+                                ),
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return 'Email is required';
+                                  if (!v.contains('@')) return 'Enter a valid email';
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _passCtrl,
+                                obscureText: _obscurePass,
+                                decoration: InputDecoration(
+                                  labelText: 'Password',
+                                  hintText: 'Enter your password',
+                                  prefixIcon: const Icon(Icons.lock_outlined),
+                                  suffixIcon: InkWell(
+                                    onTap: () => setState(() => _obscurePass = !_obscurePass),
+                                    child: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
+                                  ),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) return 'Password is required';
+                                  if (v.length < 6) return 'Minimum 6 characters';
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        height: 24,
+                                        width: 24,
+                                        child: Checkbox(
+                                          value: _rememberMe,
+                                          onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text('Remember me', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                    ],
+                                  ),
+                                  TextButton(
+                                    onPressed: () {},
+                                    child: const Text('Forgot password?', style: TextStyle(fontSize: 13)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              BlocConsumer<AuthBloc, AppAuthState>(
+                                listener: (context, state) {
+                                  if (state is AppAuthError) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(state.message), backgroundColor: Colors.red.shade700),
+                                    );
+                                  }
+                                },
+                                builder: (context, state) {
+                                  final loading = state is AppAuthLoading;
+                                  return AppButton(
+                                    label: 'Sign In',
+                                    onPressed: loading ? null : _submit,
+                                    icon: Icons.login_rounded,
+                                    expanded: true,
+                                    loading: loading,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text("Don't have an account?", style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                            TextButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const RegisterPage()),
+                              ),
+                              child: const Text('Create account'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _featureBadge(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: AppColors.primaryLight),
+        ),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.8))),
+      ],
     );
   }
 }

@@ -21,7 +21,7 @@ class MeterLocalDatasource {
       final db = await _db;
       await _store.record(meter.id).put(db, meter.toMap());
     } catch (e) {
-      throw LocalStorageException('Failed to insert meter: $e');
+      throw const LocalStorageException('Unable to save meter. Please try again.');
     }
   }
 
@@ -35,7 +35,7 @@ class MeterLocalDatasource {
           .map((r) => MeterModel.fromMap(r.value.cast<String, Object?>()))
           .toList();
     } catch (e) {
-      throw LocalStorageException('Failed to fetch meters: $e');
+      throw const LocalStorageException('Unable to load meters from storage.');
     }
   }
 
@@ -46,7 +46,7 @@ class MeterLocalDatasource {
       if (record == null) return null;
       return MeterModel.fromMap(record.cast<String, Object?>());
     } catch (e) {
-      throw LocalStorageException('Failed to fetch meter: $e');
+      throw const LocalStorageException('Unable to load meter details.');
     }
   }
 
@@ -55,7 +55,7 @@ class MeterLocalDatasource {
       final db = await _db;
       await _store.record(meter.id).put(db, meter.toMap());
     } catch (e) {
-      throw LocalStorageException('Failed to update meter: $e');
+      throw const LocalStorageException('Unable to update meter.');
     }
   }
 
@@ -64,7 +64,7 @@ class MeterLocalDatasource {
       final db = await _db;
       await _store.record(id).delete(db);
     } catch (e) {
-      throw LocalStorageException('Failed to delete meter: $e');
+      throw const LocalStorageException('Unable to delete meter.');
     }
   }
 }
