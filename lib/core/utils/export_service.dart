@@ -1,8 +1,7 @@
-import 'dart:io';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../domain/entities/energy_log_entity.dart';
+import 'export_service_io.dart'
+    if (dart.library.js_interop) 'export_service_web.dart' as save;
 
 class ExportService {
   Future<void> exportCsv(List<EnergyLogEntity> logs) async {
@@ -30,13 +29,7 @@ class ExportService {
       );
     }
 
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/ems_readings_export.csv');
-    await file.writeAsString(buffer.toString());
-
-    await SharePlus.instance.share(
-      ShareParams(files: [XFile(file.path)], subject: 'EMS Readings Export'),
-    );
+    await save.saveCsv(buffer.toString(), 'ems_readings_export.csv');
   }
 
   String _escapeCsv(String value) {
