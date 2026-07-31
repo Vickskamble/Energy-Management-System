@@ -286,12 +286,11 @@ class _MeterListState extends State<_MeterList> {
                                 size: 20,
                                 color: AppColors.danger,
                               ),
-                                onPressed: () async {
-                                  final repo =
-                                      context.read<MeterRepository>();
-                                  final confirmed = await showDialog<bool>(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
+                              onPressed: () async {
+                                final repo = context.read<MeterRepository>();
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
                                     title: const Text('Delete Meter'),
                                     content: Text(
                                       'Meter "${meter.name}" aur uski saari readings delete ho jayengi. Kya aap sure hain?',

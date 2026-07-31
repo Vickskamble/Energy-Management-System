@@ -1,7 +1,8 @@
 import 'package:intl/intl.dart';
 import '../../domain/entities/energy_log_entity.dart';
 import 'export_service_io.dart'
-    if (dart.library.js_interop) 'export_service_web.dart' as save;
+    if (dart.library.js_interop) 'export_service_web.dart'
+    as save;
 
 class ExportService {
   Future<void> exportCsv(List<EnergyLogEntity> logs) async {

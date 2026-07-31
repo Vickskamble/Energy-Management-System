@@ -10,7 +10,23 @@ class DashboardChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (logs.isEmpty) {
+    final now = DateTime.now();
+    final monthlySum = <int, double>{};
+    final monthlyCount = <int, int>{};
+
+    for (final log in logs) {
+      if (log.loggedAt.year == now.year) {
+        final month = log.loggedAt.month;
+        monthlySum.update(
+          month,
+          (v) => v + log.mdRecorded,
+          ifAbsent: () => log.mdRecorded,
+        );
+        monthlyCount.update(month, (v) => v + 1, ifAbsent: () => 1);
+      }
+    }
+
+    if (monthlySum.isEmpty) {
       return const SizedBox(
         height: 220,
         child: Center(
@@ -22,31 +38,27 @@ class DashboardChart extends StatelessWidget {
       );
     }
 
-    final sorted = List<EnergyLogEntity>.from(logs)
-      ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
-    final mdSpots = <FlSpot>[];
-    double maxMd = 0;
-
-    for (int i = 0; i < sorted.length; i++) {
-      final log = sorted[i];
-      final x = i.toDouble();
-      mdSpots.add(FlSpot(x, log.mdRecorded));
-      if (log.mdRecorded > maxMd) maxMd = log.mdRecorded;
+    final avgPerMonth = List<double>.filled(12, 0);
+    for (final entry in monthlySum.entries) {
+      avgPerMonth[entry.key - 1] =
+          ((entry.value / monthlyCount[entry.key]!) * 100).roundToDouble() /
+          100;
     }
 
+    final spots = <FlSpot>[
+      for (int i = 0; i < 12; i++) FlSpot(i.toDouble(), avgPerMonth[i]),
+    ];
+
     final contractDemand = AppConstants.defaultContractDemandKva;
-    final mdMaxY = (maxMd > contractDemand ? maxMd : contractDemand) * 1.2;
-    final maxX = (sorted.length - 1)
-        .toDouble()
-        .clamp(0, double.infinity)
-        .toDouble();
+    final maxAvg = avgPerMonth.reduce((a, b) => a > b ? a : b);
+    final mdMaxY = (maxAvg > contractDemand ? maxAvg : contractDemand) * 1.2;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            _legendItem(AppColors.warning, 'Max Demand (kVA)'),
+            _legendItem(AppColors.warning, 'Avg Demand (kVA)'),
             const SizedBox(width: 16),
             _dashedLegendItem(AppColors.danger, 'Contract Demand'),
           ],
@@ -57,7 +69,7 @@ class DashboardChart extends StatelessWidget {
           child: LineChart(
             LineChartData(
               minX: 0,
-              maxX: maxX,
+              maxX: 11,
               minY: 0,
               maxY: mdMaxY,
               gridData: FlGridData(
@@ -93,7 +105,7 @@ class DashboardChart extends StatelessWidget {
                     },
                   ),
                 ),
-                bottomTitles: _bottomTitles(sorted),
+                bottomTitles: _bottomTitles(),
                 topTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
@@ -104,7 +116,7 @@ class DashboardChart extends StatelessWidget {
               borderData: FlBorderData(show: false),
               lineBarsData: [
                 LineChartBarData(
-                  spots: mdSpots,
+                  spots: spots,
                   isCurved: true,
                   curveSmoothness: 0.25,
                   color: AppColors.warning,
@@ -142,7 +154,8 @@ class DashboardChart extends StatelessWidget {
                 touchTooltipData: LineTouchTooltipData(
                   getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
                     return LineTooltipItem(
-                      'kVA: ${spot.y.toStringAsFixed(1)}',
+                      'Month ${spot.x.toInt() + 1}: '
+                      'Avg Demand ${spot.y.toStringAsFixed(1)} kVA',
                       TextStyle(
                         color: AppColors.warning,
                         fontWeight: FontWeight.bold,
@@ -159,24 +172,23 @@ class DashboardChart extends StatelessWidget {
     );
   }
 
-  AxisTitles _bottomTitles(List<EnergyLogEntity> sorted) {
+  AxisTitles _bottomTitles() {
     return AxisTitles(
-      axisNameWidget: _axisLabel('Date (day/hour)'),
+      axisNameWidget: _axisLabel('Month (1-12)'),
       axisNameSize: 22,
       sideTitles: SideTitles(
         showTitles: true,
-        reservedSize: 32,
-        interval: _bottomInterval(sorted.length),
+        reservedSize: 28,
+        interval: 1,
         getTitlesWidget: (value, meta) {
-          final idx = value.toInt();
-          if (idx < 0 || idx >= sorted.length) {
+          final month = value.toInt();
+          if (month < 1 || month > 12) {
             return const SizedBox.shrink();
           }
-          final date = sorted[idx].loggedAt;
           return Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              '${date.day}/${date.hour}h',
+              '$month',
               style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
             ),
           );
@@ -229,13 +241,6 @@ class DashboardChart extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  double _bottomInterval(int count) {
-    if (count <= 5) return 1;
-    if (count <= 10) return 2;
-    if (count <= 20) return 4;
-    return (count / 5).ceilToDouble();
   }
 }
 

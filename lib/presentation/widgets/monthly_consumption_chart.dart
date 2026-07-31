@@ -11,20 +11,20 @@ class MonthlyConsumptionChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final dailyMap = <int, double>{};
+    final monthlyMap = <int, double>{};
 
     for (final log in logs) {
-      if (log.loggedAt.year == now.year && log.loggedAt.month == now.month) {
-        final day = log.loggedAt.day;
-        dailyMap.update(
-          day,
+      if (log.loggedAt.year == now.year) {
+        final month = log.loggedAt.month;
+        monthlyMap.update(
+          month,
           (v) => v + log.kwh * AppConstants.multiplyingFactor,
           ifAbsent: () => log.kwh * AppConstants.multiplyingFactor,
         );
       }
     }
 
-    if (dailyMap.isEmpty) {
+    if (monthlyMap.isEmpty) {
       return const SizedBox(
         height: 200,
         child: Center(
@@ -36,17 +36,15 @@ class MonthlyConsumptionChart extends StatelessWidget {
       );
     }
 
-    final dayNumbers = dailyMap.keys.toList()..sort();
-    final spots = <FlSpot>[];
-    double maxConsumption = 0;
-
-    for (int i = 0; i < dayNumbers.length; i++) {
-      final x = i.toDouble();
-      final y = (dailyMap[dayNumbers[i]]! * 100).roundToDouble() / 100;
-      spots.add(FlSpot(x, y));
-      if (y > maxConsumption) maxConsumption = y;
+    final months = List<double>.filled(12, 0);
+    for (final entry in monthlyMap.entries) {
+      months[entry.key - 1] = (entry.value * 100).roundToDouble() / 100;
     }
 
+    final spots = <FlSpot>[
+      for (int i = 0; i < 12; i++) FlSpot(i.toDouble(), months[i]),
+    ];
+    final maxConsumption = months.reduce((a, b) => a > b ? a : b);
     final chartMaxY = (maxConsumption * 1.2).clamp(1.0, double.infinity);
 
     return SizedBox(
@@ -54,7 +52,7 @@ class MonthlyConsumptionChart extends StatelessWidget {
       child: LineChart(
         LineChartData(
           minX: 0,
-          maxX: (dayNumbers.length - 1).toDouble().clamp(0, double.infinity),
+          maxX: 11,
           minY: 0,
           maxY: chartMaxY,
           gridData: FlGridData(
@@ -104,7 +102,7 @@ class MonthlyConsumptionChart extends StatelessWidget {
               axisNameWidget: Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Day of Month',
+                  'Month (1-12)',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -116,16 +114,16 @@ class MonthlyConsumptionChart extends StatelessWidget {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 28,
-                interval: _bottomInterval(dayNumbers.length),
+                interval: 1,
                 getTitlesWidget: (value, meta) {
-                  final idx = value.toInt();
-                  if (idx < 0 || idx >= dayNumbers.length) {
+                  final month = value.toInt();
+                  if (month < 1 || month > 12) {
                     return const SizedBox.shrink();
                   }
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      '${dayNumbers[idx]}',
+                      '$month',
                       style: TextStyle(
                         fontSize: 9,
                         color: AppColors.textSecondary,
@@ -163,7 +161,7 @@ class MonthlyConsumptionChart extends StatelessWidget {
               getTooltipItems: (touchedSpots) => touchedSpots
                   .map(
                     (spot) => LineTooltipItem(
-                      'Day ${dayNumbers[spot.spotIndex.toInt()]}: ${spot.y.toStringAsFixed(1)} kWh',
+                      'Month ${spot.x.toInt() + 1}: ${spot.y.toStringAsFixed(1)} kWh',
                       TextStyle(
                         color: AppColors.primary,
                         fontWeight: FontWeight.bold,
@@ -177,12 +175,5 @@ class MonthlyConsumptionChart extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  double _bottomInterval(int count) {
-    if (count <= 7) return 1;
-    if (count <= 15) return 2;
-    if (count <= 25) return 4;
-    return (count / 6).ceilToDouble();
   }
 }
