@@ -1,11 +1,11 @@
 {
-    "name": "ems",
-    "short_name": "ems",
+    "name": "Energy Management System",
+    "short_name": "EMS",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0F172A",
+    "theme_color": "#2563EB",
+    "description": "Track energy consumption, maximum demand, power factor and monthly bills for your meters.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/config/app_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/calculation_engine.dart';
 import '../../domain/entities/energy_log_entity.dart';
@@ -240,6 +241,7 @@ class EnergyLogModel {
   }
 
   factory EnergyLogModel.create({
+    String? id,
     required String meterName,
     required double kwh,
     required double kvah,
@@ -260,7 +262,7 @@ class EnergyLogModel {
 
     final energyCharges = CalculationEngine.calculateEnergyCharges(
       totalUnits,
-      AppConstants.tariffPerUnit,
+      AppConfig.tariffPerUnit,
     );
     final demandCharges = CalculationEngine.calculateDemandCharges(
       billingDemand,
@@ -321,7 +323,7 @@ class EnergyLogModel {
     final uid = userId ?? _tryGetCurrentUserId();
 
     return EnergyLogModel(
-      id: const Uuid().v4(),
+      id: id ?? const Uuid().v4(),
       meterName: meterName,
       kwh: (kwh * 100).round() / 100,
       kvah: (kvah * 100).round() / 100,

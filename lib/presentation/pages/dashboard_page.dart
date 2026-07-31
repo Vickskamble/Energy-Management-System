@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/constants/app_constants.dart';
@@ -22,8 +23,30 @@ import '../bloc/energy_state.dart';
 import '../widgets/dashboard_chart.dart';
 import '../widgets/monthly_consumption_chart.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      context.read<EnergyBloc>().add(const LoadInitialDashboardData());
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -157,6 +180,9 @@ class _DashboardContent extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg),
 
           _buildAlertsSection(context),
+          const SizedBox(height: AppSpacing.xl),
+
+          _buildMdBreachCard(entityLogs),
           const SizedBox(height: AppSpacing.xl),
 
           _kpiGrid(
@@ -393,6 +419,127 @@ class _DashboardContent extends StatelessWidget {
         );
       },
     );
+  }
+
+  Widget _buildMdBreachCard(List<EnergyLogEntity> logs) {
+    final events = _mdEvents(logs);
+    if (events.isEmpty) return const SizedBox.shrink();
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 18,
+                  color: AppColors.danger,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Maximum Demand History',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                '${events.length} event(s)',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          for (var i = 0; i < events.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${events[i].loggedAt.day}/${events[i].loggedAt.month}/${events[i].loggedAt.year} '
+                          '${events[i].loggedAt.hour.toString().padLeft(2, '0')}:${events[i].loggedAt.minute.toString().padLeft(2, '0')}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          events[i].meterName,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '${events[i].mdRecorded.toStringAsFixed(1)} / '
+                    '${events[i].contractDemand.toStringAsFixed(0)} kVA',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: events[i].mdRecorded >= events[i].contractDemand
+                          ? AppColors.danger
+                          : AppColors.warning,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      events[i].mdRecorded >= events[i].contractDemand
+                          ? 'BREACH'
+                          : 'NEAR',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textOnPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<EnergyLogEntity> _mdEvents(List<EnergyLogEntity> logs) {
+    final sorted = List<EnergyLogEntity>.from(logs)
+      ..sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
+    return sorted
+        .where(
+          (l) => l.mdRecorded >= l.contractDemand * AppConstants.mdWarningRatio,
+        )
+        .take(5)
+        .toList();
   }
 
   Widget _buildInsightsSection(List<InsightItem> insights) {

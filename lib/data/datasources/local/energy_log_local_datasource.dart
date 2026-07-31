@@ -182,6 +182,59 @@ class EnergyLogLocalDatasource {
     }
   }
 
+  /// Update an existing log locally (marks as unsynced so it re-syncs)
+  Future<void> updateLog(EnergyLogModel log) async {
+    try {
+      final db = await _db;
+      final map = log.toMap();
+      map['is_synced'] = 0;
+      await _store.record(log.id).put(db, map);
+    } catch (e) {
+      throw const LocalStorageException(
+        'Unable to update reading offline. Please try again.',
+      );
+    }
+  }
+
+  /// Find a log with the same meter at a near-identical timestamp (duplicate guard)
+  Future<EnergyLogModel?> findDuplicate(
+    String meterName,
+    DateTime loggedAt,
+  ) async {
+    try {
+      final db = await _db;
+      final records = await _store.find(
+        db,
+        finder: Finder(
+          filter: Filter.and([
+            Filter.equals('meter_name', meterName),
+            Filter.greaterThanOrEquals(
+              'logged_at',
+              loggedAt
+                  .subtract(const Duration(minutes: 2))
+                  .toUtc()
+                  .toIso8601String(),
+            ),
+            Filter.lessThanOrEquals(
+              'logged_at',
+              loggedAt
+                  .add(const Duration(minutes: 2))
+                  .toUtc()
+                  .toIso8601String(),
+            ),
+          ]),
+          limit: 1,
+        ),
+      );
+      if (records.isEmpty) return null;
+      return EnergyLogModel.fromMap(
+        records.first.value.cast<String, Object?>(),
+      );
+    } catch (e) {
+      throw const LocalStorageException('Unable to check for duplicates.');
+    }
+  }
+
   /// Delete a log locally
   Future<void> deleteLog(String logId) async {
     try {
@@ -189,6 +242,16 @@ class EnergyLogLocalDatasource {
       await _store.record(logId).delete(db);
     } catch (e) {
       throw const LocalStorageException('Unable to delete reading.');
+    }
+  }
+
+  /// Wipe all logs (used when the logged-in user changes)
+  Future<void> clearAll() async {
+    try {
+      final db = await _db;
+      await _store.delete(db);
+    } catch (e) {
+      throw const LocalStorageException('Unable to clear local readings.');
     }
   }
 

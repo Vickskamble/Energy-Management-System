@@ -70,4 +70,14 @@ class MeterLocalDatasource {
       throw const LocalStorageException('Unable to delete meter.');
     }
   }
+
+  /// Wipe all meters (used when the logged-in user changes)
+  Future<void> clearAll() async {
+    try {
+      final db = await _db;
+      await _store.delete(db);
+    } catch (e) {
+      throw const LocalStorageException('Unable to clear meters.');
+    }
+  }
 }

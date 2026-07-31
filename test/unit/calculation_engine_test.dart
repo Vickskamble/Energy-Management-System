@@ -4,11 +4,17 @@ import 'package:ems/core/utils/calculation_engine.dart';
 void main() {
   group('calculatePowerFactor', () {
     test('returns correct PF for valid inputs', () {
-      expect(CalculationEngine.calculatePowerFactor(100, 125), closeTo(0.800, 0.001));
+      expect(
+        CalculationEngine.calculatePowerFactor(100, 125),
+        closeTo(0.800, 0.001),
+      );
     });
 
     test('clamps PF to 1.000 maximum', () {
-      expect(CalculationEngine.calculatePowerFactor(150, 100), closeTo(1.000, 0.001));
+      expect(
+        CalculationEngine.calculatePowerFactor(150, 100),
+        closeTo(1.000, 0.001),
+      );
     });
 
     test('returns 0 when kwh is 0', () {

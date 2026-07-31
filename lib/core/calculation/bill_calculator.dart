@@ -1,4 +1,5 @@
 import '../../domain/entities/energy_log_entity.dart';
+import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import 'bill_breakdown.dart';
 import 'energy_calculator.dart';
@@ -9,11 +10,12 @@ class BillCalculator {
   static BillBreakdown calculate({
     required List<EnergyLogEntity> logs,
     double contractDemand = AppConstants.defaultContractDemandKva,
-    double energyRate = AppConstants.tariffPerUnit,
+    double? energyRate,
     double demandRate = AppConstants.demandChargePerKva,
     double facRate = AppConstants.facRatePerUnit,
     double wheelingRate = AppConstants.wheelingChargePerUnit,
   }) {
+    final effectiveEnergyRate = energyRate ?? AppConfig.tariffPerUnit;
     if (logs.isEmpty) return _emptyBreakdown(contractDemand);
 
     double totalKwh = 0;
@@ -43,7 +45,7 @@ class BillCalculator {
 
     final energyCharges = EnergyCalculator.calculateEnergyCharges(
       totalUnits,
-      energyRate,
+      effectiveEnergyRate,
     );
     final demandCharges = EnergyCalculator.calculateDemandCharges(
       billingDemand,

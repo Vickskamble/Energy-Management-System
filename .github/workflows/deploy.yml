@@ -32,6 +32,9 @@ jobs:
 
       - run: flutter pub get
 
+      - name: Run tests
+        run: flutter test
+
       - name: Build web
         run: flutter build web --release --base-href=/Energy-Management-System/
 

@@ -73,13 +73,26 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
 
       _validateConsumedValues(consumedKwh, consumedKvah);
 
-      // ── Step 3: Compute derived metrics ─────────────────────────────────
+      // ── Step 3: Duplicate guard — same meter at nearly the same time ───
+      final duplicate = await _repository.findDuplicateReading(
+        event.meterName.trim(),
+        event.loggedAt,
+      );
+      if (duplicate != null) {
+        throw ValidationException(
+          'A reading for "${event.meterName.trim()}" already exists at '
+          '${event.loggedAt.toString().substring(0, 16)}. '
+          'Use a different time or edit the existing entry.',
+        );
+      }
+
+      // ── Step 4: Compute derived metrics ─────────────────────────────────
       final powerFactor = CalculationEngine.calculatePowerFactor(
         consumedKwh,
         consumedKvah,
       );
 
-      // ── Step 4: Build domain model ───────────────────────────────────────
+      // ── Step 5: Build domain model ───────────────────────────────────────
       final model = EnergyLogModel.create(
         meterName: event.meterName,
         kwh: consumedKwh,
@@ -92,10 +105,10 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
         loggedAt: event.loggedAt,
       );
 
-      // ── Step 5: Persist locally (offline-first, is_synced = false) ──────
+      // ── Step 6: Persist locally (offline-first, is_synced = false) ──────
       await _repository.saveReading(model);
 
-      // ── Step 6: Reload dashboard data ───────────────────────────────────
+      // ── Step 7: Reload dashboard data ───────────────────────────────────
       final dashboard = await _repository.getDashboardData();
 
       emit(
