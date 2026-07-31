@@ -33,7 +33,8 @@ class AppKpiCard extends StatefulWidget {
   State<AppKpiCard> createState() => _AppKpiCardState();
 }
 
-class _AppKpiCardState extends State<AppKpiCard> with SingleTickerProviderStateMixin {
+class _AppKpiCardState extends State<AppKpiCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _anim;
   double _displayValue = 0;
@@ -41,7 +42,10 @@ class _AppKpiCardState extends State<AppKpiCard> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
     _ctrl.addListener(() {
       setState(() => _displayValue = widget.value * _anim.value);
@@ -68,75 +72,163 @@ class _AppKpiCardState extends State<AppKpiCard> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
-        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: widget.color.withValues(alpha: isDark ? 0.35 : 0.22),
+        ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 16, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: widget.color.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: widget.color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                ),
-                child: Icon(widget.icon, size: 20, color: widget.color),
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [widget.color.withValues(alpha: 0.45), widget.color],
               ),
-              const Spacer(),
-              if (widget.trendValue != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: (widget.trendUp ? AppColors.success : AppColors.danger).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(widget.trendUp ? Icons.trending_up : Icons.trending_down, size: 12,
-                          color: widget.trendUp ? AppColors.success : AppColors.danger),
-                      const SizedBox(width: 2),
-                      Text('${widget.trendValue?.toStringAsFixed(1)}%',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                              color: widget.trendUp ? AppColors.success : AppColors.danger)),
-                    ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            widget.color.withValues(alpha: 0.12),
+                            widget.color.withValues(alpha: 0.28),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
+                      ),
+                      child: Icon(widget.icon, size: 20, color: widget.color),
+                    ),
+                    const Spacer(),
+                    if (widget.trendValue != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              (widget.trendUp
+                                      ? AppColors.success
+                                      : AppColors.danger)
+                                  .withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.trendUp
+                                  ? Icons.trending_up
+                                  : Icons.trending_down,
+                              size: 12,
+                              color: widget.trendUp
+                                  ? AppColors.success
+                                  : AppColors.danger,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              '${widget.trendValue?.toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: widget.trendUp
+                                    ? AppColors.success
+                                    : AppColors.danger,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  widget.title,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
                   ),
                 ),
-            ],
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      _displayValue.toStringAsFixed(widget.decimals),
+                      style: AppTypography.mono(
+                        size: 26,
+                        weight: FontWeight.w700,
+                        color: widget.color,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.suffix,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: widget.color.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+                if (widget.trendLabel != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    widget.trendLabel!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+                if (widget.description != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    widget.description!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          Text(widget.title, style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-          const SizedBox(height: AppSpacing.xs),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                _displayValue.toStringAsFixed(widget.decimals),
-                style: AppTypography.mono(size: 28, color: isDark ? AppColors.textOnDark : AppColors.textPrimary),
-              ),
-              const SizedBox(width: 4),
-              Text(widget.suffix, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            ],
-          ),
-          if (widget.trendLabel != null) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(widget.trendLabel!, style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-          ],
-          if (widget.description != null) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(widget.description!, style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontStyle: FontStyle.italic)),
-          ],
         ],
       ),
     );

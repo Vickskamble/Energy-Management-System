@@ -124,31 +124,13 @@ class _DashboardContent extends StatelessWidget {
             title: 'Energy Overview',
             subtitle: 'Bill analysis and monitoring dashboard',
           ),
-          GridView.count(
-            crossAxisCount: 4,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.7,
-            children: [
-              AppKpiCard(
-                title: 'Bill Health Score',
-                value: kpis.billHealthScore,
-                suffix: '/100',
-                icon: Icons.health_and_safety_rounded,
-                color: kpis.billHealthScore >= 80
-                    ? AppColors.kpiEfficiency
-                    : (kpis.billHealthScore >= 60
-                          ? AppColors.warning
-                          : AppColors.danger),
-                decimals: 0,
-                description: kpis.billHealthScore >= 80
-                    ? 'Good — all parameters optimized'
-                    : kpis.billHealthScore >= 60
-                    ? 'Needs attention'
-                    : 'Critical issues',
-              ),
+          const SizedBox(height: AppSpacing.lg),
+
+          _buildAlertsSection(context),
+          const SizedBox(height: AppSpacing.xl),
+
+          _kpiGrid(
+            cards: [
               AppKpiCard(
                 title: 'Est. Monthly Bill',
                 value: estimatedBill,
@@ -159,33 +141,6 @@ class _DashboardContent extends StatelessWidget {
                 description:
                     'Avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
               ),
-              AppKpiCard(
-                title: 'Power Factor',
-                value: currentPowerFactor,
-                suffix: 'PF',
-                icon: Icons.waves_rounded,
-                color: currentPowerFactor < AppConstants.pfPenaltyThreshold
-                    ? AppColors.danger
-                    : AppColors.kpiPower,
-                decimals: 3,
-                description:
-                    currentPowerFactor >= AppConstants.pfRebateThreshold
-                    ? 'Rebate earned'
-                    : (currentPowerFactor >= AppConstants.pfSurchargeThreshold
-                          ? 'Near rebate'
-                          : 'Penalty applies'),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          GridView.count(
-            crossAxisCount: 4,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.7,
-            children: [
               AppKpiCard(
                 title: 'Total Consumption',
                 value: totalConsumption,
@@ -206,6 +161,44 @@ class _DashboardContent extends StatelessWidget {
                     : AppColors.kpiDemand,
                 description:
                     'Billing demand: ${breakdown.billingDemand.toStringAsFixed(1)} kVA',
+              ),
+              AppKpiCard(
+                title: 'Power Factor',
+                value: currentPowerFactor,
+                suffix: 'PF',
+                icon: Icons.waves_rounded,
+                color: currentPowerFactor < AppConstants.pfPenaltyThreshold
+                    ? AppColors.danger
+                    : AppColors.kpiPower,
+                decimals: 3,
+                description:
+                    currentPowerFactor >= AppConstants.pfRebateThreshold
+                    ? 'Rebate earned'
+                    : (currentPowerFactor >= AppConstants.pfSurchargeThreshold
+                          ? 'Near rebate'
+                          : 'Penalty applies'),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _kpiGrid(
+            cards: [
+              AppKpiCard(
+                title: 'Bill Health Score',
+                value: kpis.billHealthScore,
+                suffix: '/100',
+                icon: Icons.health_and_safety_rounded,
+                color: kpis.billHealthScore >= 80
+                    ? AppColors.kpiEfficiency
+                    : (kpis.billHealthScore >= 60
+                          ? AppColors.warning
+                          : AppColors.danger),
+                decimals: 0,
+                description: kpis.billHealthScore >= 80
+                    ? 'Good — all parameters optimized'
+                    : kpis.billHealthScore >= 60
+                    ? 'Needs attention'
+                    : 'Critical issues',
               ),
               AppKpiCard(
                 title: 'Load Factor',
@@ -233,41 +226,6 @@ class _DashboardContent extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.xxl),
-
-          if (breakdown.netBill > 0) _buildBillBreakdown(context, breakdown),
-          if (breakdown.netBill > 0) const SizedBox(height: AppSpacing.xl),
-
-          if (insights.isNotEmpty) ...[
-            AppSectionHeader(
-              title: 'Smart Insights',
-              subtitle: 'What these numbers mean for your business',
-            ),
-            ...insights
-                .take(4)
-                .map(
-                  (i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _InsightCard(insight: i),
-                  ),
-                ),
-            const SizedBox(height: AppSpacing.xl),
-          ],
-
-          if (recommendations.isNotEmpty) ...[
-            AppSectionHeader(
-              title: 'Recommendations',
-              subtitle: 'Actionable steps to reduce your bill',
-            ),
-            ...recommendations
-                .take(3)
-                .map(
-                  (r) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _RecommendationCard(rec: r),
-                  ),
-                ),
-            const SizedBox(height: AppSpacing.xl),
-          ],
 
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,9 +281,76 @@ class _DashboardContent extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xxl),
 
-          _buildAlertsSection(context),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (breakdown.netBill > 0)
+                Expanded(
+                  flex: 3,
+                  child: _buildBillBreakdown(context, breakdown),
+                ),
+              if (breakdown.netBill > 0 && insights.isNotEmpty)
+                const SizedBox(width: AppSpacing.lg),
+              if (insights.isNotEmpty)
+                Expanded(flex: 2, child: _buildInsightsSection(insights)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+
+          if (recommendations.isNotEmpty) ...[
+            AppSectionHeader(
+              title: 'Recommendations',
+              subtitle: 'Actionable steps to reduce your bill',
+            ),
+            ...recommendations
+                .take(3)
+                .map(
+                  (r) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _RecommendationCard(rec: r),
+                  ),
+                ),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _kpiGrid({required List<Widget> cards}) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 12.0;
+        final cardWidth = (constraints.maxWidth - spacing * 3) / 4;
+        return GridView.count(
+          crossAxisCount: 4,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: spacing,
+          mainAxisSpacing: spacing,
+          childAspectRatio: cardWidth / 200,
+          children: cards,
+        );
+      },
+    );
+  }
+
+  Widget _buildInsightsSection(List<InsightItem> insights) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppSectionHeader(
+          title: 'Smart Insights',
+          subtitle: 'What these numbers mean for your business',
+        ),
+        ...insights
+            .take(4)
+            .map(
+              (i) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _InsightCard(insight: i),
+              ),
+            ),
+      ],
     );
   }
 
