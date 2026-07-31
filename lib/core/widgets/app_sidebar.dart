@@ -51,22 +51,56 @@ class _AppSidebarState extends State<AppSidebar> {
   @override
   Widget build(BuildContext context) {
     final items = [
-      SidebarItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard_rounded, label: 'Dashboard', index: 0),
-      SidebarItem(icon: Icons.edit_note_outlined, activeIcon: Icons.edit_note_rounded, label: 'Entry', index: 1),
-      SidebarItem(icon: Icons.analytics_outlined, activeIcon: Icons.analytics_rounded, label: 'Analysis', index: 2),
-      SidebarItem(icon: Icons.description_outlined, activeIcon: Icons.description_rounded, label: 'Reports', index: 3),
-      SidebarItem(icon: Icons.speed_outlined, activeIcon: Icons.speed_rounded, label: 'Meters', index: 4),
-      SidebarItem(icon: Icons.settings_outlined, activeIcon: Icons.settings_rounded, label: 'Settings', index: 5),
+      SidebarItem(
+        icon: Icons.dashboard_outlined,
+        activeIcon: Icons.dashboard_rounded,
+        label: 'Dashboard',
+        index: 0,
+      ),
+      SidebarItem(
+        icon: Icons.edit_note_outlined,
+        activeIcon: Icons.edit_note_rounded,
+        label: 'Entry',
+        index: 1,
+      ),
+      SidebarItem(
+        icon: Icons.analytics_outlined,
+        activeIcon: Icons.analytics_rounded,
+        label: 'Analysis',
+        index: 2,
+      ),
+      SidebarItem(
+        icon: Icons.description_outlined,
+        activeIcon: Icons.description_rounded,
+        label: 'Reports',
+        index: 3,
+      ),
+      SidebarItem(
+        icon: Icons.speed_outlined,
+        activeIcon: Icons.speed_rounded,
+        label: 'Meters',
+        index: 4,
+      ),
+      SidebarItem(
+        icon: Icons.settings_outlined,
+        activeIcon: Icons.settings_rounded,
+        label: 'Settings',
+        index: 5,
+      ),
     ];
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOutCubic,
-      width: widget.isCollapsed ? AppSpacing.sidebarCollapsedWidth : AppSpacing.sidebarWidth,
+      width: widget.isCollapsed
+          ? AppSpacing.sidebarCollapsedWidth
+          : AppSpacing.sidebarWidth,
       decoration: BoxDecoration(
         color: widget.isDark ? AppColors.sidebarDark : AppColors.sidebarLight,
         border: Border(
-          right: BorderSide(color: widget.isDark ? AppColors.borderDark : AppColors.borderLight),
+          right: BorderSide(
+            color: widget.isDark ? AppColors.borderDark : AppColors.borderLight,
+          ),
         ),
         boxShadow: widget.isDark ? null : AppShadows.sidebar,
       ),
@@ -78,20 +112,35 @@ class _AppSidebarState extends State<AppSidebar> {
               horizontal: widget.isCollapsed ? 0 : AppSpacing.lg,
             ),
             child: Row(
-              mainAxisAlignment: widget.isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+              mainAxisAlignment: widget.isCollapsed
+                  ? MainAxisAlignment.center
+                  : MainAxisAlignment.start,
               children: [
                 Container(
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryLight]),
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primary, AppColors.primaryLight],
+                    ),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.bolt_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
                 if (!widget.isCollapsed) ...[
                   const SizedBox(width: 10),
-                  const Text('PowerEMS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  const Text(
+                    'PowerEMS',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -125,9 +174,15 @@ class _AppSidebarState extends State<AppSidebar> {
 
   Widget _buildUserProfile() {
     return Container(
-      padding: EdgeInsets.all(widget.isCollapsed ? AppSpacing.sm : AppSpacing.md),
+      padding: EdgeInsets.all(
+        widget.isCollapsed ? AppSpacing.sm : AppSpacing.md,
+      ),
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: widget.isDark ? AppColors.borderDark : AppColors.borderLight)),
+        border: Border(
+          top: BorderSide(
+            color: widget.isDark ? AppColors.borderDark : AppColors.borderLight,
+          ),
+        ),
       ),
       child: Column(
         children: [
@@ -135,12 +190,25 @@ class _AppSidebarState extends State<AppSidebar> {
             CircleAvatar(
               radius: 16,
               backgroundColor: AppColors.primary,
-              child: Text(widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+              child: Text(
+                widget.userName.isNotEmpty
+                    ? widget.userName[0].toUpperCase()
+                    : 'U',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             IconButton(
-              icon: Icon(widget.isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 18),
+              icon: Icon(
+                widget.isDark
+                    ? Icons.light_mode_outlined
+                    : Icons.dark_mode_outlined,
+                size: 18,
+              ),
               onPressed: widget.onThemeToggle,
               color: AppColors.textSecondary,
             ),
@@ -157,23 +225,49 @@ class _AppSidebarState extends State<AppSidebar> {
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: AppColors.primary,
-                  child: Text(widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    widget.userName.isNotEmpty
+                        ? widget.userName[0].toUpperCase()
+                        : 'U',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.userName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                          overflow: TextOverflow.ellipsis),
-                      Text(widget.userEmail, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                          overflow: TextOverflow.ellipsis),
+                      Text(
+                        widget.userName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        widget.userEmail,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: Icon(widget.isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 18),
+                  icon: Icon(
+                    widget.isDark
+                        ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined,
+                    size: 18,
+                  ),
                   onPressed: widget.onThemeToggle,
                   color: AppColors.textSecondary,
                 ),
@@ -188,9 +282,13 @@ class _AppSidebarState extends State<AppSidebar> {
                 label: const Text('Logout', style: TextStyle(fontSize: 13)),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.danger,
-                  side: BorderSide(color: AppColors.danger.withValues(alpha: 0.3)),
+                  side: BorderSide(
+                    color: AppColors.danger.withValues(alpha: 0.3),
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
             ),
@@ -233,12 +331,16 @@ class _SidebarItem extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: selected
-                  ? (isDark ? AppColors.sidebarItemActiveDark : AppColors.sidebarItemActive)
+                  ? (isDark
+                        ? AppColors.sidebarItemActiveDark
+                        : AppColors.sidebarItemActive)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
-              mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+              mainAxisAlignment: isCollapsed
+                  ? MainAxisAlignment.center
+                  : MainAxisAlignment.start,
               children: [
                 Icon(
                   selected ? item.activeIcon : item.icon,
@@ -252,8 +354,12 @@ class _SidebarItem extends StatelessWidget {
                       item.label,
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                        color: selected ? AppColors.primary : AppColors.textSecondary,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: selected
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ),

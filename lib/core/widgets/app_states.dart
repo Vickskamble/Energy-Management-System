@@ -23,7 +23,9 @@ class AppSkeleton extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: isDark ? AppColors.borderDark.withValues(alpha: 0.3) : AppColors.borderLight,
+        color: isDark
+            ? AppColors.borderDark.withValues(alpha: 0.3)
+            : AppColors.borderLight,
         borderRadius: BorderRadius.circular(borderRadius),
       ),
     );
@@ -76,16 +78,34 @@ class AppEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: AppColors.textSecondary.withValues(alpha: 0.4)),
+            Icon(
+              icon,
+              size: 64,
+              color: AppColors.textSecondary.withValues(alpha: 0.4),
+            ),
             const SizedBox(height: AppSpacing.lg),
-            Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.textSecondary)),
+            Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(color: AppColors.textSecondary),
+            ),
             if (subtitle != null) ...[
               const SizedBox(height: AppSpacing.sm),
-              Text(subtitle!, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
+              Text(
+                subtitle!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ],
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: AppSpacing.xxl),
-              AppButton(label: actionLabel!, onPressed: onAction, icon: Icons.add_rounded),
+              AppButton(
+                label: actionLabel!,
+                onPressed: onAction,
+                icon: Icons.add_rounded,
+              ),
             ],
           ],
         ),
@@ -108,12 +128,26 @@ class AppErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, size: 64, color: AppColors.danger.withValues(alpha: 0.5)),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 64,
+              color: AppColors.danger.withValues(alpha: 0.5),
+            ),
             const SizedBox(height: AppSpacing.lg),
-            Text(message, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
+            ),
             if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.xl),
-              AppButton(label: 'Retry', onPressed: onRetry, icon: Icons.refresh_rounded),
+              AppButton(
+                label: 'Retry',
+                onPressed: onRetry,
+                icon: Icons.refresh_rounded,
+              ),
             ],
           ],
         ),
@@ -136,7 +170,12 @@ class AppLoadingIndicator extends StatelessWidget {
           const CircularProgressIndicator(strokeWidth: 3),
           if (message != null) ...[
             const SizedBox(height: AppSpacing.lg),
-            Text(message!, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
+            Text(
+              message!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            ),
           ],
         ],
       ),

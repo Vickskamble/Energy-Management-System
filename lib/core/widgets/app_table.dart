@@ -24,7 +24,9 @@ class AppTable extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
-        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
@@ -46,25 +48,45 @@ class AppTable extends StatelessWidget {
               return Colors.transparent;
             }),
             border: TableBorder(
-              horizontalInside: BorderSide(color: isDark ? AppColors.borderDark : AppColors.borderLight, width: 0.5),
+              horizontalInside: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                width: 0.5,
+              ),
             ),
             columns: columns
-                .map((col) => DataColumn(
-                      label: Text(col, style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600,
+                .map(
+                  (col) => DataColumn(
+                    label: Text(
+                      col,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary,
-                      )),
-                    ))
+                      ),
+                    ),
+                  ),
+                )
                 .toList(),
             rows: rows
-                .map((row) => DataRow(
-                      cells: row.map((cell) => DataCell(
-                        DefaultTextStyle(
-                          style: TextStyle(fontSize: 13, color: isDark ? AppColors.textOnDark : AppColors.textPrimary),
-                          child: cell,
-                        ),
-                      )).toList(),
-                    ))
+                .map(
+                  (row) => DataRow(
+                    cells: row
+                        .map(
+                          (cell) => DataCell(
+                            DefaultTextStyle(
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark
+                                    ? AppColors.textOnDark
+                                    : AppColors.textPrimary,
+                              ),
+                              child: cell,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                )
                 .toList(),
           ),
         ),

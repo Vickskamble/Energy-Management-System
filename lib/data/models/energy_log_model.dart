@@ -64,91 +64,91 @@ class EnergyLogModel {
   });
 
   EnergyLogEntity toEntity() => EnergyLogEntity(
-        id: id,
-        meterName: meterName,
-        kwh: kwh,
-        kvah: kvah,
-        rkvarhLag: rkvarhLag,
-        rkvarhLead: rkvarhLead,
-        powerFactor: powerFactor,
-        mdRecorded: mdRecorded,
-        contractDemand: contractDemand,
-        estimatedBill: estimatedBill,
-        loggedAt: loggedAt,
-        isSynced: isSynced,
-        userId: userId,
-        energyCharges: energyCharges,
-        demandCharges: demandCharges,
-        facCharges: facCharges,
-        wheelingCharges: wheelingCharges,
-        electricityDuty: electricityDuty,
-        taxes: taxes,
-        pfRebate: pfRebate,
-        pfSurcharge: pfSurcharge,
-        subsidy: subsidy,
-        netBill: netBill,
-        billingDemand: billingDemand,
-        loadFactor: loadFactor,
-        avgUnitCost: avgUnitCost,
-      );
+    id: id,
+    meterName: meterName,
+    kwh: kwh,
+    kvah: kvah,
+    rkvarhLag: rkvarhLag,
+    rkvarhLead: rkvarhLead,
+    powerFactor: powerFactor,
+    mdRecorded: mdRecorded,
+    contractDemand: contractDemand,
+    estimatedBill: estimatedBill,
+    loggedAt: loggedAt,
+    isSynced: isSynced,
+    userId: userId,
+    energyCharges: energyCharges,
+    demandCharges: demandCharges,
+    facCharges: facCharges,
+    wheelingCharges: wheelingCharges,
+    electricityDuty: electricityDuty,
+    taxes: taxes,
+    pfRebate: pfRebate,
+    pfSurcharge: pfSurcharge,
+    subsidy: subsidy,
+    netBill: netBill,
+    billingDemand: billingDemand,
+    loadFactor: loadFactor,
+    avgUnitCost: avgUnitCost,
+  );
 
   factory EnergyLogModel.fromEntity(EnergyLogEntity entity) => EnergyLogModel(
-        id: entity.id,
-        meterName: entity.meterName,
-        kwh: entity.kwh,
-        kvah: entity.kvah,
-        rkvarhLag: entity.rkvarhLag,
-        rkvarhLead: entity.rkvarhLead,
-        powerFactor: entity.powerFactor,
-        mdRecorded: entity.mdRecorded,
-        contractDemand: entity.contractDemand,
-        estimatedBill: entity.estimatedBill,
-        loggedAt: entity.loggedAt,
-        isSynced: entity.isSynced,
-        userId: entity.userId,
-        energyCharges: entity.energyCharges,
-        demandCharges: entity.demandCharges,
-        facCharges: entity.facCharges,
-        wheelingCharges: entity.wheelingCharges,
-        electricityDuty: entity.electricityDuty,
-        taxes: entity.taxes,
-        pfRebate: entity.pfRebate,
-        pfSurcharge: entity.pfSurcharge,
-        subsidy: entity.subsidy,
-        netBill: entity.netBill,
-        billingDemand: entity.billingDemand,
-        loadFactor: entity.loadFactor,
-        avgUnitCost: entity.avgUnitCost,
-      );
+    id: entity.id,
+    meterName: entity.meterName,
+    kwh: entity.kwh,
+    kvah: entity.kvah,
+    rkvarhLag: entity.rkvarhLag,
+    rkvarhLead: entity.rkvarhLead,
+    powerFactor: entity.powerFactor,
+    mdRecorded: entity.mdRecorded,
+    contractDemand: entity.contractDemand,
+    estimatedBill: entity.estimatedBill,
+    loggedAt: entity.loggedAt,
+    isSynced: entity.isSynced,
+    userId: entity.userId,
+    energyCharges: entity.energyCharges,
+    demandCharges: entity.demandCharges,
+    facCharges: entity.facCharges,
+    wheelingCharges: entity.wheelingCharges,
+    electricityDuty: entity.electricityDuty,
+    taxes: entity.taxes,
+    pfRebate: entity.pfRebate,
+    pfSurcharge: entity.pfSurcharge,
+    subsidy: entity.subsidy,
+    netBill: entity.netBill,
+    billingDemand: entity.billingDemand,
+    loadFactor: entity.loadFactor,
+    avgUnitCost: entity.avgUnitCost,
+  );
 
   Map<String, Object?> toMap() => {
-        'id': id,
-        'meter_name': meterName,
-        'kwh': _toPrecision(kwh, 2),
-        'kvah': _toPrecision(kvah, 2),
-        'rkvarh_lag': _toPrecision(rkvarhLag, 2),
-        'rkvarh_lead': _toPrecision(rkvarhLead, 2),
-        'power_factor': _toPrecision(powerFactor, 3),
-        'md_recorded': _toPrecision(mdRecorded, 2),
-        'contract_demand': _toPrecision(contractDemand, 2),
-        'estimated_bill': _toPrecision(estimatedBill, 2),
-        'logged_at': loggedAt.toUtc().toIso8601String(),
-        'is_synced': isSynced ? 1 : 0,
-        if (userId != null) 'user_id': userId,
-        'energy_charges': _toPrecision(energyCharges, 2),
-        'demand_charges': _toPrecision(demandCharges, 2),
-        'fac_charges': _toPrecision(facCharges, 2),
-        'wheeling_charges': _toPrecision(wheelingCharges, 2),
-        'electricity_duty': _toPrecision(electricityDuty, 2),
-        'taxes': _toPrecision(taxes, 2),
-        'pf_rebate': _toPrecision(pfRebate, 2),
-        'pf_surcharge': _toPrecision(pfSurcharge, 2),
-        'subsidy': _toPrecision(subsidy, 2),
-        'net_bill': _toPrecision(netBill, 2),
-        'billing_demand': _toPrecision(billingDemand, 2),
-        'load_factor': _toPrecision(loadFactor, 4),
-        'avg_unit_cost': _toPrecision(avgUnitCost, 2),
-      };
+    'id': id,
+    'meter_name': meterName,
+    'kwh': _toPrecision(kwh, 2),
+    'kvah': _toPrecision(kvah, 2),
+    'rkvarh_lag': _toPrecision(rkvarhLag, 2),
+    'rkvarh_lead': _toPrecision(rkvarhLead, 2),
+    'power_factor': _toPrecision(powerFactor, 3),
+    'md_recorded': _toPrecision(mdRecorded, 2),
+    'contract_demand': _toPrecision(contractDemand, 2),
+    'estimated_bill': _toPrecision(estimatedBill, 2),
+    'logged_at': loggedAt.toUtc().toIso8601String(),
+    'is_synced': isSynced ? 1 : 0,
+    if (userId != null) 'user_id': userId,
+    'energy_charges': _toPrecision(energyCharges, 2),
+    'demand_charges': _toPrecision(demandCharges, 2),
+    'fac_charges': _toPrecision(facCharges, 2),
+    'wheeling_charges': _toPrecision(wheelingCharges, 2),
+    'electricity_duty': _toPrecision(electricityDuty, 2),
+    'taxes': _toPrecision(taxes, 2),
+    'pf_rebate': _toPrecision(pfRebate, 2),
+    'pf_surcharge': _toPrecision(pfSurcharge, 2),
+    'subsidy': _toPrecision(subsidy, 2),
+    'net_bill': _toPrecision(netBill, 2),
+    'billing_demand': _toPrecision(billingDemand, 2),
+    'load_factor': _toPrecision(loadFactor, 4),
+    'avg_unit_cost': _toPrecision(avgUnitCost, 2),
+  };
 
   factory EnergyLogModel.fromMap(Map<String, Object?> map) {
     return EnergyLogModel(
@@ -182,32 +182,32 @@ class EnergyLogModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'meter_name': meterName,
-        'kwh': (kwh * 100).round() / 100,
-        'kvah': (kvah * 100).round() / 100,
-        'rkvarh_lag': (rkvarhLag * 100).round() / 100,
-        'rkvarh_lead': (rkvarhLead * 100).round() / 100,
-        'power_factor': (powerFactor * 1000).round() / 1000,
-        'md_recorded': (mdRecorded * 100).round() / 100,
-        'contract_demand': (contractDemand * 100).round() / 100,
-        'estimated_bill': (estimatedBill * 100).round() / 100,
-        'logged_at': loggedAt.toUtc().toIso8601String(),
-        if (userId != null) 'user_id': userId,
-        'energy_charges': (energyCharges * 100).round() / 100,
-        'demand_charges': (demandCharges * 100).round() / 100,
-        'fac_charges': (facCharges * 100).round() / 100,
-        'wheeling_charges': (wheelingCharges * 100).round() / 100,
-        'electricity_duty': (electricityDuty * 100).round() / 100,
-        'taxes': (taxes * 100).round() / 100,
-        'pf_rebate': (pfRebate * 100).round() / 100,
-        'pf_surcharge': (pfSurcharge * 100).round() / 100,
-        'subsidy': (subsidy * 100).round() / 100,
-        'net_bill': (netBill * 100).round() / 100,
-        'billing_demand': (billingDemand * 100).round() / 100,
-        'load_factor': (loadFactor * 1000).round() / 1000,
-        'avg_unit_cost': (avgUnitCost * 100).round() / 100,
-      };
+    'id': id,
+    'meter_name': meterName,
+    'kwh': (kwh * 100).round() / 100,
+    'kvah': (kvah * 100).round() / 100,
+    'rkvarh_lag': (rkvarhLag * 100).round() / 100,
+    'rkvarh_lead': (rkvarhLead * 100).round() / 100,
+    'power_factor': (powerFactor * 1000).round() / 1000,
+    'md_recorded': (mdRecorded * 100).round() / 100,
+    'contract_demand': (contractDemand * 100).round() / 100,
+    'estimated_bill': (estimatedBill * 100).round() / 100,
+    'logged_at': loggedAt.toUtc().toIso8601String(),
+    if (userId != null) 'user_id': userId,
+    'energy_charges': (energyCharges * 100).round() / 100,
+    'demand_charges': (demandCharges * 100).round() / 100,
+    'fac_charges': (facCharges * 100).round() / 100,
+    'wheeling_charges': (wheelingCharges * 100).round() / 100,
+    'electricity_duty': (electricityDuty * 100).round() / 100,
+    'taxes': (taxes * 100).round() / 100,
+    'pf_rebate': (pfRebate * 100).round() / 100,
+    'pf_surcharge': (pfSurcharge * 100).round() / 100,
+    'subsidy': (subsidy * 100).round() / 100,
+    'net_bill': (netBill * 100).round() / 100,
+    'billing_demand': (billingDemand * 100).round() / 100,
+    'load_factor': (loadFactor * 1000).round() / 1000,
+    'avg_unit_cost': (avgUnitCost * 100).round() / 100,
+  };
 
   factory EnergyLogModel.fromJson(Map<String, dynamic> json) {
     return EnergyLogModel(
@@ -253,27 +253,71 @@ class EnergyLogModel {
   }) {
     final pf = powerFactor ?? CalculationEngine.calculatePowerFactor(kwh, kvah);
     final totalUnits = kwh * AppConstants.multiplyingFactor;
-    final billingDemand = CalculationEngine.calculateBillingDemand(mdRecorded, contractDemand);
+    final billingDemand = CalculationEngine.calculateBillingDemand(
+      mdRecorded,
+      contractDemand,
+    );
 
-    final energyCharges = CalculationEngine.calculateEnergyCharges(totalUnits, AppConstants.tariffPerUnit);
-    final demandCharges = CalculationEngine.calculateDemandCharges(billingDemand, AppConstants.demandChargePerKva);
-    final facCharges = CalculationEngine.calculateFac(totalUnits, AppConstants.facRatePerUnit);
-    final wheelingCharges = CalculationEngine.calculateWheelingCharges(totalUnits, AppConstants.wheelingChargePerUnit);
+    final energyCharges = CalculationEngine.calculateEnergyCharges(
+      totalUnits,
+      AppConstants.tariffPerUnit,
+    );
+    final demandCharges = CalculationEngine.calculateDemandCharges(
+      billingDemand,
+      AppConstants.demandChargePerKva,
+    );
+    final facCharges = CalculationEngine.calculateFac(
+      totalUnits,
+      AppConstants.facRatePerUnit,
+    );
+    final wheelingCharges = CalculationEngine.calculateWheelingCharges(
+      totalUnits,
+      AppConstants.wheelingChargePerUnit,
+    );
 
-    final subtotal = energyCharges + demandCharges + facCharges + wheelingCharges;
-    final electricityDuty = CalculationEngine.calculateElectricityDuty(subtotal, AppConstants.electricityDutyPercent);
-    final taxes = CalculationEngine.calculateTaxes(subtotal + electricityDuty, AppConstants.taxPercent);
+    final subtotal =
+        energyCharges + demandCharges + facCharges + wheelingCharges;
+    final electricityDuty = CalculationEngine.calculateElectricityDuty(
+      subtotal,
+      AppConstants.electricityDutyPercent,
+    );
+    final taxes = CalculationEngine.calculateTaxes(
+      subtotal + electricityDuty,
+      AppConstants.taxPercent,
+    );
 
-    final pfRebate = CalculationEngine.calculatePfRebate(energyCharges, demandCharges, pf);
-    final pfSurcharge = CalculationEngine.calculatePfSurcharge(energyCharges, demandCharges, pf);
-    final subsidy = AppConstants.subsidyPercent > 0 ? subtotal * AppConstants.subsidyPercent / 100 : 0.0;
+    final pfRebate = CalculationEngine.calculatePfRebate(
+      energyCharges,
+      demandCharges,
+      pf,
+    );
+    final pfSurcharge = CalculationEngine.calculatePfSurcharge(
+      energyCharges,
+      demandCharges,
+      pf,
+    );
+    final subsidy = AppConstants.subsidyPercent > 0
+        ? subtotal * AppConstants.subsidyPercent / 100
+        : 0.0;
 
-    final netBill = energyCharges + demandCharges + facCharges + wheelingCharges +
-        electricityDuty + taxes + pfSurcharge - pfRebate - subsidy;
+    final netBill =
+        energyCharges +
+        demandCharges +
+        facCharges +
+        wheelingCharges +
+        electricityDuty +
+        taxes +
+        pfSurcharge -
+        pfRebate -
+        subsidy;
 
     final avgUnitCost = totalUnits > 0 ? netBill / totalUnits : 0.0;
 
-    final bill = CalculationEngine.calculateEstimatedBill(kwh: kwh, mdRecorded: mdRecorded, powerFactor: pf);
+    final bill = CalculationEngine.calculateEstimatedBill(
+      kwh: kwh,
+      mdRecorded: mdRecorded,
+      powerFactor: pf,
+    );
     final uid = userId ?? _tryGetCurrentUserId();
 
     return EnergyLogModel(

@@ -18,7 +18,10 @@ class MeterManagementPage extends StatelessWidget {
     return _MeterList();
   }
 
-  static Future<void> _showMeterDialog(BuildContext context, {MeterModel? existing}) async {
+  static Future<void> showMeterDialog(
+    BuildContext context, {
+    MeterModel? existing,
+  }) async {
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
     final locationCtrl = TextEditingController(text: existing?.location ?? '');
     final demandCtrl = TextEditingController(
@@ -37,23 +40,41 @@ class MeterManagementPage extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AppTextField(controller: nameCtrl, label: 'Meter Name', prefixIcon: Icons.speed_rounded,
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
+              AppTextField(
+                controller: nameCtrl,
+                label: 'Meter Name',
+                prefixIcon: Icons.speed_rounded,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Required' : null,
+              ),
               const SizedBox(height: 12),
-              AppTextField(controller: locationCtrl, label: 'Location (optional)', prefixIcon: Icons.location_on_outlined),
+              AppTextField(
+                controller: locationCtrl,
+                label: 'Location (optional)',
+                prefixIcon: Icons.location_on_outlined,
+              ),
               const SizedBox(height: 12),
-              AppTextField(controller: demandCtrl, label: 'Contract Demand (kW)', prefixIcon: Icons.trending_up,
-                  keyboardType: TextInputType.number,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Required';
-                    if (double.tryParse(v.trim()) == null) return 'Invalid number';
-                    return null;
-                  }),
+              AppTextField(
+                controller: demandCtrl,
+                label: 'Contract Demand (kVA)',
+                prefixIcon: Icons.trending_up,
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Required';
+                  if (double.tryParse(v.trim()) == null) {
+                    return 'Invalid number';
+                  }
+                  return null;
+                },
+              ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           AppButton(
             label: 'Save',
             onPressed: () {
@@ -63,13 +84,17 @@ class MeterManagementPage extends StatelessWidget {
                   ? MeterModel(
                       id: existing.id,
                       name: nameCtrl.text.trim(),
-                      location: locationCtrl.text.trim().isEmpty ? null : locationCtrl.text.trim(),
+                      location: locationCtrl.text.trim().isEmpty
+                          ? null
+                          : locationCtrl.text.trim(),
                       contractDemandKw: double.parse(demandCtrl.text.trim()),
                       isActive: existing.isActive,
                     )
                   : MeterModel.create(
                       name: nameCtrl.text.trim(),
-                      location: locationCtrl.text.trim().isEmpty ? null : locationCtrl.text.trim(),
+                      location: locationCtrl.text.trim().isEmpty
+                          ? null
+                          : locationCtrl.text.trim(),
                       contractDemandKw: double.parse(demandCtrl.text.trim()),
                     );
               if (existing != null) {
@@ -114,105 +139,219 @@ class _MeterListState extends State<_MeterList> {
 
   List<MeterModel> get _filteredMeters {
     if (_searchQuery.isEmpty) return _meters;
-    return _meters.where((m) =>
-        m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-        (m.location?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false)).toList();
+    return _meters
+        .where(
+          (m) =>
+              m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              (m.location?.toLowerCase().contains(_searchQuery.toLowerCase()) ??
+                  false),
+        )
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     if (_meters.isEmpty) {
-      return const AppEmptyState(
-        icon: Icons.speed_rounded,
-        title: 'No meters configured',
-        subtitle: 'Tap + to add your first meter',
+      return Stack(
+        children: [
+          const AppEmptyState(
+            icon: Icons.speed_rounded,
+            title: 'No meters configured',
+            subtitle: 'Tap + to add your first meter',
+          ),
+          Positioned(
+            right: AppSpacing.lg,
+            bottom: AppSpacing.lg,
+            child: _addMeterFab(context),
+          ),
+        ],
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.page, AppSpacing.page, 0),
-          child: AppSectionHeader(
-            title: 'Meter Management',
-            subtitle: '${_meters.length} meter(s) configured',
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Search meters...',
-              prefixIcon: const Icon(Icons.search_rounded, size: 20),
-              isDense: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.page,
+                AppSpacing.page,
+                AppSpacing.page,
+                0,
+              ),
+              child: AppSectionHeader(
+                title: 'Meter Management',
+                subtitle: '${_meters.length} meter(s) configured',
+              ),
             ),
-            onChanged: (v) => setState(() => _searchQuery = v),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _load,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(AppSpacing.page),
-              itemCount: _filteredMeters.length,
-              itemBuilder: (context, index) {
-                final meter = _filteredMeters[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: AppCard(
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44, height: 44,
-                          decoration: BoxDecoration(
-                            color: (meter.isActive ? AppColors.success : AppColors.textSecondary).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(meter.isActive ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                              color: meter.isActive ? AppColors.success : AppColors.textSecondary, size: 22),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(meter.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 2),
-                              Text('${meter.contractDemandKw.toStringAsFixed(0)} kW${meter.location != null ? ' — ${meter.location}' : ''}',
-                                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 20),
-                          onPressed: () async {
-                            await MeterManagementPage._showMeterDialog(context, existing: meter);
-                            _load();
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.danger),
-                          onPressed: () async {
-                            final repo = context.read<MeterRepository>();
-                            await repo.deleteMeter(meter.id);
-                            _load();
-                          },
-                        ),
-                      ],
-                    ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search meters...',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                );
-              },
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                ),
+                onChanged: (v) => setState(() => _searchQuery = v),
+              ),
             ),
-          ),
+            const SizedBox(height: AppSpacing.sm),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _load,
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.page,
+                    0,
+                    AppSpacing.page,
+                    88,
+                  ),
+                  itemCount: _filteredMeters.length,
+                  itemBuilder: (context, index) {
+                    final meter = _filteredMeters[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: AppCard(
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color:
+                                    (meter.isActive
+                                            ? AppColors.success
+                                            : AppColors.textSecondary)
+                                        .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                meter.isActive
+                                    ? Icons.check_circle_rounded
+                                    : Icons.cancel_rounded,
+                                color: meter.isActive
+                                    ? AppColors.success
+                                    : AppColors.textSecondary,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    meter.name,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Contract: ${meter.contractDemandKw.toStringAsFixed(0)} kVA${meter.location != null ? ' — ${meter.location}' : ''}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 20),
+                              onPressed: () async {
+                                await MeterManagementPage.showMeterDialog(
+                                  context,
+                                  existing: meter,
+                                );
+                                _load();
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: 20,
+                                color: AppColors.danger,
+                              ),
+                                onPressed: () async {
+                                  final repo =
+                                      context.read<MeterRepository>();
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                    title: const Text('Delete Meter'),
+                                    content: Text(
+                                      'Meter "${meter.name}" aur uski saari readings delete ho jayengi. Kya aap sure hain?',
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, true),
+                                        child: const Text(
+                                          'Delete',
+                                          style: TextStyle(
+                                            color: AppColors.danger,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true) return;
+                                await repo.deleteMeter(meter.id);
+                                _load();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          right: AppSpacing.lg,
+          bottom: AppSpacing.lg,
+          child: _addMeterFab(context),
         ),
       ],
+    );
+  }
+
+  Widget _addMeterFab(BuildContext context) {
+    return FloatingActionButton.extended(
+      onPressed: () async {
+        await MeterManagementPage.showMeterDialog(context);
+        _load();
+      },
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      icon: const Icon(Icons.add_rounded),
+      label: const Text('Add Meter'),
     );
   }
 }

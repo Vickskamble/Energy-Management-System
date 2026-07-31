@@ -35,9 +35,16 @@ class _ErrorBoundaryStateState extends State<_ErrorBoundaryState> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline_rounded, size: 48, color: AppColors.danger),
+              Icon(
+                Icons.error_outline_rounded,
+                size: 48,
+                color: AppColors.danger,
+              ),
               const SizedBox(height: 16),
-              const Text('Rendering Error', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              const Text(
+                'Rendering Error',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 8),
               Text(
                 details.exceptionAsString(),
@@ -48,7 +55,10 @@ class _ErrorBoundaryStateState extends State<_ErrorBoundaryState> {
               Text(
                 details.stack?.toString().split('\n').take(5).join('\n') ?? '',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.5), fontSize: 11),
+                style: TextStyle(
+                  color: AppColors.textSecondary.withValues(alpha: 0.5),
+                  fontSize: 11,
+                ),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(

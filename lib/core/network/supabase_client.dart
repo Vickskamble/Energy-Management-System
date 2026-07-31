@@ -16,10 +16,7 @@ class SupabaseClientManager {
       );
     }
 
-    await Supabase.initialize(
-      url: url,
-      publishableKey: anonKey,
-    );
+    await Supabase.initialize(url: url, publishableKey: anonKey);
 
     _instance = Supabase.instance.client;
     return _instance!;

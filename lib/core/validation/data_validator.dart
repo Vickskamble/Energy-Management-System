@@ -62,7 +62,9 @@ class DataValidator {
 
     if (kwh != null && kvah != null && kvah > 0 && kwh > 0) {
       if (kwh > kvah) {
-        warnings.add('kWh ($kwh) > kVAh ($kvah) — possible meter reading error');
+        warnings.add(
+          'kWh ($kwh) > kVAh ($kvah) — possible meter reading error',
+        );
       } else {
         passed.add('kWh <= kVAh (valid ratio)');
       }
@@ -78,19 +80,27 @@ class DataValidator {
 
     if (contractDemand != null && mdRecorded != null && contractDemand > 0) {
       if (mdRecorded > contractDemand) {
-        warnings.add('MD ($mdRecorded) exceeds Contract Demand ($contractDemand)');
+        warnings.add(
+          'MD ($mdRecorded) exceeds Contract Demand ($contractDemand)',
+        );
       }
       if (mdRecorded > contractDemand * 0.9) {
-        warnings.add('MD ($mdRecorded) is >90% of Contract Demand ($contractDemand)');
+        warnings.add(
+          'MD ($mdRecorded) is >90% of Contract Demand ($contractDemand)',
+        );
       }
     }
 
     if (powerFactor == null) {
-      warnings.add('Power Factor is missing — will be calculated from kWh/kVAh');
+      warnings.add(
+        'Power Factor is missing — will be calculated from kWh/kVAh',
+      );
     } else if (powerFactor < 0 || powerFactor > 1) {
       errors.add('Power Factor must be between 0 and 1 (got $powerFactor)');
     } else if (powerFactor < AppConstants.pfPenaltyThreshold) {
-      warnings.add('PF ($powerFactor) below threshold (${AppConstants.pfPenaltyThreshold})');
+      warnings.add(
+        'PF ($powerFactor) below threshold (${AppConstants.pfPenaltyThreshold})',
+      );
     } else {
       passed.add('PF ($powerFactor) meets threshold');
     }
@@ -98,7 +108,9 @@ class DataValidator {
     if (kwh != null && kvah != null && kvah > 0) {
       final calculatedPf = (kwh / kvah).clamp(0.0, 1.0);
       if (powerFactor != null && (powerFactor - calculatedPf).abs() > 0.02) {
-        warnings.add('PF mismatch: reported $powerFactor vs calculated $calculatedPf');
+        warnings.add(
+          'PF mismatch: reported $powerFactor vs calculated $calculatedPf',
+        );
       }
     }
 
@@ -118,7 +130,9 @@ class DataValidator {
     if (breakdown.averageUnitCost < 0) {
       errors.add('Average unit cost is negative');
     } else {
-      passed.add('Average unit cost = ₹${breakdown.averageUnitCost.toStringAsFixed(2)}');
+      passed.add(
+        'Average unit cost = ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
+      );
     }
 
     if (breakdown.energyCharges < 0) {
@@ -128,23 +142,37 @@ class DataValidator {
       errors.add('Demand charges are negative');
     }
 
-    final reconstructedTotal = breakdown.energyCharges + breakdown.demandCharges +
-        breakdown.facCharges + breakdown.wheelingCharges +
-        breakdown.electricityDuty + breakdown.taxes +
-        breakdown.pfSurcharge - breakdown.pfRebate - breakdown.subsidy;
+    final reconstructedTotal =
+        breakdown.energyCharges +
+        breakdown.demandCharges +
+        breakdown.facCharges +
+        breakdown.wheelingCharges +
+        breakdown.electricityDuty +
+        breakdown.taxes +
+        breakdown.pfSurcharge -
+        breakdown.pfRebate -
+        breakdown.subsidy;
 
     if ((reconstructedTotal - breakdown.netBill).abs() > 1) {
-      errors.add('Bill mismatch: reconstructed $reconstructedTotal vs reported ${breakdown.netBill}');
+      errors.add(
+        'Bill mismatch: reconstructed $reconstructedTotal vs reported ${breakdown.netBill}',
+      );
     } else {
       passed.add('Bill totals are consistent');
     }
 
-    if (breakdown.powerFactor < AppConstants.pfPenaltyThreshold && breakdown.pfRebate > 0) {
-      errors.add('PF rebate applied but PF (${breakdown.powerFactor}) is below threshold (${AppConstants.pfPenaltyThreshold})');
+    if (breakdown.powerFactor < AppConstants.pfPenaltyThreshold &&
+        breakdown.pfRebate > 0) {
+      errors.add(
+        'PF rebate applied but PF (${breakdown.powerFactor}) is below threshold (${AppConstants.pfPenaltyThreshold})',
+      );
     }
 
-    if (breakdown.powerFactor < AppConstants.pfSurchargeThreshold && breakdown.pfSurcharge <= 0) {
-      warnings.add('PF below ${AppConstants.pfSurchargeThreshold} but no surcharge applied');
+    if (breakdown.powerFactor < AppConstants.pfSurchargeThreshold &&
+        breakdown.pfSurcharge <= 0) {
+      warnings.add(
+        'PF below ${AppConstants.pfSurchargeThreshold} but no surcharge applied',
+      );
     }
 
     return ValidationResult(
@@ -162,20 +190,31 @@ class DataValidator {
 
     if (comparison.previous == null) {
       warnings.add('No previous month data for comparison');
-      return ValidationResult(isValid: true, errors: errors, warnings: warnings, passed: passed);
+      return ValidationResult(
+        isValid: true,
+        errors: errors,
+        warnings: warnings,
+        passed: passed,
+      );
     }
 
     if ((comparison.current.netBill - comparison.previous!.netBill).abs() !=
         comparison.billDifference.abs()) {
       errors.add('Bill difference mismatch');
     } else {
-      passed.add('Bill difference = ₹${comparison.billDifference.toStringAsFixed(0)}');
+      passed.add(
+        'Bill difference = ₹${comparison.billDifference.toStringAsFixed(0)}',
+      );
     }
 
     if (comparison.billPercentChange > 50) {
-      warnings.add('Bill increased by ${comparison.billPercentChange.toStringAsFixed(0)}%');
+      warnings.add(
+        'Bill increased by ${comparison.billPercentChange.toStringAsFixed(0)}%',
+      );
     } else if (comparison.billPercentChange < -50) {
-      warnings.add('Bill decreased by ${comparison.billPercentChange.toStringAsFixed(0)}%');
+      warnings.add(
+        'Bill decreased by ${comparison.billPercentChange.toStringAsFixed(0)}%',
+      );
     }
 
     return ValidationResult(
@@ -193,18 +232,28 @@ class DataValidator {
 
     if (logs.isEmpty) {
       errors.add('No readings available for analysis');
-      return ValidationResult(isValid: false, errors: errors, warnings: warnings, passed: passed);
+      return ValidationResult(
+        isValid: false,
+        errors: errors,
+        warnings: warnings,
+        passed: passed,
+      );
     }
 
     passed.add('${logs.length} readings available');
 
-    final sortedLogs = [...logs]..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+    final sortedLogs = [...logs]
+      ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
     for (int i = 1; i < sortedLogs.length; i++) {
       if (sortedLogs[i].kwh < sortedLogs[i - 1].kwh) {
-        warnings.add('Cumulative kWh decreased from ${sortedLogs[i - 1].kwh} to ${sortedLogs[i].kwh} on ${sortedLogs[i].loggedAt}');
+        warnings.add(
+          'Cumulative kWh decreased from ${sortedLogs[i - 1].kwh} to ${sortedLogs[i].kwh} on ${sortedLogs[i].loggedAt}',
+        );
       }
       if (sortedLogs[i].kvah < sortedLogs[i - 1].kvah) {
-        warnings.add('Cumulative kVAh decreased from ${sortedLogs[i - 1].kvah} to ${sortedLogs[i].kvah} on ${sortedLogs[i].loggedAt}');
+        warnings.add(
+          'Cumulative kVAh decreased from ${sortedLogs[i - 1].kvah} to ${sortedLogs[i].kvah} on ${sortedLogs[i].loggedAt}',
+        );
       }
     }
     passed.add('Cumulative values are consistent');

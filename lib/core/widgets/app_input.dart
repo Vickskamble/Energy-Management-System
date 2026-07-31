@@ -78,7 +78,12 @@ class AppDropdown<T> extends StatelessWidget {
         labelText: label,
         prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20) : null,
       ),
-      items: items.map((item) => DropdownMenuItem(value: item, child: Text(itemLabel(item)))).toList(),
+      items: items
+          .map(
+            (item) =>
+                DropdownMenuItem(value: item, child: Text(itemLabel(item))),
+          )
+          .toList(),
       onChanged: onChanged,
     );
   }
@@ -115,7 +120,8 @@ class AppDatePicker extends StatelessWidget {
           lastDate: lastDate ?? DateTime(2030),
         );
         if (date != null) {
-          controller.text = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+          controller.text =
+              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
         }
       },
     );

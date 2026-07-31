@@ -38,13 +38,21 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       height: AppSpacing.topBarHeight,
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-        border: Border(bottom: BorderSide(color: isDark ? AppColors.borderDark : AppColors.borderLight)),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.borderDark : AppColors.borderLight,
+          ),
+        ),
       ),
       child: Row(
         children: [
           ?leading,
           if (onMenuTap != null)
-            IconButton(icon: const Icon(Icons.menu_rounded), onPressed: onMenuTap, tooltip: 'Menu'),
+            IconButton(
+              icon: const Icon(Icons.menu_rounded),
+              onPressed: onMenuTap,
+              tooltip: 'Menu',
+            ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
@@ -53,13 +61,23 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
               children: [
                 Text(title, style: Theme.of(context).textTheme.titleLarge),
                 if (subtitle != null)
-                  Text(subtitle!, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
               ],
             ),
           ),
           ...?actions,
           if (showSearch)
-            IconButton(icon: const Icon(Icons.search_rounded), onPressed: () {}, tooltip: 'Search'),
+            IconButton(
+              icon: const Icon(Icons.search_rounded),
+              onPressed: () {},
+              tooltip: 'Search',
+            ),
           if (showNotifications)
             Stack(
               children: [
@@ -82,7 +100,11 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                       child: Center(
                         child: Text(
                           notificationCount > 9 ? '9+' : '$notificationCount',
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -90,7 +112,11 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
               ],
             ),
           if (showSettings)
-            IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () {}, tooltip: 'Settings'),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () {},
+              tooltip: 'Settings',
+            ),
           const SizedBox(width: AppSpacing.sm),
         ],
       ),
@@ -109,9 +135,13 @@ class AppBreadcrumb extends StatelessWidget {
       children: List.generate(items.length * 2 - 1, (i) {
         if (i.isOdd) {
           return const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 6),
-          child: Icon(Icons.chevron_right, size: 14, color: AppColors.textSecondary),
-        );
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: Icon(
+              Icons.chevron_right,
+              size: 14,
+              color: AppColors.textSecondary,
+            ),
+          );
         }
         final idx = i ~/ 2;
         final isLast = idx == items.length - 1;

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
 import '../../core/utils/notification_service.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_kpi_card.dart';
@@ -10,6 +11,8 @@ import '../../core/widgets/app_section.dart';
 import '../../core/widgets/app_states.dart';
 import '../../core/calculation/bill_breakdown.dart';
 import '../../core/calculation/bill_calculator.dart';
+import '../../core/calculation/bill_forecast.dart';
+import '../../core/calculation/savings_opportunity.dart';
 import '../../core/insights/insight_generator.dart';
 import '../../core/recommendations/recommendation_engine.dart';
 import '../../domain/entities/energy_log_entity.dart';
@@ -101,9 +104,36 @@ class _DashboardContent extends StatelessWidget {
     final entityLogs = logs.cast<EnergyLogEntity>();
     final breakdown = BillCalculator.calculate(logs: entityLogs);
     final kpis = BillCalculator.calculateKpis(breakdown);
+    final now = DateTime.now();
+    final currentMonthLogs = entityLogs
+        .where(
+          (l) => l.loggedAt.year == now.year && l.loggedAt.month == now.month,
+        )
+        .toList();
+    final previousMonth = DateTime(now.year, now.month - 1, 1);
+    final previousMonthLogs = entityLogs
+        .where(
+          (l) =>
+              l.loggedAt.year == previousMonth.year &&
+              l.loggedAt.month == previousMonth.month,
+        )
+        .toList();
+    final currentMonthBreakdown = currentMonthLogs.isEmpty
+        ? null
+        : BillCalculator.calculate(logs: currentMonthLogs);
+    final previousBreakdown = previousMonthLogs.isEmpty
+        ? null
+        : BillCalculator.calculate(logs: previousMonthLogs);
+    final comparison = currentMonthBreakdown == null
+        ? null
+        : BillCalculator.compare(currentMonthBreakdown, previousBreakdown);
+    final forecast = BillForecastCalculator.calculate(
+      monthLogs: currentMonthLogs,
+    );
+    final opportunities = SavingOpportunityGenerator.generate(breakdown);
     final insights = InsightGenerator.generate(
       breakdown: breakdown,
-      comparison: null,
+      comparison: comparison,
       kpis: kpis,
       logs: entityLogs,
     );
@@ -227,6 +257,27 @@ class _DashboardContent extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xxl),
 
+          if (opportunities.isNotEmpty) ...[
+            AppSectionHeader(
+              title: 'Bill Saving Opportunities',
+              subtitle: 'Direct monthly savings — priority order me',
+            ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < opportunities.length; i++) ...[
+                  if (i > 0) const SizedBox(width: AppSpacing.lg),
+                  Expanded(
+                    child: _SavingOpportunityCard(
+                      opportunity: opportunities[i],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+          ],
+
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -238,7 +289,7 @@ class _DashboardContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Consumption & Demand Trend',
+                        'Demand Trend (kVA)',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -277,6 +328,16 @@ class _DashboardContent extends StatelessWidget {
                   ),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildComparisonCard(comparison)),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(child: _buildForecastCard(forecast)),
             ],
           ),
           const SizedBox(height: AppSpacing.xxl),
@@ -351,6 +412,292 @@ class _DashboardContent extends StatelessWidget {
               ),
             ),
       ],
+    );
+  }
+
+  Widget _buildComparisonCard(MonthComparison? comparison) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.compare_arrows_rounded,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Month Comparison',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (comparison != null && comparison.isBillDecreased)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.savings_rounded,
+                        size: 12,
+                        color: AppColors.success,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        'Saved ₹${comparison.billDifference.abs().toStringAsFixed(0)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (comparison == null || comparison.current.netBill <= 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'Is month abhi tak koi reading nahi',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            )
+          else ...[
+            _comparisonRow(
+              label: 'Est. Bill',
+              value: '₹${comparison.current.netBill.toStringAsFixed(0)}',
+              chipText: comparison.previous == null
+                  ? 'first month'
+                  : '${comparison.billDifference >= 0 ? '↑' : '↓'} ${comparison.billPercentChange.abs().toStringAsFixed(1)}%',
+              isGood: comparison.billDifference <= 0,
+              chipNeutral: comparison.previous == null,
+            ),
+            const Divider(height: 20),
+            _comparisonRow(
+              label: 'Consumption',
+              value: '${comparison.current.totalUnits.toStringAsFixed(0)} kWh',
+              chipText: comparison.previous == null
+                  ? 'first month'
+                  : '${comparison.unitDifference >= 0 ? '↑' : '↓'} ${comparison.unitPercentChange.abs().toStringAsFixed(1)}%',
+              isGood: comparison.unitDifference <= 0,
+              chipNeutral: comparison.previous == null,
+            ),
+            const Divider(height: 20),
+            _comparisonRow(
+              label: 'Max Demand',
+              value:
+                  '${comparison.current.billingDemand.toStringAsFixed(1)} kVA',
+              chipText: comparison.previous == null
+                  ? 'first month'
+                  : '${comparison.demandDifference >= 0 ? '↑' : '↓'} ${comparison.demandPercentChange.abs().toStringAsFixed(1)}%',
+              isGood: comparison.demandDifference <= 0,
+              chipNeutral: comparison.previous == null,
+            ),
+            const Divider(height: 20),
+            _comparisonRow(
+              label: 'Power Factor',
+              value: comparison.current.powerFactor.toStringAsFixed(3),
+              chipText: comparison.previous == null
+                  ? 'first month'
+                  : 'vs ${comparison.previous!.powerFactor.toStringAsFixed(3)}',
+              isGood: comparison.pfDifference >= 0,
+              chipNeutral: comparison.previous == null,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _comparisonRow({
+    required String label,
+    required String value,
+    required String chipText,
+    required bool isGood,
+    bool chipNeutral = false,
+  }) {
+    final chipColor = chipNeutral
+        ? AppColors.textSecondary
+        : (isGood ? AppColors.success : AppColors.danger);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: chipColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              chipText,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: chipColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildForecastCard(BillForecast? forecast) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.kpiCost.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.insights_rounded,
+                  size: 18,
+                  color: AppColors.kpiCost,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Bill Forecast',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (forecast == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'Is month abhi tak koi reading nahi',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            )
+          else ...[
+            Text(
+              'Projected Month-End Bill',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '₹${forecast.projectedBill.toStringAsFixed(0)}',
+              style: AppTypography.mono(
+                size: 28,
+                weight: FontWeight.w700,
+                color: AppColors.kpiCost,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '≈ ${forecast.projectedUnits.toStringAsFixed(0)} kWh units',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const Divider(height: 24),
+            Row(
+              children: [
+                _forecastStat(
+                  'Avg / day',
+                  '₹${forecast.dailyAverageBill.toStringAsFixed(0)}',
+                ),
+                _forecastStat(
+                  'Days left',
+                  '${forecast.daysInMonth - forecast.daysElapsed}',
+                ),
+                _forecastStat(
+                  'Progress',
+                  '${(forecast.daysElapsed / forecast.daysInMonth * 100).toStringAsFixed(0)}%',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: forecast.daysElapsed / forecast.daysInMonth,
+                minHeight: 6,
+                color: AppColors.kpiCost,
+                backgroundColor: AppColors.kpiCost.withValues(alpha: 0.12),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Aaj ki usage rate par estimated — readings badhne par update hoga',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontStyle: FontStyle.italic,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _forecastStat(String label, String value) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
     );
   }
 
@@ -634,6 +981,108 @@ class _DashboardContent extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _SavingOpportunityCard extends StatelessWidget {
+  final SavingOpportunity opportunity;
+  const _SavingOpportunityCard({required this.opportunity});
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, color) = switch (opportunity.type) {
+      SavingType.demandReduction => (
+        Icons.trending_down_rounded,
+        AppColors.kpiDemand,
+      ),
+      SavingType.powerFactorImprovement => (
+        Icons.waves_rounded,
+        AppColors.kpiPower,
+      ),
+      SavingType.loadSmoothing => (
+        Icons.linear_scale_rounded,
+        AppColors.kpiEnergy,
+      ),
+    };
+    return AppCard(
+      color: AppColors.success.withValues(alpha: 0.04),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 18, color: color),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'SAVE',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                    color: AppColors.success,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '₹${opportunity.monthlySavings.toStringAsFixed(0)}/month',
+            style: AppTypography.mono(
+              size: 24,
+              weight: FontWeight.w700,
+              color: AppColors.success,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            opportunity.title,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            opportunity.description,
+            style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.arrow_forward_rounded,
+                size: 13,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  opportunity.action,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

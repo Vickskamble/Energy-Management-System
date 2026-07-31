@@ -27,11 +27,25 @@ void main() async {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.danger),
+              const Icon(
+                Icons.error_outline_rounded,
+                size: 48,
+                color: AppColors.danger,
+              ),
               const SizedBox(height: 16),
-              const Text('Something went wrong', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              const Text(
+                'Something went wrong',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 8),
-              Text(details.exceptionAsString(), textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              Text(
+                details.exceptionAsString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ],
           ),
         ),
@@ -49,9 +63,7 @@ void main() async {
 
   final repository = EnergyRepository();
 
-  runApp(
-    EmsApp(repository: repository),
-  );
+  runApp(EmsApp(repository: repository));
 }
 
 class EmsApp extends StatefulWidget {
@@ -68,8 +80,9 @@ class _EmsAppState extends State<EmsApp> {
 
   void _toggleTheme() {
     setState(() {
-      _themeMode =
-          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+      _themeMode = _themeMode == ThemeMode.light
+          ? ThemeMode.dark
+          : ThemeMode.light;
     });
   }
 
@@ -97,10 +110,7 @@ class _AppEntry extends StatefulWidget {
   final ThemeMode themeMode;
   final VoidCallback onToggleTheme;
 
-  const _AppEntry({
-    required this.themeMode,
-    required this.onToggleTheme,
-  });
+  const _AppEntry({required this.themeMode, required this.onToggleTheme});
 
   @override
   State<_AppEntry> createState() => _AppEntryState();
@@ -138,12 +148,14 @@ class _AppEntryState extends State<_AppEntry> {
       home: BlocBuilder<AuthBloc, AppAuthState>(
         builder: (context, state) {
           return switch (state) {
-            AppAuthInitial() || AppAuthLoading() || AppAuthUnauthenticated() || AppAuthError _ =>
-              const LoginPage(),
+            AppAuthInitial() ||
+            AppAuthLoading() ||
+            AppAuthUnauthenticated() ||
+            AppAuthError _ => const LoginPage(),
             AppAuthAuthenticated() => MainNavigationHub(
-                onToggleTheme: widget.onToggleTheme,
-                isDark: widget.themeMode == ThemeMode.dark,
-              ),
+              onToggleTheme: widget.onToggleTheme,
+              isDark: widget.themeMode == ThemeMode.dark,
+            ),
           };
         },
       ),

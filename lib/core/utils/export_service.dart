@@ -9,21 +9,25 @@ class ExportService {
     final dateFmt = DateFormat('yyyy-MM-dd HH:mm');
     final buffer = StringBuffer();
 
-    buffer.writeln('ID,Meter,kWh,kVAh,Power Factor,MD (kW),Contract Demand (kW),Est. Bill (₹),Logged At,Synced');
+    buffer.writeln(
+      'ID,Meter,kWh,kVAh,Power Factor,MD (kW),Contract Demand (kW),Est. Bill (₹),Logged At,Synced',
+    );
 
     for (final log in logs) {
-      buffer.writeln([
-        _escapeCsv(log.id),
-        _escapeCsv(log.meterName),
-        log.kwh.toStringAsFixed(2),
-        log.kvah.toStringAsFixed(2),
-        log.powerFactor.toStringAsFixed(3),
-        log.mdRecorded.toStringAsFixed(2),
-        log.contractDemand.toStringAsFixed(2),
-        log.estimatedBill.toStringAsFixed(2),
-        _escapeCsv(dateFmt.format(log.loggedAt)),
-        log.isSynced ? 'Yes' : 'No',
-      ].join(','));
+      buffer.writeln(
+        [
+          _escapeCsv(log.id),
+          _escapeCsv(log.meterName),
+          log.kwh.toStringAsFixed(2),
+          log.kvah.toStringAsFixed(2),
+          log.powerFactor.toStringAsFixed(3),
+          log.mdRecorded.toStringAsFixed(2),
+          log.contractDemand.toStringAsFixed(2),
+          log.estimatedBill.toStringAsFixed(2),
+          _escapeCsv(dateFmt.format(log.loggedAt)),
+          log.isSynced ? 'Yes' : 'No',
+        ].join(','),
+      );
     }
 
     final dir = await getTemporaryDirectory();
@@ -31,10 +35,7 @@ class ExportService {
     await file.writeAsString(buffer.toString());
 
     await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile(file.path)],
-        subject: 'EMS Readings Export',
-      ),
+      ShareParams(files: [XFile(file.path)], subject: 'EMS Readings Export'),
     );
   }
 

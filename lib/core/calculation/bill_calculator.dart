@@ -30,24 +30,55 @@ class BillCalculator {
       mdCount++;
     }
 
-    final powerFactor = totalKvah > 0 ? EnergyCalculator.calculatePowerFactor(totalKwh, totalKvah) : 0.0;
+    final powerFactor = totalKvah > 0
+        ? EnergyCalculator.calculatePowerFactor(totalKwh, totalKvah)
+        : 0.0;
     final totalUnits = totalKwh * AppConstants.multiplyingFactor;
-    final billingDemand = EnergyCalculator.calculateBillingDemand(peakMd, contractDemand);
+    final billingDemand = EnergyCalculator.calculateBillingDemand(
+      peakMd,
+      contractDemand,
+    );
     final avgDemand = mdCount > 0 ? sumMd / mdCount.toDouble() : 0.0;
     final loadFactor = EnergyCalculator.calculateLoadFactor(avgDemand, peakMd);
 
-    final energyCharges = EnergyCalculator.calculateEnergyCharges(totalUnits, energyRate);
-    final demandCharges = EnergyCalculator.calculateDemandCharges(billingDemand, demandRate);
+    final energyCharges = EnergyCalculator.calculateEnergyCharges(
+      totalUnits,
+      energyRate,
+    );
+    final demandCharges = EnergyCalculator.calculateDemandCharges(
+      billingDemand,
+      demandRate,
+    );
     final facCharges = EnergyCalculator.calculateFac(totalUnits, facRate);
-    final wheelingCharges = EnergyCalculator.calculateWheelingCharges(totalUnits, wheelingRate);
+    final wheelingCharges = EnergyCalculator.calculateWheelingCharges(
+      totalUnits,
+      wheelingRate,
+    );
 
-    final subtotal = energyCharges + demandCharges + facCharges + wheelingCharges;
-    final electricityDuty = EnergyCalculator.calculateElectricityDuty(subtotal, AppConstants.electricityDutyPercent);
-    final taxes = EnergyCalculator.calculateTaxes(subtotal + electricityDuty, AppConstants.taxPercent);
+    final subtotal =
+        energyCharges + demandCharges + facCharges + wheelingCharges;
+    final electricityDuty = EnergyCalculator.calculateElectricityDuty(
+      subtotal,
+      AppConstants.electricityDutyPercent,
+    );
+    final taxes = EnergyCalculator.calculateTaxes(
+      subtotal + electricityDuty,
+      AppConstants.taxPercent,
+    );
 
-    final pfRebate = EnergyCalculator.calculatePfRebate(energyCharges, demandCharges, powerFactor);
-    final pfSurcharge = EnergyCalculator.calculatePfSurcharge(energyCharges, demandCharges, powerFactor);
-    final subsidy = AppConstants.subsidyPercent > 0 ? subtotal * AppConstants.subsidyPercent / 100 : 0.0;
+    final pfRebate = EnergyCalculator.calculatePfRebate(
+      energyCharges,
+      demandCharges,
+      powerFactor,
+    );
+    final pfSurcharge = EnergyCalculator.calculatePfSurcharge(
+      energyCharges,
+      demandCharges,
+      powerFactor,
+    );
+    final subsidy = AppConstants.subsidyPercent > 0
+        ? subtotal * AppConstants.subsidyPercent / 100
+        : 0.0;
 
     final netBill = EnergyCalculator.calculateTotalBill(
       energyCharges: energyCharges,
@@ -61,7 +92,10 @@ class BillCalculator {
       subsidy: subsidy,
     );
 
-    final averageUnitCost = EnergyCalculator.calculateAverageUnitCost(netBill, totalUnits);
+    final averageUnitCost = EnergyCalculator.calculateAverageUnitCost(
+      netBill,
+      totalUnits,
+    );
 
     return BillBreakdown(
       totalUnits: totalUnits,
@@ -83,7 +117,10 @@ class BillCalculator {
     );
   }
 
-  static MonthComparison compare(BillBreakdown current, BillBreakdown? previous) {
+  static MonthComparison compare(
+    BillBreakdown current,
+    BillBreakdown? previous,
+  ) {
     if (previous == null) {
       return MonthComparison(
         current: current,
@@ -99,39 +136,107 @@ class BillCalculator {
     return MonthComparison(
       current: current,
       previous: previous,
-      billDifference: (EnergyCalculator.calculateDifference(current.netBill, previous.netBill) * 100).roundToDouble() / 100,
-      billPercentChange: (EnergyCalculator.calculatePercentChange(current.netBill, previous.netBill) * 100).roundToDouble() / 100,
-      unitDifference: (EnergyCalculator.calculateDifference(current.totalUnits, previous.totalUnits) * 100).roundToDouble() / 100,
-      unitPercentChange: (EnergyCalculator.calculatePercentChange(current.totalUnits, previous.totalUnits) * 100).roundToDouble() / 100,
-      demandDifference: (EnergyCalculator.calculateDifference(current.billingDemand, previous.billingDemand) * 100).roundToDouble() / 100,
-      demandPercentChange: (EnergyCalculator.calculatePercentChange(current.billingDemand, previous.billingDemand) * 100).roundToDouble() / 100,
-      pfDifference: (EnergyCalculator.calculateDifference(current.powerFactor, previous.powerFactor) * 1000).roundToDouble() / 1000,
+      billDifference:
+          (EnergyCalculator.calculateDifference(
+                    current.netBill,
+                    previous.netBill,
+                  ) *
+                  100)
+              .roundToDouble() /
+          100,
+      billPercentChange:
+          (EnergyCalculator.calculatePercentChange(
+                    current.netBill,
+                    previous.netBill,
+                  ) *
+                  100)
+              .roundToDouble() /
+          100,
+      unitDifference:
+          (EnergyCalculator.calculateDifference(
+                    current.totalUnits,
+                    previous.totalUnits,
+                  ) *
+                  100)
+              .roundToDouble() /
+          100,
+      unitPercentChange:
+          (EnergyCalculator.calculatePercentChange(
+                    current.totalUnits,
+                    previous.totalUnits,
+                  ) *
+                  100)
+              .roundToDouble() /
+          100,
+      demandDifference:
+          (EnergyCalculator.calculateDifference(
+                    current.billingDemand,
+                    previous.billingDemand,
+                  ) *
+                  100)
+              .roundToDouble() /
+          100,
+      demandPercentChange:
+          (EnergyCalculator.calculatePercentChange(
+                    current.billingDemand,
+                    previous.billingDemand,
+                  ) *
+                  100)
+              .roundToDouble() /
+          100,
+      pfDifference:
+          (EnergyCalculator.calculateDifference(
+                    current.powerFactor,
+                    previous.powerFactor,
+                  ) *
+                  1000)
+              .roundToDouble() /
+          1000,
     );
   }
 
   static BusinessKpi calculateKpis(BillBreakdown breakdown) {
     return BusinessKpi(
-      billHealthScore: (EnergyCalculator.calculateBillHealthScore(
-        powerFactor: breakdown.powerFactor,
-        loadFactor: breakdown.loadFactor,
-        billingDemand: breakdown.billingDemand,
-        contractDemand: breakdown.contractDemand,
-        pfSurcharge: breakdown.pfSurcharge,
-      ) * 100).roundToDouble() / 100,
-      energyScore: (EnergyCalculator.calculateEnergyScore(
-        powerFactor: breakdown.powerFactor,
-        loadFactor: breakdown.loadFactor,
-        averageUnitCost: breakdown.averageUnitCost,
-      ) * 100).roundToDouble() / 100,
+      billHealthScore:
+          (EnergyCalculator.calculateBillHealthScore(
+                    powerFactor: breakdown.powerFactor,
+                    loadFactor: breakdown.loadFactor,
+                    billingDemand: breakdown.billingDemand,
+                    contractDemand: breakdown.contractDemand,
+                    pfSurcharge: breakdown.pfSurcharge,
+                  ) *
+                  100)
+              .roundToDouble() /
+          100,
+      energyScore:
+          (EnergyCalculator.calculateEnergyScore(
+                    powerFactor: breakdown.powerFactor,
+                    loadFactor: breakdown.loadFactor,
+                    averageUnitCost: breakdown.averageUnitCost,
+                  ) *
+                  100)
+              .roundToDouble() /
+          100,
     );
   }
 
   static BillBreakdown _emptyBreakdown(double contractDemand) {
     return BillBreakdown(
-      totalUnits: 0, energyCharges: 0, demandCharges: 0, facCharges: 0,
-      wheelingCharges: 0, electricityDuty: 0, taxes: 0, pfRebate: 0,
-      pfSurcharge: 0, subsidy: 0, netBill: 0, billingDemand: 0,
-      contractDemand: contractDemand, powerFactor: 0, loadFactor: 0,
+      totalUnits: 0,
+      energyCharges: 0,
+      demandCharges: 0,
+      facCharges: 0,
+      wheelingCharges: 0,
+      electricityDuty: 0,
+      taxes: 0,
+      pfRebate: 0,
+      pfSurcharge: 0,
+      subsidy: 0,
+      netBill: 0,
+      billingDemand: 0,
+      contractDemand: contractDemand,
+      powerFactor: 0,
+      loadFactor: 0,
       averageUnitCost: 0,
     );
   }

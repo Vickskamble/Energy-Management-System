@@ -46,10 +46,12 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
       final authState = data as AuthState;
       final session = authState.session;
       if (session != null) {
-        emit(AppAuthAuthenticated(
-          userId: session.user.id,
-          email: session.user.email ?? '',
-        ));
+        emit(
+          AppAuthAuthenticated(
+            userId: session.user.id,
+            email: session.user.email ?? '',
+          ),
+        );
       } else {
         emit(const AppAuthUnauthenticated());
       }
@@ -67,10 +69,12 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
     try {
       final session = Supabase.instance.client.auth.currentSession;
       if (session != null) {
-        emit(AppAuthAuthenticated(
-          userId: session.user.id,
-          email: session.user.email ?? '',
-        ));
+        emit(
+          AppAuthAuthenticated(
+            userId: session.user.id,
+            email: session.user.email ?? '',
+          ),
+        );
       } else {
         emit(const AppAuthUnauthenticated());
       }
@@ -89,10 +93,12 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
         await SupabaseClientManager.initialize();
         _trySetupAuthListener();
       }
-      await Supabase.instance.client.auth.signInWithPassword(
-        email: event.email.trim(),
-        password: event.password,
-      ).timeout(const Duration(seconds: 15));
+      await Supabase.instance.client.auth
+          .signInWithPassword(
+            email: event.email.trim(),
+            password: event.password,
+          )
+          .timeout(const Duration(seconds: 15));
     } on TimeoutException {
       emit(const AppAuthError('Connection timed out. Check your network.'));
     } on AuthException catch (e) {
@@ -112,10 +118,9 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
         await SupabaseClientManager.initialize();
         _trySetupAuthListener();
       }
-      await Supabase.instance.client.auth.signUp(
-        email: event.email.trim(),
-        password: event.password,
-      ).timeout(const Duration(seconds: 15));
+      await Supabase.instance.client.auth
+          .signUp(email: event.email.trim(), password: event.password)
+          .timeout(const Duration(seconds: 15));
     } on TimeoutException {
       emit(const AppAuthError('Connection timed out. Check your network.'));
     } on AuthException catch (e) {
@@ -131,8 +136,9 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
   ) async {
     emit(const AppAuthLoading());
     try {
-      await Supabase.instance.client.auth.signOut()
-          .timeout(const Duration(seconds: 15));
+      await Supabase.instance.client.auth.signOut().timeout(
+        const Duration(seconds: 15),
+      );
       emit(const AppAuthUnauthenticated());
     } on TimeoutException {
       emit(const AppAuthError('Connection timed out. Check your network.'));

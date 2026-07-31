@@ -22,7 +22,9 @@ class EnergyLogLocalDatasource {
       final db = await _db;
       await _store.record(log.id).put(db, log.toMap());
     } catch (e) {
-      throw const LocalStorageException('Unable to save reading offline. Please try again.');
+      throw const LocalStorageException(
+        'Unable to save reading offline. Please try again.',
+      );
     }
   }
 
@@ -53,11 +55,12 @@ class EnergyLogLocalDatasource {
         ),
       );
       return records
-          .map((r) => EnergyLogModel.fromMap(
-              r.value.cast<String, Object?>()))
+          .map((r) => EnergyLogModel.fromMap(r.value.cast<String, Object?>()))
           .toList();
     } catch (e) {
-      throw const LocalStorageException('Unable to load readings from storage.');
+      throw const LocalStorageException(
+        'Unable to load readings from storage.',
+      );
     }
   }
 
@@ -77,11 +80,12 @@ class EnergyLogLocalDatasource {
         ),
       );
       return records
-          .map((r) => EnergyLogModel.fromMap(
-              r.value.cast<String, Object?>()))
+          .map((r) => EnergyLogModel.fromMap(r.value.cast<String, Object?>()))
           .toList();
     } catch (e) {
-      throw const LocalStorageException('Unable to load readings for this meter.');
+      throw const LocalStorageException(
+        'Unable to load readings for this meter.',
+      );
     }
   }
 
@@ -113,11 +117,12 @@ class EnergyLogLocalDatasource {
         ),
       );
       return records
-          .map((r) => EnergyLogModel.fromMap(
-              r.value.cast<String, Object?>()))
+          .map((r) => EnergyLogModel.fromMap(r.value.cast<String, Object?>()))
           .toList();
     } catch (e) {
-      throw const LocalStorageException('Unable to load readings for selected date range.');
+      throw const LocalStorageException(
+        'Unable to load readings for selected date range.',
+      );
     }
   }
 
@@ -135,7 +140,8 @@ class EnergyLogLocalDatasource {
       );
       if (records.isEmpty) return null;
       return EnergyLogModel.fromMap(
-          records.first.value.cast<String, Object?>());
+        records.first.value.cast<String, Object?>(),
+      );
     } catch (e) {
       throw const LocalStorageException('Unable to load previous reading.');
     }
@@ -153,8 +159,7 @@ class EnergyLogLocalDatasource {
         ),
       );
       return records
-          .map((r) => EnergyLogModel.fromMap(
-              r.value.cast<String, Object?>()))
+          .map((r) => EnergyLogModel.fromMap(r.value.cast<String, Object?>()))
           .toList();
     } catch (e) {
       throw const LocalStorageException('Unable to load pending sync data.');

@@ -26,7 +26,8 @@ class AppDialog extends StatelessWidget {
     this.destructive = false,
   });
 
-  static Future<bool?> show(BuildContext context, {
+  static Future<bool?> show(
+    BuildContext context, {
     required String title,
     required Widget content,
     String confirmLabel = 'Confirm',
@@ -55,9 +56,24 @@ class AppDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      titlePadding: EdgeInsets.fromLTRB(AppSpacing.xxl, AppSpacing.xxl, AppSpacing.xxl, 0),
-      contentPadding: EdgeInsets.fromLTRB(AppSpacing.xxl, AppSpacing.lg, AppSpacing.xxl, 0),
-      actionsPadding: EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.lg),
+      titlePadding: EdgeInsets.fromLTRB(
+        AppSpacing.xxl,
+        AppSpacing.xxl,
+        AppSpacing.xxl,
+        0,
+      ),
+      contentPadding: EdgeInsets.fromLTRB(
+        AppSpacing.xxl,
+        AppSpacing.lg,
+        AppSpacing.xxl,
+        0,
+      ),
+      actionsPadding: EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Column(
         children: [

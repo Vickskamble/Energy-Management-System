@@ -5,7 +5,7 @@ class MeterRepository {
   final MeterLocalDatasource _local;
 
   MeterRepository({MeterLocalDatasource? local})
-      : _local = local ?? MeterLocalDatasource();
+    : _local = local ?? MeterLocalDatasource();
 
   Future<List<MeterModel>> getAllMeters() => _local.getAllMeters();
 

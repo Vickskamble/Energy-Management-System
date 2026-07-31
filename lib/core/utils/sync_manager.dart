@@ -8,7 +8,7 @@ class SyncManager {
   final Connectivity _connectivity;
 
   SyncManager({Connectivity? connectivity})
-      : _connectivity = connectivity ?? Connectivity();
+    : _connectivity = connectivity ?? Connectivity();
 
   void start(EnergyBloc bloc) {
     _subscription = _connectivity.onConnectivityChanged.listen((results) {

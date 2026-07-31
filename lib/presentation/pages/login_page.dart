@@ -12,7 +12,8 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
+class _LoginPageState extends State<LoginPage>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
@@ -24,7 +25,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
     _fadeIn = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic);
     _animCtrl.forward();
   }
@@ -40,11 +44,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     context.read<AuthBloc>().add(
-          AppAuthLoginRequested(
-            email: _emailCtrl.text.trim(),
-            password: _passCtrl.text,
-          ),
-        );
+      AppAuthLoginRequested(
+        email: _emailCtrl.text.trim(),
+        password: _passCtrl.text,
+      ),
+    );
   }
 
   @override
@@ -74,13 +78,29 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryLight]),
+                              gradient: const LinearGradient(
+                                colors: [
+                                  AppColors.primary,
+                                  AppColors.primaryLight,
+                                ],
+                              ),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 24),
+                            child: const Icon(
+                              Icons.bolt_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: 12),
-                          const Text('PowerEMS', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white)),
+                          const Text(
+                            'PowerEMS',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
                         ],
                       ),
                       const Spacer(),
@@ -91,21 +111,39 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           children: [
                             const Text(
                               'Enterprise Energy\nManagement System',
-                              style: TextStyle(fontSize: 36, fontWeight: FontWeight.w700, color: Colors.white, height: 1.2),
+                              style: TextStyle(
+                                fontSize: 36,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                height: 1.2,
+                              ),
                             ),
                             const SizedBox(height: 16),
                             Text(
                               'Monitor, analyze, and optimize your energy consumption\nwith real-time data and AI-powered insights.',
-                              style: TextStyle(fontSize: 16, color: Colors.white.withValues(alpha: 0.7), height: 1.5),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white.withValues(alpha: 0.7),
+                                height: 1.5,
+                              ),
                             ),
                             const SizedBox(height: 48),
                             Wrap(
                               spacing: 16,
                               runSpacing: 8,
                               children: [
-                                _featureBadge(Icons.analytics_rounded, 'Real-time Monitoring'),
-                                _featureBadge(Icons.auto_awesome_rounded, 'AI Insights'),
-                                _featureBadge(Icons.savings_rounded, 'Cost Optimization'),
+                                _featureBadge(
+                                  Icons.analytics_rounded,
+                                  'Real-time Monitoring',
+                                ),
+                                _featureBadge(
+                                  Icons.auto_awesome_rounded,
+                                  'AI Insights',
+                                ),
+                                _featureBadge(
+                                  Icons.savings_rounded,
+                                  'Cost Optimization',
+                                ),
                               ],
                             ),
                           ],
@@ -114,7 +152,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       const Spacer(),
                       Text(
                         '© 2026 PowerEMS. All rights reserved.',
-                        style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.4)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.4),
+                        ),
                       ),
                     ],
                   ),
@@ -134,9 +175,22 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text('Welcome back', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        const Text(
+                          'Welcome back',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
                         const SizedBox(height: 8),
-                        const Text('Sign in to your account to continue', style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
+                        const Text(
+                          'Sign in to your account to continue',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                         const SizedBox(height: 40),
                         Form(
                           key: _formKey,
@@ -152,8 +206,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 ),
                                 keyboardType: TextInputType.emailAddress,
                                 validator: (v) {
-                                  if (v == null || v.trim().isEmpty) return 'Email is required';
-                                  if (!v.contains('@')) return 'Enter a valid email';
+                                  if (v == null || v.trim().isEmpty) {
+                                    return 'Email is required';
+                                  }
+                                  if (!v.contains('@')) {
+                                    return 'Enter a valid email';
+                                  }
                                   return null;
                                 },
                               ),
@@ -166,19 +224,31 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   hintText: 'Enter your password',
                                   prefixIcon: const Icon(Icons.lock_outlined),
                                   suffixIcon: InkWell(
-                                    onTap: () => setState(() => _obscurePass = !_obscurePass),
-                                    child: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
+                                    onTap: () => setState(
+                                      () => _obscurePass = !_obscurePass,
+                                    ),
+                                    child: Icon(
+                                      _obscurePass
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                                 validator: (v) {
-                                  if (v == null || v.isEmpty) return 'Password is required';
-                                  if (v.length < 6) return 'Minimum 6 characters';
+                                  if (v == null || v.isEmpty) {
+                                    return 'Password is required';
+                                  }
+                                  if (v.length < 6) {
+                                    return 'Minimum 6 characters';
+                                  }
                                   return null;
                                 },
                               ),
                               const SizedBox(height: 12),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -188,17 +258,29 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                         width: 24,
                                         child: Checkbox(
                                           value: _rememberMe,
-                                          onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          onChanged: (v) => setState(
+                                            () => _rememberMe = v ?? false,
+                                          ),
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      const Text('Remember me', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                      const Text(
+                                        'Remember me',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   TextButton(
                                     onPressed: () {},
-                                    child: const Text('Forgot password?', style: TextStyle(fontSize: 13)),
+                                    child: const Text(
+                                      'Forgot password?',
+                                      style: TextStyle(fontSize: 13),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -207,7 +289,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 listener: (context, state) {
                                   if (state is AppAuthError) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(state.message), backgroundColor: Colors.red.shade700),
+                                      SnackBar(
+                                        content: Text(state.message),
+                                        backgroundColor: Colors.red.shade700,
+                                      ),
                                     );
                                   }
                                 },
@@ -229,11 +314,19 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text("Don't have an account?", style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                            const Text(
+                              "Don't have an account?",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
                             TextButton(
                               onPressed: () => Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const RegisterPage()),
+                                MaterialPageRoute(
+                                  builder: (_) => const RegisterPage(),
+                                ),
                               ),
                               child: const Text('Create account'),
                             ),
@@ -265,7 +358,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           child: Icon(icon, size: 16, color: AppColors.primaryLight),
         ),
         const SizedBox(width: 8),
-        Text(label, style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.8))),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.white.withValues(alpha: 0.8),
+          ),
+        ),
       ],
     );
   }

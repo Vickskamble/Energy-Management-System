@@ -17,7 +17,9 @@ class EnergyLogRemoteDatasource {
           .single();
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
-      throw const RemoteStorageException('Unable to sync data. Check your connection and try again.');
+      throw const RemoteStorageException(
+        'Unable to sync data. Check your connection and try again.',
+      );
     }
   }
 
@@ -31,7 +33,9 @@ class EnergyLogRemoteDatasource {
           .select();
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
-      throw const RemoteStorageException('Unable to sync data. Check your connection and try again.');
+      throw const RemoteStorageException(
+        'Unable to sync data. Check your connection and try again.',
+      );
     }
   }
 
@@ -44,9 +48,7 @@ class EnergyLogRemoteDatasource {
     int? offset,
   }) async {
     try {
-      var query = _client
-          .from(AppConstants.energyLogsTable)
-          .select('*');
+      var query = _client.from(AppConstants.energyLogsTable).select('*');
 
       if (from != null) {
         query = query.gte('logged_at', from.toUtc().toIso8601String());
@@ -60,16 +62,19 @@ class EnergyLogRemoteDatasource {
 
       var ordered = query.order('logged_at', ascending: false);
       if (limit != null) ordered = ordered.limit(limit);
-      if (offset != null) ordered = ordered.range(offset, offset + (limit ?? 50) - 1);
+      if (offset != null) {
+        ordered = ordered.range(offset, offset + (limit ?? 50) - 1);
+      }
 
       final data = await ordered;
       return (data as List<dynamic>)
-          .map((json) =>
-              EnergyLogModel.fromJson(json as Map<String, dynamic>))
+          .map((json) => EnergyLogModel.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
-      throw const RemoteStorageException('Unable to fetch data from server. Check your connection.');
+      throw const RemoteStorageException(
+        'Unable to fetch data from server. Check your connection.',
+      );
     }
   }
 
@@ -93,10 +98,7 @@ class EnergyLogRemoteDatasource {
   /// Delete a log on remote
   Future<void> deleteLog(String id) async {
     try {
-      await _client
-          .from(AppConstants.energyLogsTable)
-          .delete()
-          .eq('id', id);
+      await _client.from(AppConstants.energyLogsTable).delete().eq('id', id);
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
       throw const RemoteStorageException('Unable to delete log from server.');
@@ -106,10 +108,7 @@ class EnergyLogRemoteDatasource {
   /// Check if Supabase is reachable (connectivity check)
   Future<bool> healthCheck() async {
     try {
-      await _client
-          .from(AppConstants.energyLogsTable)
-          .select('id')
-          .limit(1);
+      await _client.from(AppConstants.energyLogsTable).select('id').limit(1);
       return true;
     } catch (_) {
       return false;
