@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
@@ -15,6 +16,10 @@ class NotificationService {
 
   Future<void> initialize() async {
     if (_initialized) return;
+    if (kIsWeb) {
+      _initialized = true;
+      return;
+    }
 
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
@@ -55,7 +60,8 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
-    if (!_initialized) await initialize();
+    if (_initialized) await initialize();
+    if (kIsWeb) return;
 
     const androidDetails = AndroidNotificationDetails(
       _channelId,
