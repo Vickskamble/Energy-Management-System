@@ -17,9 +17,9 @@ class EnergyRepository {
     EnergyLogLocalDatasource? local,
     EnergyLogRemoteDatasource? remote,
     Connectivity? connectivity,
-  })  : _local = local ?? EnergyLogLocalDatasource(),
-        _remote = remote ?? EnergyLogRemoteDatasource(),
-        _connectivity = connectivity ?? Connectivity();
+  }) : _local = local ?? EnergyLogLocalDatasource(),
+       _remote = remote ?? EnergyLogRemoteDatasource(),
+       _connectivity = connectivity ?? Connectivity();
 
   /// Get all logs from local storage
   Future<List<EnergyLogEntity>> getAllLogs({int? limit}) async {
@@ -37,7 +37,11 @@ class EnergyRepository {
   Future<DashboardData> getDashboardData() async {
     await _ensureLocalDataSynced();
 
-    final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final todayStart = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
     final tomorrowStart = todayStart.add(const Duration(days: 1));
     final monthStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
     final now = DateTime.now();
@@ -78,7 +82,9 @@ class EnergyRepository {
     }
 
     // Actual units after applying multiplying factor
-    final totalConsumption = (totalKwhMonth * AppConstants.multiplyingFactor * 100).roundToDouble() / 100;
+    final totalConsumption =
+        (totalKwhMonth * AppConstants.multiplyingFactor * 100).roundToDouble() /
+        100;
 
     return DashboardData(
       logs: allLogs.map((m) => m.toEntity()).toList(),
@@ -136,7 +142,8 @@ class EnergyRepository {
 
     final daily = <String, double>{};
     for (final log in logs) {
-      final dayKey = '${log.loggedAt.year}-${log.loggedAt.month.toString().padLeft(2, '0')}-${log.loggedAt.day.toString().padLeft(2, '0')}';
+      final dayKey =
+          '${log.loggedAt.year}-${log.loggedAt.month.toString().padLeft(2, '0')}-${log.loggedAt.day.toString().padLeft(2, '0')}';
       daily.update(dayKey, (v) => v + log.kwh, ifAbsent: () => log.kwh);
     }
     return daily;
@@ -172,14 +179,25 @@ class EnergyRepository {
   /// Generate 90 realistic demo records (3 meters x 30 days)
   List<EnergyLogModel> _generateSeedData() {
     final rng = Random(42);
-    final meters = ['HT-11 kV Feeder-1', 'HT-11 kV Feeder-2', 'HT-11 kV Feeder-3'];
+    final meters = [
+      'HT-11 kV Feeder-1',
+      'HT-11 kV Feeder-2',
+      'HT-11 kV Feeder-3',
+    ];
     final now = DateTime.now();
 
     final List<EnergyLogModel> models = [];
 
     for (final meter in meters) {
       for (int day = 30; day >= 1; day--) {
-        final loggedAt = DateTime(now.year, now.month, now.day, 10, 0, 0).subtract(Duration(days: day));
+        final loggedAt = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          10,
+          0,
+          0,
+        ).subtract(Duration(days: day));
 
         final kwhDelta = 280 + rng.nextDouble() * 180;
         final kvahDelta = kwhDelta * (0.95 + rng.nextDouble() * 0.07);
@@ -207,7 +225,9 @@ class EnergyRepository {
   /// Bill = Total Units × ₹8.68
   /// where Total Units = sum(consumed_kwh) × multiplyingFactor (5)
   double _calculateBill(double totalConsumption) {
-    return (totalConsumption * AppConstants.tariffPerUnit * 100).roundToDouble() / 100;
+    return (totalConsumption * AppConstants.tariffPerUnit * 100)
+            .roundToDouble() /
+        100;
   }
 }
 

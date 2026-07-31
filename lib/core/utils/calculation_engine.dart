@@ -18,12 +18,17 @@ class CalculationEngine {
     double demandRate = 0,
     double pfThreshold = AppConstants.pfPenaltyThreshold,
   }) {
-    final units = Decimal.fromInt((kwh * AppConstants.multiplyingFactor).round());
+    final units = Decimal.fromInt(
+      (kwh * AppConstants.multiplyingFactor).round(),
+    );
     final total = units * Decimal.parse(energyRate.toStringAsFixed(2));
     return total.toDouble();
   }
 
-  static double calculateBillingDemand(double mdRecorded, double contractDemand) {
+  static double calculateBillingDemand(
+    double mdRecorded,
+    double contractDemand,
+  ) {
     return max(mdRecorded, contractDemand * 0.75);
   }
 
@@ -31,7 +36,10 @@ class CalculationEngine {
     return totalUnits * rate;
   }
 
-  static double calculateDemandCharges(double billingDemand, double ratePerKva) {
+  static double calculateDemandCharges(
+    double billingDemand,
+    double ratePerKva,
+  ) {
     return billingDemand * ratePerKva;
   }
 
@@ -39,7 +47,10 @@ class CalculationEngine {
     return totalUnits * ratePerUnit;
   }
 
-  static double calculateWheelingCharges(double totalUnits, double ratePerUnit) {
+  static double calculateWheelingCharges(
+    double totalUnits,
+    double ratePerUnit,
+  ) {
     return totalUnits * ratePerUnit;
   }
 
@@ -51,16 +62,28 @@ class CalculationEngine {
     return subtotal * percent / 100;
   }
 
-  static double calculatePfRebate(double energyCharges, double demandCharges, double powerFactor) {
+  static double calculatePfRebate(
+    double energyCharges,
+    double demandCharges,
+    double powerFactor,
+  ) {
     if (powerFactor >= AppConstants.pfRebateThreshold) {
-      return (energyCharges + demandCharges) * AppConstants.pfRebatePercent / 100;
+      return (energyCharges + demandCharges) *
+          AppConstants.pfRebatePercent /
+          100;
     }
     return 0;
   }
 
-  static double calculatePfSurcharge(double energyCharges, double demandCharges, double powerFactor) {
+  static double calculatePfSurcharge(
+    double energyCharges,
+    double demandCharges,
+    double powerFactor,
+  ) {
     if (powerFactor < AppConstants.pfSurchargeThreshold) {
-      return (energyCharges + demandCharges) * AppConstants.pfSurchargePercent / 100;
+      return (energyCharges + demandCharges) *
+          AppConstants.pfSurchargePercent /
+          100;
     }
     return 0;
   }

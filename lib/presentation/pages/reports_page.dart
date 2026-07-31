@@ -11,8 +11,6 @@ import '../../core/widgets/app_states.dart';
 import '../../core/widgets/app_table.dart';
 import '../../core/calculation/bill_breakdown.dart';
 import '../../core/calculation/bill_calculator.dart';
-import '../../core/insights/insight_generator.dart';
-import '../../core/recommendations/recommendation_engine.dart';
 import '../../domain/entities/energy_log_entity.dart';
 import '../bloc/energy_bloc.dart';
 import '../bloc/energy_state.dart';
@@ -71,17 +69,6 @@ class _ReportsContent extends StatelessWidget {
     final entityLogs = logs.cast<EnergyLogEntity>();
     final breakdown = BillCalculator.calculate(logs: entityLogs);
     final kpis = BillCalculator.calculateKpis(breakdown);
-    final insights = InsightGenerator.generate(
-      breakdown: breakdown,
-      comparison: null,
-      kpis: kpis,
-      logs: entityLogs,
-    );
-    final recommendations = RecommendationEngine.generate(
-      breakdown: breakdown,
-      comparison: null,
-      logs: entityLogs,
-    );
 
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.page),
@@ -108,18 +95,6 @@ class _ReportsContent extends StatelessWidget {
         ),
         _buildExecutiveSummary(currencyFmt, entityLogs, breakdown, kpis),
         const SizedBox(height: AppSpacing.lg),
-        _buildBillBreakdownReport(breakdown),
-        const SizedBox(height: AppSpacing.lg),
-        if (insights.isNotEmpty) ...[
-          AppSectionHeader(title: 'Smart Insights'),
-          ...insights.take(4).map((i) => _insightRow(i)),
-          const SizedBox(height: AppSpacing.lg),
-        ],
-        if (recommendations.isNotEmpty) ...[
-          AppSectionHeader(title: 'Recommendations'),
-          ...recommendations.map((r) => _recRow(r)),
-          const SizedBox(height: AppSpacing.lg),
-        ],
         if (logs.isEmpty)
           const AppEmptyState(
             icon: Icons.description_rounded,
@@ -136,8 +111,9 @@ class _ReportsContent extends StatelessWidget {
                     'Date',
                     'Meter',
                     'kWh',
+                    'Unit Cost',
                     'PF',
-                    'MD (kW)',
+                    'MD (kVA)',
                     'Bill',
                     'Status',
                   ],
@@ -252,273 +228,6 @@ class _ReportsContent extends StatelessWidget {
     );
   }
 
-  Widget _buildBillBreakdownReport(BillBreakdown breakdown) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Bill Breakdown',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          _billRow(
-            'Energy Charges',
-            breakdown.energyCharges,
-            breakdown.energyChargesPercent,
-            AppColors.kpiEnergy,
-          ),
-          const Divider(height: 16),
-          _billRow(
-            'Demand Charges',
-            breakdown.demandCharges,
-            breakdown.demandChargesPercent,
-            AppColors.kpiDemand,
-          ),
-          const Divider(height: 16),
-          _billRow(
-            'FAC',
-            breakdown.facCharges,
-            breakdown.facPercent,
-            AppColors.warning,
-          ),
-          const Divider(height: 16),
-          _billRow(
-            'Wheeling',
-            breakdown.wheelingCharges,
-            breakdown.wheelingPercent,
-            AppColors.textSecondary,
-          ),
-          const Divider(height: 16),
-          _billRow(
-            'Electricity Duty',
-            breakdown.electricityDuty,
-            breakdown.dutyPercent,
-            AppColors.kpiEfficiency,
-          ),
-          const Divider(height: 16),
-          _billRow(
-            'Taxes',
-            breakdown.taxes,
-            breakdown.taxesPercent,
-            AppColors.kpiCO2,
-          ),
-          if (breakdown.pfRebate > 0) ...[
-            const Divider(height: 16),
-            _rebateRow('PF Rebate', breakdown.pfRebate),
-          ],
-          if (breakdown.pfSurcharge > 0) ...[
-            const Divider(height: 16),
-            _penaltyRow('PF Surcharge', breakdown.pfSurcharge),
-          ],
-          const Divider(height: 16),
-          _billRow(
-            'Net Bill',
-            breakdown.netBill,
-            100,
-            AppColors.primary,
-            bold: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _billRow(
-    String label,
-    double amount,
-    double percent,
-    Color color, {
-    bool bold = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ),
-          if (percent > 0 && percent < 100)
-            Text(
-              '${percent.toStringAsFixed(1)}%',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-          const SizedBox(width: 16),
-          Text(
-            '₹${amount.toStringAsFixed(0)}',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _rebateRow(String label, double amount) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: AppColors.success,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-            ),
-          ),
-          Text(
-            '-₹${amount.toStringAsFixed(0)}',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.success,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _penaltyRow(String label, double amount) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: AppColors.danger,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-            ),
-          ),
-          Text(
-            '+₹${amount.toStringAsFixed(0)}',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.danger,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _insightRow(InsightItem insight) {
-    final iconColor = switch (insight.severity) {
-      InsightSeverity.positive => AppColors.success,
-      InsightSeverity.neutral => AppColors.primary,
-      InsightSeverity.warning => AppColors.warning,
-      InsightSeverity.critical => AppColors.danger,
-    };
-    return AppCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info_rounded, size: 16, color: iconColor),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  insight.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-                Text(
-                  insight.description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _recRow(RecommendationItem rec) {
-    return AppCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(
-            Icons.auto_awesome_rounded,
-            size: 16,
-            color: AppColors.primary,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  rec.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-                Text(
-                  rec.action,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                if (rec.estimatedSavings != null)
-                  Text(
-                    'Savings: ₹${rec.estimatedSavings!.toStringAsFixed(0)}/mo',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.success,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   List<List<Widget>> _buildTableRows(NumberFormat currencyFmt) {
     final entities = logs.cast<EnergyLogEntity>();
     final dateFmt = DateFormat('dd/MM/yy HH:mm');
@@ -528,6 +237,7 @@ class _ReportsContent extends StatelessWidget {
             Text(dateFmt.format(log.loggedAt)),
             Text(log.meterName),
             Text(log.kwh.toStringAsFixed(1)),
+            Text('₹${(log.estimatedBill / log.kwh).toStringAsFixed(2)}'),
             Text(log.powerFactor.toStringAsFixed(3)),
             Text(log.mdRecorded.toStringAsFixed(1)),
             Text('₹ ${log.estimatedBill.toStringAsFixed(0)}'),

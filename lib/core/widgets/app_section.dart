@@ -26,7 +26,13 @@ class AppSectionHeader extends StatelessWidget {
                 Text(title, style: Theme.of(context).textTheme.titleLarge),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
-                  Text(subtitle!, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ],
             ),

@@ -13,8 +13,8 @@ class AppAnimations {
   static const Curve spring = Curves.elasticOut;
 
   static TweenSequence<double> get bounceIn => TweenSequence<double>([
-        TweenSequenceItem(tween: Tween(begin: 0.8, end: 1.05), weight: 40),
-        TweenSequenceItem(tween: Tween(begin: 1.05, end: 0.95), weight: 20),
-        TweenSequenceItem(tween: Tween(begin: 0.95, end: 1.0), weight: 40),
-      ]);
+    TweenSequenceItem(tween: Tween(begin: 0.8, end: 1.05), weight: 40),
+    TweenSequenceItem(tween: Tween(begin: 1.05, end: 0.95), weight: 20),
+    TweenSequenceItem(tween: Tween(begin: 0.95, end: 1.0), weight: 40),
+  ]);
 }

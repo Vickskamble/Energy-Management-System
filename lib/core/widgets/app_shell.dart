@@ -53,7 +53,10 @@ class _AppShellState extends State<AppShell> {
   Widget _buildMobileLayout() {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.menu_rounded), onPressed: () {}),
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () {},
+        ),
         title: Text(widget.title),
         actions: widget.actions,
       ),
@@ -71,7 +74,8 @@ class _AppShellState extends State<AppShell> {
             selectedIndex: widget.selectedIndex,
             isCollapsed: _sidebarCollapsed,
             onItemSelected: widget.onItemSelected,
-            onToggleCollapse: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+            onToggleCollapse: () =>
+                setState(() => _sidebarCollapsed = !_sidebarCollapsed),
             userName: widget.userName,
             userEmail: widget.userEmail,
             onLogout: widget.onLogout,
@@ -79,19 +83,28 @@ class _AppShellState extends State<AppShell> {
             isDark: widget.isDark,
             notificationCount: widget.notificationCount,
           ),
-          VerticalDivider(width: 1, thickness: 1, color: Theme.of(context).dividerColor),
+          VerticalDivider(
+            width: 1,
+            thickness: 1,
+            color: Theme.of(context).dividerColor,
+          ),
           Expanded(
             child: Column(
               children: [
                 AppTopBar(
                   title: widget.title,
                   subtitle: widget.subtitle,
-                  onMenuTap: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+                  onMenuTap: () =>
+                      setState(() => _sidebarCollapsed = !_sidebarCollapsed),
                   onNotificationsTap: widget.onNotificationsTap,
                   notificationCount: widget.notificationCount,
                   actions: widget.actions,
                 ),
-                Divider(height: 1, thickness: 1, color: Theme.of(context).dividerColor),
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Theme.of(context).dividerColor,
+                ),
                 Expanded(child: widget.body),
               ],
             ),

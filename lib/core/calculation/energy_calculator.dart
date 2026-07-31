@@ -9,7 +9,10 @@ class EnergyCalculator {
     return (kwh / kvah).clamp(0.000, 1.000);
   }
 
-  static double calculateBillingDemand(double mdRecorded, double contractDemand) {
+  static double calculateBillingDemand(
+    double mdRecorded,
+    double contractDemand,
+  ) {
     return max(mdRecorded, contractDemand * 0.75);
   }
 
@@ -17,7 +20,10 @@ class EnergyCalculator {
     return totalUnits * rate;
   }
 
-  static double calculateDemandCharges(double billingDemand, double ratePerKva) {
+  static double calculateDemandCharges(
+    double billingDemand,
+    double ratePerKva,
+  ) {
     return billingDemand * ratePerKva;
   }
 
@@ -25,7 +31,10 @@ class EnergyCalculator {
     return totalUnits * ratePerUnit;
   }
 
-  static double calculateWheelingCharges(double totalUnits, double ratePerUnit) {
+  static double calculateWheelingCharges(
+    double totalUnits,
+    double ratePerUnit,
+  ) {
     return totalUnits * ratePerUnit;
   }
 
@@ -37,16 +46,28 @@ class EnergyCalculator {
     return subtotal * percent / 100;
   }
 
-  static double calculatePfRebate(double energyCharges, double demandCharges, double powerFactor) {
+  static double calculatePfRebate(
+    double energyCharges,
+    double demandCharges,
+    double powerFactor,
+  ) {
     if (powerFactor >= AppConstants.pfRebateThreshold) {
-      return (energyCharges + demandCharges) * AppConstants.pfRebatePercent / 100;
+      return (energyCharges + demandCharges) *
+          AppConstants.pfRebatePercent /
+          100;
     }
     return 0;
   }
 
-  static double calculatePfSurcharge(double energyCharges, double demandCharges, double powerFactor) {
+  static double calculatePfSurcharge(
+    double energyCharges,
+    double demandCharges,
+    double powerFactor,
+  ) {
     if (powerFactor < AppConstants.pfSurchargeThreshold) {
-      return (energyCharges + demandCharges) * AppConstants.pfSurchargePercent / 100;
+      return (energyCharges + demandCharges) *
+          AppConstants.pfSurchargePercent /
+          100;
     }
     return 0;
   }
@@ -72,8 +93,12 @@ class EnergyCalculator {
     double pfSurcharge = 0,
     double subsidy = 0,
   }) {
-    final subtotal = energyCharges + demandCharges + facCharges + wheelingCharges;
-    final duty = calculateElectricityDuty(subtotal, AppConstants.electricityDutyPercent);
+    final subtotal =
+        energyCharges + demandCharges + facCharges + wheelingCharges;
+    final duty = calculateElectricityDuty(
+      subtotal,
+      AppConstants.electricityDutyPercent,
+    );
     final tax = calculateTaxes(subtotal + duty, AppConstants.taxPercent);
     return (subtotal + duty + tax + pfSurcharge) - pfRebate - subsidy;
   }
@@ -86,9 +111,15 @@ class EnergyCalculator {
     required double pfSurcharge,
   }) {
     double score = 100;
-    if (powerFactor < AppConstants.pfRebateThreshold) score -= (AppConstants.pfRebateThreshold - powerFactor) * 100;
-    if (loadFactor < AppConstants.loadFactorThresholdGood) score -= (AppConstants.loadFactorThresholdGood - loadFactor) * 50;
-    if (billingDemand > contractDemand) score -= ((billingDemand - contractDemand) / contractDemand) * 30;
+    if (powerFactor < AppConstants.pfRebateThreshold) {
+      score -= (AppConstants.pfRebateThreshold - powerFactor) * 100;
+    }
+    if (loadFactor < AppConstants.loadFactorThresholdGood) {
+      score -= (AppConstants.loadFactorThresholdGood - loadFactor) * 50;
+    }
+    if (billingDemand > contractDemand) {
+      score -= ((billingDemand - contractDemand) / contractDemand) * 30;
+    }
     if (pfSurcharge > 0) score -= 15;
     return score.clamp(0, 100);
   }

@@ -30,10 +30,20 @@ class AppButton extends StatelessWidget {
         backgroundColor: color ?? AppColors.primary,
         foregroundColor: textColor ?? AppColors.textOnPrimary,
         minimumSize: expanded ? const Size(double.infinity, 48) : null,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: 14),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xl,
+          vertical: 14,
+        ),
       ),
       icon: loading
-          ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: textColor ?? AppColors.textOnPrimary))
+          ? SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: textColor ?? AppColors.textOnPrimary,
+              ),
+            )
           : (icon != null ? Icon(icon, size: 18) : const SizedBox.shrink()),
       label: Text(loading ? 'Please wait...' : label),
     );

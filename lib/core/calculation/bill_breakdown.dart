@@ -35,10 +35,13 @@ class BillBreakdown {
     required this.averageUnitCost,
   });
 
-  double get energyChargesPercent => netBill > 0 ? (energyCharges / netBill * 100) : 0;
-  double get demandChargesPercent => netBill > 0 ? (demandCharges / netBill * 100) : 0;
+  double get energyChargesPercent =>
+      netBill > 0 ? (energyCharges / netBill * 100) : 0;
+  double get demandChargesPercent =>
+      netBill > 0 ? (demandCharges / netBill * 100) : 0;
   double get facPercent => netBill > 0 ? (facCharges / netBill * 100) : 0;
-  double get wheelingPercent => netBill > 0 ? (wheelingCharges / netBill * 100) : 0;
+  double get wheelingPercent =>
+      netBill > 0 ? (wheelingCharges / netBill * 100) : 0;
   double get taxesPercent => netBill > 0 ? (taxes / netBill * 100) : 0;
   double get dutyPercent => netBill > 0 ? (electricityDuty / netBill * 100) : 0;
 
@@ -95,10 +98,7 @@ class BusinessKpi {
   final double billHealthScore;
   final double energyScore;
 
-  const BusinessKpi({
-    required this.billHealthScore,
-    required this.energyScore,
-  });
+  const BusinessKpi({required this.billHealthScore, required this.energyScore});
 }
 
 class CalculationValidation {

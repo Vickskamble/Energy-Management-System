@@ -7,19 +7,23 @@ import '../../core/widgets/app_section.dart';
 import '../auth_bloc/auth_bloc.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  final bool isDark;
+  final VoidCallback? onToggleTheme;
+
+  const SettingsScreen({super.key, this.isDark = false, this.onToggleTheme});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProviderStateMixin {
+class _SettingsScreenState extends State<SettingsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
 
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 6, vsync: this);
+    _tabCtrl = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -41,173 +45,152 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primary,
           tabs: const [
-            Tab(text: 'General', icon: Icon(Icons.tune_rounded, size: 18)),
             Tab(text: 'Account', icon: Icon(Icons.person_outline, size: 18)),
-            Tab(text: 'Notifications', icon: Icon(Icons.notifications_outlined, size: 18)),
-            Tab(text: 'Security', icon: Icon(Icons.lock_outline, size: 18)),
-            Tab(text: 'Appearance', icon: Icon(Icons.palette_outlined, size: 18)),
+            Tab(
+              text: 'Appearance',
+              icon: Icon(Icons.palette_outlined, size: 18),
+            ),
             Tab(text: 'System', icon: Icon(Icons.memory_outlined, size: 18)),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabCtrl,
-        children: [
-          _buildGeneral(),
-          _buildAccount(),
-          _buildNotifications(),
-          _buildSecurity(),
-          _buildAppearance(),
-          _buildSystem(),
-        ],
+        children: [_buildAccount(), _buildAppearance(), _buildSystem()],
       ),
     );
   }
 
-  Widget _buildGeneral() {
-    return ListView(padding: const EdgeInsets.all(AppSpacing.page), children: [
-      AppSectionHeader(title: 'General Settings', subtitle: 'Configure your application preferences'),
-      AppCard(child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SwitchListTile(
-            title: const Text('Auto-sync data', style: TextStyle(fontSize: 14)),
-            subtitle: const Text('Automatically sync readings to cloud', style: TextStyle(fontSize: 12)),
-            value: true,
-            onChanged: (_) {},
-            contentPadding: EdgeInsets.zero,
-          ),
-          const Divider(),
-          SwitchListTile(
-            title: const Text('Offline mode', style: TextStyle(fontSize: 14)),
-            subtitle: const Text('Work offline and sync when connected', style: TextStyle(fontSize: 12)),
-            value: false,
-            onChanged: (_) {},
-            contentPadding: EdgeInsets.zero,
-          ),
-        ],
-      )),
-      const SizedBox(height: AppSpacing.lg),
-      AppCard(child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Language', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          const Text('English (US)', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-        ],
-      )),
-    ]);
-  }
-
   Widget _buildAccount() {
     final authState = context.watch<AuthBloc>().state;
-    final email = authState is AppAuthAuthenticated ? authState.email : 'user@powerems.com';
-    final name = authState is AppAuthAuthenticated ? authState.email.split('@').first : 'User';
+    final email = authState is AppAuthAuthenticated
+        ? authState.email
+        : 'user@powerems.com';
+    final name = authState is AppAuthAuthenticated
+        ? authState.email.split('@').first
+        : 'User';
 
-    return ListView(padding: const EdgeInsets.all(AppSpacing.page), children: [
-      AppSectionHeader(title: 'Account', subtitle: 'Manage your account settings'),
-      AppCard(child: Column(
-        children: [
-          _accountRow(Icons.person_outline, 'Full Name', name),
-          const Divider(),
-          _accountRow(Icons.email_outlined, 'Email', email),
-          const Divider(),
-          _accountRow(Icons.business_outlined, 'Organization', 'PowerEMS Inc.'),
-        ],
-      )),
-    ]);
-  }
-
-  Widget _buildNotifications() {
-    return ListView(padding: const EdgeInsets.all(AppSpacing.page), children: [
-      AppSectionHeader(title: 'Notifications', subtitle: 'Configure how you receive alerts'),
-      AppCard(child: Column(
-        children: [
-          SwitchListTile(title: const Text('Push notifications'), value: true, onChanged: (_) {}, contentPadding: EdgeInsets.zero),
-          const Divider(),
-          SwitchListTile(title: const Text('Email alerts'), value: true, onChanged: (_) {}, contentPadding: EdgeInsets.zero),
-          const Divider(),
-          SwitchListTile(title: const Text('PF penalty warnings'), value: true, onChanged: (_) {}, contentPadding: EdgeInsets.zero),
-          const Divider(),
-          SwitchListTile(title: const Text('MD breach warnings'), value: true, onChanged: (_) {}, contentPadding: EdgeInsets.zero),
-        ],
-      )),
-    ]);
-  }
-
-  Widget _buildSecurity() {
-    return ListView(padding: const EdgeInsets.all(AppSpacing.page), children: [
-      AppSectionHeader(title: 'Security', subtitle: 'Manage your security preferences'),
-      AppCard(child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SwitchListTile(title: const Text('Two-factor authentication'), value: false, onChanged: (_) {}, contentPadding: EdgeInsets.zero),
-          const Divider(),
-          ListTile(title: const Text('Change password', style: TextStyle(fontSize: 14)), trailing: const Icon(Icons.chevron_right), contentPadding: EdgeInsets.zero, onTap: () {}),
-          const Divider(),
-          ListTile(title: const Text('Active sessions', style: TextStyle(fontSize: 14)), trailing: const Icon(Icons.chevron_right), contentPadding: EdgeInsets.zero, onTap: () {}),
-          const Divider(),
-          ListTile(
-            title: const Text('Sign out', style: TextStyle(fontSize: 14, color: AppColors.danger)),
-            trailing: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 20),
-            contentPadding: EdgeInsets.zero,
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Sign out'),
-                  content: const Text('Are you sure you want to sign out?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        Navigator.pop(context);
-                        context.read<AuthBloc>().add(const AppAuthLogoutRequested());
-                      },
-                      child: const Text('Sign out', style: TextStyle(color: AppColors.danger)),
-                    ),
-                  ],
+    return ListView(
+      padding: const EdgeInsets.all(AppSpacing.page),
+      children: [
+        AppSectionHeader(
+          title: 'Account',
+          subtitle: 'Your account information',
+        ),
+        AppCard(
+          child: Column(
+            children: [
+              _accountRow(Icons.person_outline, 'Full Name', name),
+              const Divider(),
+              _accountRow(Icons.email_outlined, 'Email', email),
+              const Divider(),
+              _accountRow(
+                Icons.business_outlined,
+                'Organization',
+                'PowerEMS Inc.',
+              ),
+              const Divider(),
+              ListTile(
+                title: const Text(
+                  'Sign out',
+                  style: TextStyle(fontSize: 14, color: AppColors.danger),
                 ),
-              );
-            },
+                trailing: const Icon(
+                  Icons.logout_rounded,
+                  color: AppColors.danger,
+                  size: 20,
+                ),
+                contentPadding: EdgeInsets.zero,
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Sign out'),
+                      content: const Text('Are you sure you want to sign out?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.pop(context);
+                            context.read<AuthBloc>().add(
+                              const AppAuthLogoutRequested(),
+                            );
+                          },
+                          child: const Text(
+                            'Sign out',
+                            style: TextStyle(color: AppColors.danger),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      )),
-    ]);
+        ),
+      ],
+    );
   }
 
   Widget _buildAppearance() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return ListView(padding: const EdgeInsets.all(AppSpacing.page), children: [
-      AppSectionHeader(title: 'Appearance', subtitle: 'Customize the look and feel'),
-      AppCard(child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            title: const Text('Theme', style: TextStyle(fontSize: 14)),
-            subtitle: Text(isDark ? 'Dark Mode' : 'Light Mode', style: const TextStyle(fontSize: 12)),
-            trailing: Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded),
-            contentPadding: EdgeInsets.zero,
+    return ListView(
+      padding: const EdgeInsets.all(AppSpacing.page),
+      children: [
+        AppSectionHeader(
+          title: 'Appearance',
+          subtitle: 'Customize the look and feel',
+        ),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SwitchListTile(
+                title: const Text('Dark Mode', style: TextStyle(fontSize: 14)),
+                subtitle: Text(
+                  widget.isDark ? 'Dark theme active' : 'Light theme active',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                value: widget.isDark,
+                onChanged: (_) => widget.onToggleTheme?.call(),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ],
           ),
-        ],
-      )),
-    ]);
+        ),
+      ],
+    );
   }
 
   Widget _buildSystem() {
-    return ListView(padding: const EdgeInsets.all(AppSpacing.page), children: [
-      AppSectionHeader(title: 'System', subtitle: 'System information and configuration'),
-      AppCard(child: Column(
-        children: [
-          _accountRow(Icons.info_outline, 'App Version', '1.0.0'),
-          const Divider(),
-          _accountRow(Icons.cloud_outlined, 'Supabase', 'Connected'),
-          const Divider(),
-          _accountRow(Icons.auto_awesome_outlined, 'Analysis Engine', 'Rule-based'),
-        ],
-      )),
-    ]);
+    return ListView(
+      padding: const EdgeInsets.all(AppSpacing.page),
+      children: [
+        AppSectionHeader(
+          title: 'System',
+          subtitle: 'System information and configuration',
+        ),
+        AppCard(
+          child: Column(
+            children: [
+              _accountRow(Icons.info_outline, 'App Version', '1.0.0'),
+              const Divider(),
+              _accountRow(Icons.cloud_outlined, 'Supabase', 'Connected'),
+              const Divider(),
+              _accountRow(
+                Icons.auto_awesome_outlined,
+                'Analysis Engine',
+                'Rule-based',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _accountRow(IconData icon, String label, String value) {
@@ -221,9 +204,21 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ),

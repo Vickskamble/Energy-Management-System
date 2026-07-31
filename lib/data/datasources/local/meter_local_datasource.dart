@@ -21,16 +21,19 @@ class MeterLocalDatasource {
       final db = await _db;
       await _store.record(meter.id).put(db, meter.toMap());
     } catch (e) {
-      throw const LocalStorageException('Unable to save meter. Please try again.');
+      throw const LocalStorageException(
+        'Unable to save meter. Please try again.',
+      );
     }
   }
 
   Future<List<MeterModel>> getAllMeters() async {
     try {
       final db = await _db;
-      final records = await _store.find(db, finder: Finder(
-        sortOrders: [SortOrder('name')],
-      ));
+      final records = await _store.find(
+        db,
+        finder: Finder(sortOrders: [SortOrder('name')]),
+      );
       return records
           .map((r) => MeterModel.fromMap(r.value.cast<String, Object?>()))
           .toList();

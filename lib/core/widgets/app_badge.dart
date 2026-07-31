@@ -18,17 +18,45 @@ class AppBadge extends StatelessWidget {
     this.icon,
   });
 
-  factory AppBadge.success(String label, {IconData? icon}) => AppBadge(label: label, color: AppColors.success, textColor: AppColors.textOnPrimary, icon: icon);
-  factory AppBadge.warning(String label, {IconData? icon}) => AppBadge(label: label, color: AppColors.warning, textColor: AppColors.textOnPrimary, icon: icon);
-  factory AppBadge.danger(String label, {IconData? icon}) => AppBadge(label: label, color: AppColors.danger, textColor: AppColors.textOnPrimary, icon: icon);
-  factory AppBadge.info(String label, {IconData? icon}) => AppBadge(label: label, color: AppColors.info, textColor: AppColors.textOnPrimary, icon: icon);
-  factory AppBadge.neutral(String label, {IconData? icon}) => AppBadge(label: label, color: AppColors.textSecondary, textColor: AppColors.textOnPrimary, icon: icon);
+  factory AppBadge.success(String label, {IconData? icon}) => AppBadge(
+    label: label,
+    color: AppColors.success,
+    textColor: AppColors.textOnPrimary,
+    icon: icon,
+  );
+  factory AppBadge.warning(String label, {IconData? icon}) => AppBadge(
+    label: label,
+    color: AppColors.warning,
+    textColor: AppColors.textOnPrimary,
+    icon: icon,
+  );
+  factory AppBadge.danger(String label, {IconData? icon}) => AppBadge(
+    label: label,
+    color: AppColors.danger,
+    textColor: AppColors.textOnPrimary,
+    icon: icon,
+  );
+  factory AppBadge.info(String label, {IconData? icon}) => AppBadge(
+    label: label,
+    color: AppColors.info,
+    textColor: AppColors.textOnPrimary,
+    icon: icon,
+  );
+  factory AppBadge.neutral(String label, {IconData? icon}) => AppBadge(
+    label: label,
+    color: AppColors.textSecondary,
+    textColor: AppColors.textOnPrimary,
+    icon: icon,
+  );
 
   @override
   Widget build(BuildContext context) {
     final bgColor = color ?? AppColors.textSecondary;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 2,
+      ),
       decoration: BoxDecoration(
         color: bgColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -37,8 +65,18 @@ class AppBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[Icon(icon, size: fontSize + 1, color: bgColor), const SizedBox(width: 3)],
-          Text(label, style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600, color: bgColor)),
+          if (icon != null) ...[
+            Icon(icon, size: fontSize + 1, color: bgColor),
+            const SizedBox(width: 3),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w600,
+              color: bgColor,
+            ),
+          ),
         ],
       ),
     );

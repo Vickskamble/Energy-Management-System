@@ -30,9 +30,16 @@ class AppCard extends StatelessWidget {
       margin: margin ?? EdgeInsets.zero,
       padding: padding ?? const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: color ?? (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
-        borderRadius: BorderRadius.circular(borderRadius ?? AppSpacing.radiusXl),
-        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight.withValues(alpha: 0.5)),
+        color:
+            color ?? (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
+        borderRadius: BorderRadius.circular(
+          borderRadius ?? AppSpacing.radiusXl,
+        ),
+        border: Border.all(
+          color: isDark
+              ? AppColors.borderDark
+              : AppColors.borderLight.withValues(alpha: 0.5),
+        ),
         boxShadow: AppShadows.card,
       ),
       child: child,
@@ -40,7 +47,9 @@ class AppCard extends StatelessWidget {
     if (onTap != null) {
       return InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(borderRadius ?? AppSpacing.radiusXl),
+        borderRadius: BorderRadius.circular(
+          borderRadius ?? AppSpacing.radiusXl,
+        ),
         child: card,
       );
     }
@@ -68,13 +77,16 @@ class AppCardLift extends StatefulWidget {
   State<AppCardLift> createState() => _AppCardLiftState();
 }
 
-class _AppCardLiftState extends State<AppCardLift> with SingleTickerProviderStateMixin {
+class _AppCardLiftState extends State<AppCardLift>
+    with SingleTickerProviderStateMixin {
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final t = _hovered ? (Matrix4.identity()..translateByDouble(0, -2, 0, 0)) : Matrix4.identity();
+    final t = _hovered
+        ? (Matrix4.identity()..translateByDouble(0, -2, 0, 0))
+        : Matrix4.identity();
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -84,14 +96,24 @@ class _AppCardLiftState extends State<AppCardLift> with SingleTickerProviderStat
         transform: t,
         padding: widget.padding ?? const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          color: widget.color ?? (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
-          borderRadius: BorderRadius.circular(widget.borderRadius ?? AppSpacing.radiusXl),
-          border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight.withValues(alpha: 0.5)),
+          color:
+              widget.color ??
+              (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
+          borderRadius: BorderRadius.circular(
+            widget.borderRadius ?? AppSpacing.radiusXl,
+          ),
+          border: Border.all(
+            color: isDark
+                ? AppColors.borderDark
+                : AppColors.borderLight.withValues(alpha: 0.5),
+          ),
           boxShadow: _hovered ? AppShadows.cardHover : AppShadows.card,
         ),
         child: InkWell(
           onTap: widget.onTap,
-          borderRadius: BorderRadius.circular(widget.borderRadius ?? AppSpacing.radiusXl),
+          borderRadius: BorderRadius.circular(
+            widget.borderRadius ?? AppSpacing.radiusXl,
+          ),
           child: widget.child,
         ),
       ),

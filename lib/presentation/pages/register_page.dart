@@ -29,11 +29,11 @@ class _RegisterPageState extends State<RegisterPage> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     context.read<AuthBloc>().add(
-          AppAuthRegisterRequested(
-            email: _emailCtrl.text.trim(),
-            password: _passCtrl.text,
-          ),
-        );
+      AppAuthRegisterRequested(
+        email: _emailCtrl.text.trim(),
+        password: _passCtrl.text,
+      ),
+    );
   }
 
   @override
@@ -51,9 +51,18 @@ class _RegisterPageState extends State<RegisterPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('Get started', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+                  const Text(
+                    'Get started',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 8),
-                  const Text('Create your account to start monitoring', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                  const Text(
+                    'Create your account to start monitoring',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   const SizedBox(height: 32),
                   TextFormField(
                     controller: _emailCtrl,
@@ -63,7 +72,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     keyboardType: TextInputType.emailAddress,
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Email required';
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Email required';
+                      }
                       if (!v.contains('@')) return 'Invalid email';
                       return null;
                     },
@@ -76,8 +87,14 @@ class _RegisterPageState extends State<RegisterPage> {
                       labelText: 'Password',
                       prefixIcon: const Icon(Icons.lock_outlined),
                       suffixIcon: InkWell(
-                        onTap: () => setState(() => _obscurePass = !_obscurePass),
-                        child: Icon(_obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
+                        onTap: () =>
+                            setState(() => _obscurePass = !_obscurePass),
+                        child: Icon(
+                          _obscurePass
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 20,
+                        ),
                       ),
                     ),
                     validator: (v) {
@@ -104,7 +121,10 @@ class _RegisterPageState extends State<RegisterPage> {
                     listener: (context, state) {
                       if (state is AppAuthError) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(state.message), backgroundColor: Colors.red.shade700),
+                          SnackBar(
+                            content: Text(state.message),
+                            backgroundColor: Colors.red.shade700,
+                          ),
                         );
                       }
                     },

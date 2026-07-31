@@ -40,7 +40,15 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
   void _onItemTapped(int index) {
     if (index == 5) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SettingsScreen(
+            isDark: widget.isDark,
+            onToggleTheme: widget.onToggleTheme,
+          ),
+        ),
+      );
       return;
     }
     setState(() => _selectedIndex = index);
@@ -48,23 +56,33 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
   @override
   Widget build(BuildContext context) {
-    final titles = ['Dashboard', 'Reading Entry', 'Analysis', 'Reports', 'Meter Management'];
-    final hubTitle = _selectedIndex < titles.length ? titles[_selectedIndex] : 'PowerEMS';
+    final titles = [
+      'Dashboard',
+      'Reading Entry',
+      'Analysis',
+      'Reports',
+      'Meter Management',
+    ];
+    final hubTitle = _selectedIndex < titles.length
+        ? titles[_selectedIndex]
+        : 'PowerEMS';
     final authState = context.watch<AuthBloc>().state;
-    final email = authState is AppAuthAuthenticated ? authState.email : 'user@powerems.com';
-    final name = authState is AppAuthAuthenticated ? authState.email.split('@').first : 'User';
+    final email = authState is AppAuthAuthenticated
+        ? authState.email
+        : 'user@powerems.com';
+    final name = authState is AppAuthAuthenticated
+        ? authState.email.split('@').first
+        : 'User';
 
     return AppShell(
       title: hubTitle,
       selectedIndex: _selectedIndex,
       onItemSelected: _onItemTapped,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _pages),
       userName: name,
       userEmail: email,
-      onLogout: () => context.read<AuthBloc>().add(const AppAuthLogoutRequested()),
+      onLogout: () =>
+          context.read<AuthBloc>().add(const AppAuthLogoutRequested()),
       onThemeToggle: () => widget.onToggleTheme?.call(),
       isDark: widget.isDark,
       notificationCount: 0,

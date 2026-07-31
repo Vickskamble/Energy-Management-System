@@ -29,7 +29,11 @@ class AppTheme {
         centerTitle: false,
         backgroundColor: AppColors.surfaceLight,
         foregroundColor: AppColors.textPrimary,
-        titleTextStyle: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+        titleTextStyle: GoogleFonts.inter(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
@@ -40,14 +44,35 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.backgroundLight,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.borderLight)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.borderLight)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
-        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.danger)),
-        focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.danger, width: 1.5)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppColors.borderLight),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppColors.borderLight),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppColors.danger),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppColors.danger, width: 1.5),
+        ),
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        labelStyle: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary),
-        floatingLabelStyle: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
+        labelStyle: GoogleFonts.inter(
+          fontSize: 14,
+          color: AppColors.textSecondary,
+        ),
+        floatingLabelStyle: GoogleFonts.inter(
+          fontSize: 12,
+          color: AppColors.primary,
+        ),
         prefixIconColor: AppColors.textSecondary,
         suffixIconColor: AppColors.textSecondary,
       ),
@@ -59,8 +84,13 @@ class AppTheme {
           disabledBackgroundColor: AppColors.borderLight,
           disabledForegroundColor: AppColors.textSecondary,
           padding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -71,8 +101,13 @@ class AppTheme {
           disabledBackgroundColor: AppColors.borderLight,
           disabledForegroundColor: AppColors.textSecondary,
           padding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -80,20 +115,35 @@ class AppTheme {
           foregroundColor: AppColors.primary,
           side: BorderSide(color: AppColors.borderLight),
           padding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
-          textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
-      dividerTheme: DividerThemeData(color: AppColors.borderLight, thickness: 1, space: 1),
+      dividerTheme: DividerThemeData(
+        color: AppColors.borderLight,
+        thickness: 1,
+        space: 1,
+      ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.backgroundLight,
-        labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
+        labelStyle: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         side: BorderSide(color: AppColors.borderLight),
         padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -110,23 +160,40 @@ class AppTheme {
         indicatorColor: AppColors.primary.withValues(alpha: 0.1),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary);
+            return GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            );
           }
-          return GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary);
+          return GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          );
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return IconThemeData(size: 22, color: AppColors.primary);
+          if (states.contains(WidgetState.selected)) {
+            return IconThemeData(size: 22, color: AppColors.primary);
+          }
           return IconThemeData(size: 22, color: AppColors.textSecondary);
         }),
       ),
       dialogTheme: DialogThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        titleTextStyle: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+        titleTextStyle: GoogleFonts.inter(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        contentTextStyle: GoogleFonts.inter(fontSize: 14, color: AppColors.textOnPrimary),
+        contentTextStyle: GoogleFonts.inter(
+          fontSize: 14,
+          color: AppColors.textOnPrimary,
+        ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: AppColors.primary,
@@ -140,7 +207,9 @@ class AppTheme {
           return AppColors.textSecondary;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return AppColors.primary.withValues(alpha: 0.3);
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.primary.withValues(alpha: 0.3);
+          }
           return AppColors.borderLight;
         }),
       ),
@@ -183,16 +252,27 @@ class AppTheme {
       appBarTheme: base.appBarTheme.copyWith(
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textOnDark,
-        titleTextStyle: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textOnDark),
+        titleTextStyle: GoogleFonts.inter(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textOnDark,
+        ),
       ),
-      cardTheme: base.cardTheme.copyWith(
-        color: AppColors.surfaceDark,
-      ),
+      cardTheme: base.cardTheme.copyWith(color: AppColors.surfaceDark),
       inputDecorationTheme: base.inputDecorationTheme.copyWith(
         fillColor: AppColors.backgroundDark,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.borderDark)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.borderDark)),
-        labelStyle: GoogleFonts.inter(fontSize: 14, color: AppColors.textDarkSecondary),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppColors.borderDark),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppColors.borderDark),
+        ),
+        labelStyle: GoogleFonts.inter(
+          fontSize: 14,
+          color: AppColors.textDarkSecondary,
+        ),
       ),
       dividerTheme: base.dividerTheme.copyWith(color: AppColors.borderDark),
       chipTheme: base.chipTheme.copyWith(
