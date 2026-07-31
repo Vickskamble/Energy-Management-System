@@ -1,4 +1,5 @@
 import '../../domain/entities/energy_log_entity.dart';
+import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import 'bill_calculator.dart';
 import 'energy_calculator.dart';
@@ -35,7 +36,7 @@ class BillForecastCalculator {
     final scale = daysInMonth / daysElapsed.toDouble();
 
     final projectedUnits = monthBreakdown.totalUnits * scale;
-    final energyCharges = projectedUnits * AppConstants.tariffPerUnit;
+    final energyCharges = projectedUnits * AppConfig.tariffPerUnit;
     final facCharges = projectedUnits * AppConstants.facRatePerUnit;
     final wheelingCharges = projectedUnits * AppConstants.wheelingChargePerUnit;
     final demandCharges =

@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS meters (
   meter_type   TEXT,
   ct_ratio     DOUBLE PRECISION,
   pt_ratio     DOUBLE PRECISION,
+  contract_demand DOUBLE PRECISION DEFAULT 400,
   user_id      UUID,
   created_at   TIMESTAMPTZ DEFAULT NOW(),
   updated_at   TIMESTAMPTZ DEFAULT NOW()
@@ -142,7 +143,16 @@ ALTER TABLE readings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contract_demands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analysis_results ENABLE ROW LEVEL SECURITY;
 
--- RLS: Users can only see their own data
+-- Default user_id to the authenticated user for all rows
+ALTER TABLE energy_logs ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE sites ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE panels ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE meters ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE readings ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE contract_demands ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE analysis_results ALTER COLUMN user_id SET DEFAULT auth.uid();
+
+-- RLS: Users can only see their own data (full CRUD)
 CREATE POLICY "Users can view own energy_logs"
   ON energy_logs FOR SELECT
   USING (auth.uid() = user_id);
@@ -153,6 +163,10 @@ CREATE POLICY "Users can insert own energy_logs"
 
 CREATE POLICY "Users can update own energy_logs"
   ON energy_logs FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own energy_logs"
+  ON energy_logs FOR DELETE
   USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can view own sites"
@@ -179,6 +193,14 @@ CREATE POLICY "Users can insert own panels"
   ON panels FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+CREATE POLICY "Users can update own panels"
+  ON panels FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own panels"
+  ON panels FOR DELETE
+  USING (auth.uid() = user_id);
+
 CREATE POLICY "Users can view own meters"
   ON meters FOR SELECT
   USING (auth.uid() = user_id);
@@ -186,6 +208,14 @@ CREATE POLICY "Users can view own meters"
 CREATE POLICY "Users can insert own meters"
   ON meters FOR INSERT
   WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own meters"
+  ON meters FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own meters"
+  ON meters FOR DELETE
+  USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can view own readings"
   ON readings FOR SELECT
@@ -195,6 +225,14 @@ CREATE POLICY "Users can insert own readings"
   ON readings FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+CREATE POLICY "Users can update own readings"
+  ON readings FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own readings"
+  ON readings FOR DELETE
+  USING (auth.uid() = user_id);
+
 CREATE POLICY "Users can view own contract_demands"
   ON contract_demands FOR SELECT
   USING (auth.uid() = user_id);
@@ -203,6 +241,26 @@ CREATE POLICY "Users can insert own contract_demands"
   ON contract_demands FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+CREATE POLICY "Users can update own contract_demands"
+  ON contract_demands FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own contract_demands"
+  ON contract_demands FOR DELETE
+  USING (auth.uid() = user_id);
+
 CREATE POLICY "Users can view own analysis_results"
   ON analysis_results FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own analysis_results"
+  ON analysis_results FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own analysis_results"
+  ON analysis_results FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own analysis_results"
+  ON analysis_results FOR DELETE
   USING (auth.uid() = user_id);

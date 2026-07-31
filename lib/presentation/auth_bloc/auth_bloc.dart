@@ -15,6 +15,7 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
     on<AppAuthLoginRequested>(_onLogin);
     on<AppAuthRegisterRequested>(_onRegister);
     on<AppAuthLogoutRequested>(_onLogout);
+    on<AppAuthPasswordResetRequested>(_onPasswordReset);
     on<AppAuthStateChanged>(_onSupabaseAuthChanged);
 
     // Try to set up auth listener — safe even if Supabase isn't ready yet
@@ -150,6 +151,29 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
       emit(AppAuthError(e.message));
     } catch (e) {
       emit(AppAuthError('Logout failed: $e'));
+    }
+  }
+
+  Future<void> _onPasswordReset(
+    AppAuthPasswordResetRequested event,
+    Emitter<AppAuthState> emit,
+  ) async {
+    emit(const AppAuthLoading());
+    try {
+      if (!SupabaseClientManager.isInitialized) {
+        await SupabaseClientManager.initialize();
+        _trySetupAuthListener();
+      }
+      await Supabase.instance.client.auth
+          .resetPasswordForEmail(event.email.trim())
+          .timeout(const Duration(seconds: 15));
+      emit(const AppAuthPasswordResetSent());
+    } on TimeoutException {
+      emit(const AppAuthError('Connection timed out. Check your network.'));
+    } on AuthException catch (e) {
+      emit(AppAuthError(e.message));
+    } catch (e) {
+      emit(AppAuthError('Password reset failed: $e'));
     }
   }
 

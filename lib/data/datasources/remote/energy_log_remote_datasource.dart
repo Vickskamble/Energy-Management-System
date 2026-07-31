@@ -105,6 +105,22 @@ class EnergyLogRemoteDatasource {
     }
   }
 
+  /// Update a log on remote (upsert)
+  Future<void> updateLog(EnergyLogModel log) async {
+    try {
+      await _client
+          .from(AppConstants.energyLogsTable)
+          .upsert(log.toJson())
+          .select()
+          .single();
+    } catch (e) {
+      if (e is RemoteStorageException) rethrow;
+      throw const RemoteStorageException(
+        'Unable to update log on server. Check your connection.',
+      );
+    }
+  }
+
   /// Check if Supabase is reachable (connectivity check)
   Future<bool> healthCheck() async {
     try {

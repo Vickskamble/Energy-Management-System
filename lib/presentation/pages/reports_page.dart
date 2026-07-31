@@ -3,7 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/app_logger.dart';
 import '../../core/utils/export_service.dart';
+import '../../core/utils/pdf_report_service.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_section.dart';
@@ -79,6 +81,28 @@ class _ReportsContent extends StatelessWidget {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              AppButtonOutline(
+                label: 'PDF',
+                icon: Icons.picture_as_pdf_outlined,
+                onPressed: () async {
+                  final state = context.read<EnergyBloc>().state;
+                  if (state is EnergySuccess) {
+                    final entities = state.logs.cast<EnergyLogEntity>();
+                    try {
+                      await PdfReportService.exportPdf(
+                        logs: entities,
+                        title: 'Energy Management Report',
+                        subtitle:
+                            '${entities.length} reading(s) across '
+                            '${entities.map((e) => e.meterName).toSet().length} meter(s)',
+                      );
+                    } catch (e) {
+                      AppLogger.e('PDF export failed', e);
+                    }
+                  }
+                },
+              ),
+              const SizedBox(width: 8),
               AppButtonOutline(
                 label: 'Export CSV',
                 icon: Icons.file_download_rounded,

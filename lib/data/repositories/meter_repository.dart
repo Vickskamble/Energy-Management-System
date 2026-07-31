@@ -14,4 +14,12 @@ class MeterRepository {
   Future<void> updateMeter(MeterModel meter) => _local.updateMeter(meter);
 
   Future<void> deleteMeter(String id) => _local.deleteMeter(id);
+
+  Future<void> clearLocalCache() async {
+    try {
+      await _local.clearAll();
+    } catch (e) {
+      // Cache wipe is best-effort — data re-fetches from cloud on next login.
+    }
+  }
 }

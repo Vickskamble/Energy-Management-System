@@ -276,7 +276,8 @@ class _LoginPageState extends State<LoginPage>
                                     ],
                                   ),
                                   TextButton(
-                                    onPressed: () {},
+                                    onPressed: () =>
+                                        _showForgotPasswordDialog(context),
                                     child: const Text(
                                       'Forgot password?',
                                       style: TextStyle(fontSize: 13),
@@ -287,7 +288,16 @@ class _LoginPageState extends State<LoginPage>
                               const SizedBox(height: 24),
                               BlocConsumer<AuthBloc, AppAuthState>(
                                 listener: (context, state) {
-                                  if (state is AppAuthError) {
+                                  if (state is AppAuthPasswordResetSent) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Password reset link sent to your email.',
+                                        ),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  } else if (state is AppAuthError) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(state.message),
@@ -338,6 +348,52 @@ class _LoginPageState extends State<LoginPage>
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showForgotPasswordDialog(BuildContext context) {
+    final emailCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Reset Password'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: emailCtrl,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email address',
+              prefixIcon: Icon(Icons.email_outlined),
+            ),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) {
+                return 'Email required';
+              }
+              if (!v.contains('@')) return 'Enter a valid email';
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.pop(dialogCtx);
+              context.read<AuthBloc>().add(
+                AppAuthPasswordResetRequested(email: emailCtrl.text.trim()),
+              );
+            },
+            child: const Text('Send reset link'),
           ),
         ],
       ),

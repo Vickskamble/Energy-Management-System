@@ -18,6 +18,11 @@ final class AppAuthLogoutRequested extends AppAuthEvent {
   const AppAuthLogoutRequested();
 }
 
+final class AppAuthPasswordResetRequested extends AppAuthEvent {
+  final String email;
+  const AppAuthPasswordResetRequested({required this.email});
+}
+
 final class AppAuthCheckRequested extends AppAuthEvent {
   const AppAuthCheckRequested();
 }

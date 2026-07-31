@@ -28,3 +28,7 @@ final class AppAuthError extends AppAuthState {
 final class AppAuthRegisterSuccess extends AppAuthState {
   const AppAuthRegisterSuccess();
 }
+
+final class AppAuthPasswordResetSent extends AppAuthState {
+  const AppAuthPasswordResetSent();
+}

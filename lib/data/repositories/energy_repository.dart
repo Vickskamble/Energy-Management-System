@@ -1,8 +1,9 @@
-import 'dart:math';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import '../../core/config/app_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/network/supabase_client.dart';
+import '../../core/utils/app_logger.dart';
 import '../../domain/entities/energy_log_entity.dart';
 import '../datasources/local/energy_log_local_datasource.dart';
 import '../datasources/remote/energy_log_remote_datasource.dart';
@@ -31,6 +32,49 @@ class EnergyRepository {
   Future<EnergyLogEntity> saveReading(EnergyLogModel model) async {
     await _local.insertLog(model);
     return model.toEntity();
+  }
+
+  /// Update an existing reading (local + best-effort remote sync)
+  Future<void> updateReading(EnergyLogModel model) async {
+    await _local.updateLog(model);
+    if (model.isSynced && SupabaseClientManager.isInitialized) {
+      try {
+        await _remote.updateLog(model);
+        await _local.markAsSynced(model.id);
+      } catch (e) {
+        AppLogger.w('Remote update deferred (will sync later): $e');
+      }
+    }
+  }
+
+  /// Delete a reading (local always; remote best-effort)
+  Future<void> deleteReading(String id, {bool synced = false}) async {
+    await _local.deleteLog(id);
+    if (synced && SupabaseClientManager.isInitialized) {
+      try {
+        await _remote.deleteLog(id);
+      } catch (e) {
+        AppLogger.w('Remote delete deferred (will sync later): $e');
+      }
+    }
+  }
+
+  /// Check for a duplicate reading (same meter, near-identical time)
+  Future<EnergyLogEntity?> findDuplicateReading(
+    String meterName,
+    DateTime loggedAt,
+  ) async {
+    final model = await _local.findDuplicate(meterName, loggedAt);
+    return model?.toEntity();
+  }
+
+  /// Wipe all cached readings (used when the logged-in user changes)
+  Future<void> clearLocalCache() async {
+    try {
+      await _local.clearAll();
+    } catch (e) {
+      AppLogger.e('Failed to clear local readings cache', e);
+    }
   }
 
   /// Get dashboard aggregate data from local storage
@@ -150,83 +194,31 @@ class EnergyRepository {
   }
 
   /// If local DB is empty, pull data from Supabase and cache locally.
-  /// Falls back to generating demo seed data so the dashboard always has something to show.
+  /// Never generates placeholder data — an empty dashboard is honest data.
   Future<void> _ensureLocalDataSynced() async {
     try {
       final count = await _local.getLogCount();
       if (count > 0) return;
 
-      List<EnergyLogModel>? remoteLogs;
-      if (SupabaseClientManager.isInitialized) {
-        try {
-          remoteLogs = await _remote.fetchLogs(limit: 200);
-        } catch (_) {
-          // Supabase unavailable — fall through to seed data
+      if (!SupabaseClientManager.isInitialized) return;
+
+      try {
+        final remoteLogs = await _remote.fetchLogs(limit: 200);
+        if (remoteLogs.isNotEmpty) {
+          await _local.insertLogs(remoteLogs);
         }
+      } catch (e) {
+        AppLogger.e('Failed to pull remote logs', e);
       }
-
-      if (remoteLogs != null && remoteLogs.isNotEmpty) {
-        await _local.insertLogs(remoteLogs);
-      } else {
-        final seed = _generateSeedData();
-        await _local.insertLogs(seed);
-      }
-    } catch (_) {
-      // Silently continue — local data might be empty, that's OK
+    } catch (e) {
+      AppLogger.e('Failed to ensure local data', e);
     }
   }
 
-  /// Generate 90 realistic demo records (3 meters x 30 days)
-  List<EnergyLogModel> _generateSeedData() {
-    final rng = Random(42);
-    final meters = [
-      'HT-11 kV Feeder-1',
-      'HT-11 kV Feeder-2',
-      'HT-11 kV Feeder-3',
-    ];
-    final now = DateTime.now();
-
-    final List<EnergyLogModel> models = [];
-
-    for (final meter in meters) {
-      for (int day = 30; day >= 1; day--) {
-        final loggedAt = DateTime(
-          now.year,
-          now.month,
-          now.day,
-          10,
-          0,
-          0,
-        ).subtract(Duration(days: day));
-
-        final kwhDelta = 280 + rng.nextDouble() * 180;
-        final kvahDelta = kwhDelta * (0.95 + rng.nextDouble() * 0.07);
-        final rkvarhLag = 20 + rng.nextDouble() * 60;
-        final rkvarhLead = 5 + rng.nextDouble() * 15;
-        final md = (140 + rng.nextDouble() * 100).clamp(100.0, 350.0);
-
-        final model = EnergyLogModel.create(
-          meterName: meter,
-          kwh: (kwhDelta * 100).roundToDouble() / 100,
-          kvah: (kvahDelta * 100).roundToDouble() / 100,
-          rkvarhLag: (rkvarhLag * 100).roundToDouble() / 100,
-          rkvarhLead: (rkvarhLead * 100).roundToDouble() / 100,
-          mdRecorded: md,
-          loggedAt: loggedAt,
-        );
-
-        models.add(model);
-      }
-    }
-
-    return models;
-  }
-
-  /// Bill = Total Units × ₹8.68
+  /// Bill = Total Units × configured tariff
   /// where Total Units = sum(consumed_kwh) × multiplyingFactor (5)
   double _calculateBill(double totalConsumption) {
-    return (totalConsumption * AppConstants.tariffPerUnit * 100)
-            .roundToDouble() /
+    return (totalConsumption * AppConfig.tariffPerUnit * 100).roundToDouble() /
         100;
   }
 }

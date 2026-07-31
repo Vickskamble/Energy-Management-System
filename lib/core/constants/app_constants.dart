@@ -9,6 +9,7 @@ class AppConstants {
   static const double defaultContractDemandKva = 400.00;
   static const double pfPenaltyThreshold = 0.95;
   static const double mdWarningThresholdKva = 380.00;
+  static const double mdWarningRatio = 0.9;
   static const double pfCriticalThreshold = 0.90;
 
   static const double demandChargePerKva = 320.00;

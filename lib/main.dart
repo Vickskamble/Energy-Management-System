@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'core/config/app_config.dart';
 import 'core/network/supabase_client.dart';
 import 'core/utils/notification_service.dart';
 import 'core/utils/sync_manager.dart';
+import 'core/utils/user_cache_guard.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'data/repositories/energy_repository.dart';
@@ -54,6 +56,7 @@ void main() async {
   };
 
   await dotenv.load(fileName: '.env');
+  await TariffStore.load();
 
   try {
     await SupabaseClientManager.initialize();
@@ -145,20 +148,23 @@ class _AppEntryState extends State<_AppEntry> {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: widget.themeMode,
-      home: BlocBuilder<AuthBloc, AppAuthState>(
-        builder: (context, state) {
-          return switch (state) {
-            AppAuthInitial() ||
-            AppAuthLoading() ||
-            AppAuthUnauthenticated() ||
-            AppAuthRegisterSuccess() ||
-            AppAuthError _ => const LoginPage(),
-            AppAuthAuthenticated() => MainNavigationHub(
-              onToggleTheme: widget.onToggleTheme,
-              isDark: widget.themeMode == ThemeMode.dark,
-            ),
-          };
-        },
+      home: UserCacheGuard(
+        child: BlocBuilder<AuthBloc, AppAuthState>(
+          builder: (context, state) {
+            return switch (state) {
+              AppAuthInitial() ||
+              AppAuthLoading() ||
+              AppAuthUnauthenticated() ||
+              AppAuthRegisterSuccess() ||
+              AppAuthPasswordResetSent() ||
+              AppAuthError _ => const LoginPage(),
+              AppAuthAuthenticated() => MainNavigationHub(
+                onToggleTheme: widget.onToggleTheme,
+                isDark: widget.themeMode == ThemeMode.dark,
+              ),
+            };
+          },
+        ),
       ),
     );
   }

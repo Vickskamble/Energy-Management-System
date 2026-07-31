@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_section.dart';
 import '../auth_bloc/auth_bloc.dart';
@@ -23,7 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 3, vsync: this);
+    _tabCtrl = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -50,13 +52,22 @@ class _SettingsScreenState extends State<SettingsScreen>
               text: 'Appearance',
               icon: Icon(Icons.palette_outlined, size: 18),
             ),
+            Tab(
+              text: 'Billing',
+              icon: Icon(Icons.receipt_long_outlined, size: 18),
+            ),
             Tab(text: 'System', icon: Icon(Icons.memory_outlined, size: 18)),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabCtrl,
-        children: [_buildAccount(), _buildAppearance(), _buildSystem()],
+        children: [
+          _buildAccount(),
+          _buildAppearance(),
+          _buildBilling(),
+          _buildSystem(),
+        ],
       ),
     );
   }
@@ -160,6 +171,73 @@ class _SettingsScreenState extends State<SettingsScreen>
                 contentPadding: EdgeInsets.zero,
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBilling() {
+    final tariffCtrl = TextEditingController(
+      text: AppConfig.tariffPerUnit.toStringAsFixed(2),
+    );
+    final formKey = GlobalKey<FormState>();
+
+    return ListView(
+      padding: const EdgeInsets.all(AppSpacing.page),
+      children: [
+        AppSectionHeader(
+          title: 'Billing',
+          subtitle: 'Tariff configuration used for all bill estimates',
+        ),
+        AppCard(
+          child: Form(
+            key: formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(
+                  controller: tariffCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Energy Tariff (₹ per kWh)',
+                    prefixText: '₹ ',
+                    helperText:
+                        'Applied to energy charges, unit cost and bill forecast',
+                  ),
+                  validator: (v) {
+                    final val = double.tryParse(v ?? '');
+                    if (val == null || val <= 0) {
+                      return 'Enter a valid positive rate';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                AppButton(
+                  label: 'Save Tariff',
+                  icon: Icons.save_outlined,
+                  onPressed: () async {
+                    if (!formKey.currentState!.validate()) return;
+                    final rate = double.parse(tariffCtrl.text.trim());
+                    AppConfig.tariffPerUnit = rate;
+                    await TariffStore.saveTariff(rate);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Tariff updated — bills will recalculate',
+                          ),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ],

@@ -43,6 +43,7 @@ dependencies:
   flutter_bloc: ^9.1.1
   decimal: ^3.2.4
   web: ^1.1.0
+  pdf: ^3.11.3
   freezed_annotation: ^3.1.0
   flutter_local_notifications: ^22.0.1
   share_plus: ^13.2.1
