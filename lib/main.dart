@@ -151,6 +151,7 @@ class _AppEntryState extends State<_AppEntry> {
             AppAuthInitial() ||
             AppAuthLoading() ||
             AppAuthUnauthenticated() ||
+            AppAuthRegisterSuccess() ||
             AppAuthError _ => const LoginPage(),
             AppAuthAuthenticated() => MainNavigationHub(
               onToggleTheme: widget.onToggleTheme,

@@ -118,9 +118,13 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
         await SupabaseClientManager.initialize();
         _trySetupAuthListener();
       }
-      await Supabase.instance.client.auth
+      final res = await Supabase.instance.client.auth
           .signUp(email: event.email.trim(), password: event.password)
           .timeout(const Duration(seconds: 15));
+      if (res.session != null) {
+        await Supabase.instance.client.auth.signOut();
+      }
+      emit(const AppAuthRegisterSuccess());
     } on TimeoutException {
       emit(const AppAuthError('Connection timed out. Check your network.'));
     } on AuthException catch (e) {

@@ -24,3 +24,7 @@ final class AppAuthError extends AppAuthState {
   final String message;
   const AppAuthError(this.message);
 }
+
+final class AppAuthRegisterSuccess extends AppAuthState {
+  const AppAuthRegisterSuccess();
+}

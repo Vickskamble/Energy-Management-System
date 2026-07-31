@@ -119,7 +119,17 @@ class _RegisterPageState extends State<RegisterPage> {
                   const SizedBox(height: 24),
                   BlocConsumer<AuthBloc, AppAuthState>(
                     listener: (context, state) {
-                      if (state is AppAuthError) {
+                      if (state is AppAuthRegisterSuccess) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Account created! Please sign in to continue.',
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        Navigator.pop(context);
+                      } else if (state is AppAuthError) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(state.message),
