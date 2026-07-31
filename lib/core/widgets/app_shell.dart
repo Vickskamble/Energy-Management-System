@@ -46,10 +46,7 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
-
-    if (isMobile) {
-      return _buildMobileLayout();
-    }
+    if (isMobile) return _buildMobileLayout();
     return _buildDesktopLayout();
   }
 
@@ -60,7 +57,7 @@ class _AppShellState extends State<AppShell> {
         title: Text(widget.title),
         actions: widget.actions,
       ),
-      body: AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: widget.body),
+      body: widget.body,
       floatingActionButton: widget.floatingActionButton,
     );
   }
@@ -68,6 +65,7 @@ class _AppShellState extends State<AppShell> {
   Widget _buildDesktopLayout() {
     return Scaffold(
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppSidebar(
             selectedIndex: widget.selectedIndex,
@@ -81,6 +79,7 @@ class _AppShellState extends State<AppShell> {
             isDark: widget.isDark,
             notificationCount: widget.notificationCount,
           ),
+          VerticalDivider(width: 1, thickness: 1, color: Theme.of(context).dividerColor),
           Expanded(
             child: Column(
               children: [
@@ -92,12 +91,8 @@ class _AppShellState extends State<AppShell> {
                   notificationCount: widget.notificationCount,
                   actions: widget.actions,
                 ),
-                Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    child: widget.body,
-                  ),
-                ),
+                Divider(height: 1, thickness: 1, color: Theme.of(context).dividerColor),
+                Expanded(child: widget.body),
               ],
             ),
           ),
