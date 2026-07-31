@@ -15,13 +15,7 @@ class MeterManagementPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showMeterDialog(context),
-        child: const Icon(Icons.add_rounded),
-      ),
-      body: _MeterList(),
-    );
+    return _MeterList();
   }
 
   static Future<void> _showMeterDialog(BuildContext context, {MeterModel? existing}) async {

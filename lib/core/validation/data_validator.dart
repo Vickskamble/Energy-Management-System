@@ -198,13 +198,13 @@ class DataValidator {
 
     passed.add('${logs.length} readings available');
 
-    logs.sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
-    for (int i = 1; i < logs.length; i++) {
-      if (logs[i].kwh < logs[i - 1].kwh) {
-        warnings.add('Cumulative kWh decreased from ${logs[i - 1].kwh} to ${logs[i].kwh} on ${logs[i].loggedAt}');
+    final sortedLogs = [...logs]..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+    for (int i = 1; i < sortedLogs.length; i++) {
+      if (sortedLogs[i].kwh < sortedLogs[i - 1].kwh) {
+        warnings.add('Cumulative kWh decreased from ${sortedLogs[i - 1].kwh} to ${sortedLogs[i].kwh} on ${sortedLogs[i].loggedAt}');
       }
-      if (logs[i].kvah < logs[i - 1].kvah) {
-        warnings.add('Cumulative kVAh decreased from ${logs[i - 1].kvah} to ${logs[i].kvah} on ${logs[i].loggedAt}');
+      if (sortedLogs[i].kvah < sortedLogs[i - 1].kvah) {
+        warnings.add('Cumulative kVAh decreased from ${sortedLogs[i - 1].kvah} to ${sortedLogs[i].kvah} on ${sortedLogs[i].loggedAt}');
       }
     }
     passed.add('Cumulative values are consistent');

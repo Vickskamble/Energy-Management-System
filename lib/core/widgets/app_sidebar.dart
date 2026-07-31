@@ -129,54 +129,74 @@ class _AppSidebarState extends State<AppSidebar> {
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: widget.isDark ? AppColors.borderDark : AppColors.borderLight)),
       ),
-      child: widget.isCollapsed
-          ? Column(
+      child: Column(
+        children: [
+          if (widget.isCollapsed) ...[
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.primary,
+              child: Text(widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
+                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
+            const SizedBox(height: 8),
+            IconButton(
+              icon: Icon(widget.isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 18),
+              onPressed: widget.onThemeToggle,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(height: 4),
+            IconButton(
+              icon: const Icon(Icons.logout_rounded, size: 18),
+              onPressed: widget.onLogout,
+              color: AppColors.danger,
+              tooltip: 'Logout',
+            ),
+          ] else ...[
+            Row(
               children: [
                 CircleAvatar(
-                  radius: 16,
+                  radius: 18,
                   backgroundColor: AppColors.primary,
                   child: Text(widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.userName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          overflow: TextOverflow.ellipsis),
+                      Text(widget.userEmail, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
                 IconButton(
                   icon: Icon(widget.isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 18),
                   onPressed: widget.onThemeToggle,
                   color: AppColors.textSecondary,
                 ),
               ],
-            )
-          : Column(
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: AppColors.primary,
-                      child: Text(widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(widget.userName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                              overflow: TextOverflow.ellipsis),
-                          Text(widget.userEmail, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                              overflow: TextOverflow.ellipsis),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(widget.isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 18),
-                      onPressed: widget.onThemeToggle,
-                      color: AppColors.textSecondary,
-                    ),
-                  ],
-                ),
-              ],
             ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: widget.onLogout,
+                icon: const Icon(Icons.logout_rounded, size: 16),
+                label: const Text('Logout', style: TextStyle(fontSize: 13)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                  side: BorderSide(color: AppColors.danger.withValues(alpha: 0.3)),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

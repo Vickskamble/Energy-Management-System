@@ -120,8 +120,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: BlocListener<EnergyBloc, EnergyState>(
+    return BlocListener<EnergyBloc, EnergyState>(
         listener: (context, state) {
           switch (state) {
             case EnergySuccess(:final currentPowerFactor, :final maxDemandPeak):
@@ -238,7 +237,6 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
             );
           },
         ),
-      ),
     );
   }
 }

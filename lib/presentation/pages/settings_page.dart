@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_section.dart';
+import '../auth_bloc/auth_bloc.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -98,13 +100,17 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   }
 
   Widget _buildAccount() {
+    final authState = context.watch<AuthBloc>().state;
+    final email = authState is AppAuthAuthenticated ? authState.email : 'user@powerems.com';
+    final name = authState is AppAuthAuthenticated ? authState.email.split('@').first : 'User';
+
     return ListView(padding: const EdgeInsets.all(AppSpacing.page), children: [
       AppSectionHeader(title: 'Account', subtitle: 'Manage your account settings'),
       AppCard(child: Column(
         children: [
-          _accountRow(Icons.person_outline, 'Full Name', 'Admin User'),
+          _accountRow(Icons.person_outline, 'Full Name', name),
           const Divider(),
-          _accountRow(Icons.email_outlined, 'Email', 'admin@powerems.com'),
+          _accountRow(Icons.email_outlined, 'Email', email),
           const Divider(),
           _accountRow(Icons.business_outlined, 'Organization', 'PowerEMS Inc.'),
         ],
@@ -140,6 +146,32 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           ListTile(title: const Text('Change password', style: TextStyle(fontSize: 14)), trailing: const Icon(Icons.chevron_right), contentPadding: EdgeInsets.zero, onTap: () {}),
           const Divider(),
           ListTile(title: const Text('Active sessions', style: TextStyle(fontSize: 14)), trailing: const Icon(Icons.chevron_right), contentPadding: EdgeInsets.zero, onTap: () {}),
+          const Divider(),
+          ListTile(
+            title: const Text('Sign out', style: TextStyle(fontSize: 14, color: AppColors.danger)),
+            trailing: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 20),
+            contentPadding: EdgeInsets.zero,
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Sign out'),
+                  content: const Text('Are you sure you want to sign out?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.pop(context);
+                        context.read<AuthBloc>().add(const AppAuthLogoutRequested());
+                      },
+                      child: const Text('Sign out', style: TextStyle(color: AppColors.danger)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       )),
     ]);

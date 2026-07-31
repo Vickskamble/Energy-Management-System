@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/network/supabase_client.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
+export 'auth_event.dart';
+export 'auth_state.dart';
 
 class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
   StreamSubscription<AuthState>? _authSub;

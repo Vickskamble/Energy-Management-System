@@ -13,7 +13,6 @@ import '../../core/calculation/bill_breakdown.dart';
 import '../../core/calculation/bill_calculator.dart';
 import '../../core/insights/insight_generator.dart';
 import '../../core/recommendations/recommendation_engine.dart';
-import '../../core/validation/data_validator.dart';
 import '../../domain/entities/energy_log_entity.dart';
 import '../bloc/energy_bloc.dart';
 import '../bloc/energy_state.dart';
@@ -23,30 +22,30 @@ class ReportsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: BlocBuilder<EnergyBloc, EnergyState>(
-        builder: (context, state) {
-          return switch (state) {
-            EnergyInitial() || EnergyLoading() => const AppLoadingIndicator(message: 'Loading reports...'),
-            EnergySuccess(
-              :final logs,
-              :final estimatedBill,
-              :final activeConsumptionToday,
-              :final currentPowerFactor,
-              :final maxDemandPeak,
-            ) =>
-              _ReportsContent(
-                logs: logs,
-                estimatedBill: estimatedBill,
-                activeConsumptionToday: activeConsumptionToday,
-                currentPowerFactor: currentPowerFactor,
-                maxDemandPeak: maxDemandPeak,
-              ),
-            EnergyValidationError _ => Center(child: Text(state.message)),
-            EnergyOperationFailure _ => Center(child: Text(state.message)),
-          };
-        },
-      ),
+    return BlocBuilder<EnergyBloc, EnergyState>(
+      builder: (context, state) {
+        return switch (state) {
+          EnergyInitial() || EnergyLoading() => const AppLoadingIndicator(
+            message: 'Loading reports...',
+          ),
+          EnergySuccess(
+            :final logs,
+            :final estimatedBill,
+            :final activeConsumptionToday,
+            :final currentPowerFactor,
+            :final maxDemandPeak,
+          ) =>
+            _ReportsContent(
+              logs: logs,
+              estimatedBill: estimatedBill,
+              activeConsumptionToday: activeConsumptionToday,
+              currentPowerFactor: currentPowerFactor,
+              maxDemandPeak: maxDemandPeak,
+            ),
+          EnergyValidationError _ => Center(child: Text(state.message)),
+          EnergyOperationFailure _ => Center(child: Text(state.message)),
+        };
+      },
     );
   }
 }
@@ -72,9 +71,17 @@ class _ReportsContent extends StatelessWidget {
     final entityLogs = logs.cast<EnergyLogEntity>();
     final breakdown = BillCalculator.calculate(logs: entityLogs);
     final kpis = BillCalculator.calculateKpis(breakdown);
-    final validation = DataValidator.validateLogs(entityLogs);
-    final insights = InsightGenerator.generate(breakdown: breakdown, comparison: null, kpis: kpis, logs: entityLogs);
-    final recommendations = RecommendationEngine.generate(breakdown: breakdown, comparison: null, logs: entityLogs);
+    final insights = InsightGenerator.generate(
+      breakdown: breakdown,
+      comparison: null,
+      kpis: kpis,
+      logs: entityLogs,
+    );
+    final recommendations = RecommendationEngine.generate(
+      breakdown: breakdown,
+      comparison: null,
+      logs: entityLogs,
+    );
 
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.page),
@@ -105,7 +112,7 @@ class _ReportsContent extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         if (insights.isNotEmpty) ...[
           AppSectionHeader(title: 'Smart Insights'),
-          ...insights.map((i) => _insightRow(i)),
+          ...insights.take(4).map((i) => _insightRow(i)),
           const SizedBox(height: AppSpacing.lg),
         ],
         if (recommendations.isNotEmpty) ...[
@@ -113,13 +120,11 @@ class _ReportsContent extends StatelessWidget {
           ...recommendations.map((r) => _recRow(r)),
           const SizedBox(height: AppSpacing.lg),
         ],
-        if (validation.issueCount > 0) ...[
-          AppSectionHeader(title: 'Data Quality'),
-          _validationSection(validation),
-          const SizedBox(height: AppSpacing.lg),
-        ],
         if (logs.isEmpty)
-          const AppEmptyState(icon: Icons.description_rounded, title: 'No readings recorded yet')
+          const AppEmptyState(
+            icon: Icons.description_rounded,
+            title: 'No readings recorded yet',
+          )
         else ...[
           AppSectionHeader(title: 'Reading History'),
           AppCard(
@@ -127,7 +132,15 @@ class _ReportsContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AppTable(
-                  columns: const ['Date', 'Meter', 'kWh', 'PF', 'MD (kW)', 'Bill', 'Status'],
+                  columns: const [
+                    'Date',
+                    'Meter',
+                    'kWh',
+                    'PF',
+                    'MD (kW)',
+                    'Bill',
+                    'Status',
+                  ],
                   rows: _buildTableRows(currencyFmt),
                 ),
               ],
@@ -138,28 +151,79 @@ class _ReportsContent extends StatelessWidget {
     );
   }
 
-  Widget _buildExecutiveSummary(NumberFormat currencyFmt, List<EnergyLogEntity> entityLogs, BillBreakdown breakdown, BusinessKpi kpis) {
+  Widget _buildExecutiveSummary(
+    NumberFormat currencyFmt,
+    List<EnergyLogEntity> entityLogs,
+    BillBreakdown breakdown,
+    BusinessKpi kpis,
+  ) {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Executive Summary', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const Text(
+            'Executive Summary',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 4),
-          Text('Bill Analysis for ${entityLogs.length} readings', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          Text(
+            'Bill Analysis for ${entityLogs.length} readings',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
           const Divider(height: 24),
-          Row(children: [
-            _summaryItem('Est. Net Bill', currencyFmt.format(breakdown.netBill), AppColors.kpiCost),
-            _summaryItem('Total Units', '${breakdown.totalUnits.toStringAsFixed(0)} kWh', AppColors.kpiEnergy),
-            _summaryItem('Avg Unit Cost', '₹${breakdown.averageUnitCost.toStringAsFixed(2)}', AppColors.kpiCost),
-            _summaryItem('Bill Health', '${kpis.billHealthScore.toStringAsFixed(0)}/100', kpis.billHealthScore >= 80 ? AppColors.success : AppColors.warning),
-          ]),
+          Row(
+            children: [
+              _summaryItem(
+                'Est. Net Bill',
+                currencyFmt.format(breakdown.netBill),
+                AppColors.kpiCost,
+              ),
+              _summaryItem(
+                'Total Units',
+                '${breakdown.totalUnits.toStringAsFixed(0)} kWh',
+                AppColors.kpiEnergy,
+              ),
+              _summaryItem(
+                'Avg Unit Cost',
+                '₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
+                AppColors.kpiCost,
+              ),
+              _summaryItem(
+                'Bill Health',
+                '${kpis.billHealthScore.toStringAsFixed(0)}/100',
+                kpis.billHealthScore >= 80
+                    ? AppColors.success
+                    : AppColors.warning,
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
-          Row(children: [
-            _summaryItem('Power Factor', breakdown.powerFactor.toStringAsFixed(3), AppColors.kpiPower),
-            _summaryItem('Billing Demand', '${breakdown.billingDemand.toStringAsFixed(1)} kVA', AppColors.kpiDemand),
-            _summaryItem('Load Factor', '${(breakdown.loadFactor * 100).toStringAsFixed(0)}%', breakdown.loadFactor >= 0.75 ? AppColors.success : AppColors.warning),
-            _summaryItem('Energy Score', '${kpis.energyScore.toStringAsFixed(0)}/100', AppColors.kpiEfficiency),
-          ]),
+          Row(
+            children: [
+              _summaryItem(
+                'Power Factor',
+                breakdown.powerFactor.toStringAsFixed(3),
+                AppColors.kpiPower,
+              ),
+              _summaryItem(
+                'Billing Demand',
+                '${breakdown.billingDemand.toStringAsFixed(1)} kVA',
+                AppColors.kpiDemand,
+              ),
+              _summaryItem(
+                'Load Factor',
+                '${(breakdown.loadFactor * 100).toStringAsFixed(0)}%',
+                breakdown.loadFactor >= 0.75
+                    ? AppColors.success
+                    : AppColors.warning,
+              ),
+              _summaryItem(
+                'Energy Score',
+                '${kpis.energyScore.toStringAsFixed(0)}/100',
+                AppColors.kpiEfficiency,
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -170,9 +234,19 @@ class _ReportsContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          ),
           const SizedBox(height: 2),
-          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
@@ -183,39 +257,112 @@ class _ReportsContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Bill Breakdown', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          const Text(
+            'Bill Breakdown',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 12),
-          _billRow('Energy Charges', breakdown.energyCharges, breakdown.energyChargesPercent, AppColors.kpiEnergy),
+          _billRow(
+            'Energy Charges',
+            breakdown.energyCharges,
+            breakdown.energyChargesPercent,
+            AppColors.kpiEnergy,
+          ),
           const Divider(height: 16),
-          _billRow('Demand Charges', breakdown.demandCharges, breakdown.demandChargesPercent, AppColors.kpiDemand),
+          _billRow(
+            'Demand Charges',
+            breakdown.demandCharges,
+            breakdown.demandChargesPercent,
+            AppColors.kpiDemand,
+          ),
           const Divider(height: 16),
-          _billRow('FAC', breakdown.facCharges, breakdown.facPercent, AppColors.warning),
+          _billRow(
+            'FAC',
+            breakdown.facCharges,
+            breakdown.facPercent,
+            AppColors.warning,
+          ),
           const Divider(height: 16),
-          _billRow('Wheeling', breakdown.wheelingCharges, breakdown.wheelingPercent, AppColors.textSecondary),
+          _billRow(
+            'Wheeling',
+            breakdown.wheelingCharges,
+            breakdown.wheelingPercent,
+            AppColors.textSecondary,
+          ),
           const Divider(height: 16),
-          _billRow('Electricity Duty', breakdown.electricityDuty, breakdown.dutyPercent, AppColors.kpiEfficiency),
+          _billRow(
+            'Electricity Duty',
+            breakdown.electricityDuty,
+            breakdown.dutyPercent,
+            AppColors.kpiEfficiency,
+          ),
           const Divider(height: 16),
-          _billRow('Taxes', breakdown.taxes, breakdown.taxesPercent, AppColors.kpiCO2),
-          if (breakdown.pfRebate > 0) ...[const Divider(height: 16), _rebateRow('PF Rebate', breakdown.pfRebate)],
-          if (breakdown.pfSurcharge > 0) ...[const Divider(height: 16), _penaltyRow('PF Surcharge', breakdown.pfSurcharge)],
+          _billRow(
+            'Taxes',
+            breakdown.taxes,
+            breakdown.taxesPercent,
+            AppColors.kpiCO2,
+          ),
+          if (breakdown.pfRebate > 0) ...[
+            const Divider(height: 16),
+            _rebateRow('PF Rebate', breakdown.pfRebate),
+          ],
+          if (breakdown.pfSurcharge > 0) ...[
+            const Divider(height: 16),
+            _penaltyRow('PF Surcharge', breakdown.pfSurcharge),
+          ],
           const Divider(height: 16),
-          _billRow('Net Bill', breakdown.netBill, 100, AppColors.primary, bold: true),
+          _billRow(
+            'Net Bill',
+            breakdown.netBill,
+            100,
+            AppColors.primary,
+            bold: true,
+          ),
         ],
       ),
     );
   }
 
-  Widget _billRow(String label, double amount, double percent, Color color, {bool bold = false}) {
+  Widget _billRow(
+    String label,
+    double amount,
+    double percent,
+    Color color, {
+    bool bold = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 10),
-          Expanded(child: Text(label, style: TextStyle(fontSize: 13, fontWeight: bold ? FontWeight.w700 : FontWeight.w500))),
-          if (percent > 0 && percent < 100) Text('${percent.toStringAsFixed(1)}%', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+          if (percent > 0 && percent < 100)
+            Text(
+              '${percent.toStringAsFixed(1)}%',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
           const SizedBox(width: 16),
-          Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 13, fontWeight: bold ? FontWeight.w700 : FontWeight.w600)),
+          Text(
+            '₹${amount.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -226,10 +373,29 @@ class _ReportsContent extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: AppColors.success, shape: BoxShape.circle)),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: AppColors.success,
+              shape: BoxShape.circle,
+            ),
+          ),
           const SizedBox(width: 10),
-          Expanded(child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-          Text('-₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.success)),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
+          Text(
+            '-₹${amount.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.success,
+            ),
+          ),
         ],
       ),
     );
@@ -240,10 +406,29 @@ class _ReportsContent extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: AppColors.danger, shape: BoxShape.circle)),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: AppColors.danger,
+              shape: BoxShape.circle,
+            ),
+          ),
           const SizedBox(width: 10),
-          Expanded(child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-          Text('+₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.danger)),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
+          Text(
+            '+₹${amount.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.danger,
+            ),
+          ),
         ],
       ),
     );
@@ -262,13 +447,27 @@ class _ReportsContent extends StatelessWidget {
         children: [
           Icon(Icons.info_rounded, size: 16, color: iconColor),
           const SizedBox(width: 8),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(insight.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              Text(insight.description, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            ],
-          )),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  insight.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  insight.description,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -279,38 +478,42 @@ class _ReportsContent extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.auto_awesome_rounded, size: 16, color: AppColors.primary),
+          const Icon(
+            Icons.auto_awesome_rounded,
+            size: 16,
+            color: AppColors.primary,
+          ),
           const SizedBox(width: 8),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(rec.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              Text(rec.action, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-              if (rec.estimatedSavings != null)
-                Text('Savings: ₹${rec.estimatedSavings!.toStringAsFixed(0)}/mo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.success)),
-            ],
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _validationSection(ValidationResult validation) {
-    return AppCard(
-      child: Column(
-        children: [
-          ...validation.passed.map((p) => Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: Row(children: [Icon(Icons.check_circle, size: 14, color: AppColors.success), const SizedBox(width: 8), Text(p, style: TextStyle(fontSize: 12, color: AppColors.textSecondary))]),
-          )),
-          ...validation.warnings.map((w) => Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: Row(children: [Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.warning), const SizedBox(width: 8), Expanded(child: Text(w, style: TextStyle(fontSize: 12, color: AppColors.warning)))]),
-          )),
-          ...validation.errors.map((e) => Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: Row(children: [Icon(Icons.error, size: 14, color: AppColors.danger), const SizedBox(width: 8), Expanded(child: Text(e, style: TextStyle(fontSize: 12, color: AppColors.danger)))]),
-          )),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  rec.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  rec.action,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (rec.estimatedSavings != null)
+                  Text(
+                    'Savings: ₹${rec.estimatedSavings!.toStringAsFixed(0)}/mo',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.success,
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -319,23 +522,33 @@ class _ReportsContent extends StatelessWidget {
   List<List<Widget>> _buildTableRows(NumberFormat currencyFmt) {
     final entities = logs.cast<EnergyLogEntity>();
     final dateFmt = DateFormat('dd/MM/yy HH:mm');
-    return entities.map((log) => [
-      Text(dateFmt.format(log.loggedAt)),
-      Text(log.meterName),
-      Text(log.kwh.toStringAsFixed(1)),
-      Text(log.powerFactor.toStringAsFixed(3)),
-      Text(log.mdRecorded.toStringAsFixed(1)),
-      Text('₹ ${log.estimatedBill.toStringAsFixed(0)}'),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: (log.isSynced ? AppColors.success : AppColors.warning).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(log.isSynced ? 'Cloud' : 'Pending',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                color: log.isSynced ? AppColors.success : AppColors.warning)),
-      ),
-    ]).toList();
+    return entities
+        .map(
+          (log) => [
+            Text(dateFmt.format(log.loggedAt)),
+            Text(log.meterName),
+            Text(log.kwh.toStringAsFixed(1)),
+            Text(log.powerFactor.toStringAsFixed(3)),
+            Text(log.mdRecorded.toStringAsFixed(1)),
+            Text('₹ ${log.estimatedBill.toStringAsFixed(0)}'),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: (log.isSynced ? AppColors.success : AppColors.warning)
+                    .withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                log.isSynced ? 'Cloud' : 'Pending',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: log.isSynced ? AppColors.success : AppColors.warning,
+                ),
+              ),
+            ),
+          ],
+        )
+        .toList();
   }
 }

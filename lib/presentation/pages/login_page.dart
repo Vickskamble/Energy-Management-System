@@ -3,8 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_button.dart';
 import '../auth_bloc/auth_bloc.dart';
-import '../auth_bloc/auth_event.dart';
-import '../auth_bloc/auth_state.dart';
 import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -101,12 +99,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                               style: TextStyle(fontSize: 16, color: Colors.white.withValues(alpha: 0.7), height: 1.5),
                             ),
                             const SizedBox(height: 48),
-                            Row(
+                            Wrap(
+                              spacing: 16,
+                              runSpacing: 8,
                               children: [
                                 _featureBadge(Icons.analytics_rounded, 'Real-time Monitoring'),
-                                const SizedBox(width: 24),
                                 _featureBadge(Icons.auto_awesome_rounded, 'AI Insights'),
-                                const SizedBox(width: 24),
                                 _featureBadge(Icons.savings_rounded, 'Cost Optimization'),
                               ],
                             ),

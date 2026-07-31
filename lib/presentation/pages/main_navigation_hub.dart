@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/widgets/app_shell.dart';
 import '../auth_bloc/auth_bloc.dart';
-import '../auth_bloc/auth_event.dart';
+import '../bloc/energy_bloc.dart';
+import '../bloc/energy_event.dart';
 import 'dashboard_page.dart';
 import 'reading_entry_page.dart';
 import 'analysis_page.dart';
@@ -22,6 +23,12 @@ class MainNavigationHub extends StatefulWidget {
 
 class _MainNavigationHubState extends State<MainNavigationHub> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<EnergyBloc>().add(const LoadInitialDashboardData());
+  }
 
   final List<Widget> _pages = const [
     DashboardPage(),
@@ -43,6 +50,9 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   Widget build(BuildContext context) {
     final titles = ['Dashboard', 'Reading Entry', 'Analysis', 'Reports', 'Meter Management'];
     final hubTitle = _selectedIndex < titles.length ? titles[_selectedIndex] : 'PowerEMS';
+    final authState = context.watch<AuthBloc>().state;
+    final email = authState is AppAuthAuthenticated ? authState.email : 'user@powerems.com';
+    final name = authState is AppAuthAuthenticated ? authState.email.split('@').first : 'User';
 
     return AppShell(
       title: hubTitle,
@@ -52,12 +62,12 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         index: _selectedIndex,
         children: _pages,
       ),
-      userName: 'Admin',
-      userEmail: 'admin@powerems.com',
+      userName: name,
+      userEmail: email,
       onLogout: () => context.read<AuthBloc>().add(const AppAuthLogoutRequested()),
       onThemeToggle: () => widget.onToggleTheme?.call(),
       isDark: widget.isDark,
-      notificationCount: 3,
+      notificationCount: 0,
     );
   }
 }

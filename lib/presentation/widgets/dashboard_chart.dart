@@ -11,10 +11,19 @@ class DashboardChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (logs.isEmpty) {
-      return const SizedBox(height: 220, child: Center(child: Text('No data available for chart', style: TextStyle(color: AppColors.textSecondary))));
+      return const SizedBox(
+        height: 220,
+        child: Center(
+          child: Text(
+            'No data available for chart',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
+      );
     }
 
-    final sorted = List<EnergyLogEntity>.from(logs)..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+    final sorted = List<EnergyLogEntity>.from(logs)
+      ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
     final kwhSpots = <FlSpot>[];
     final mdSpots = <FlSpot>[];
     double maxY = 0;
@@ -31,57 +40,167 @@ class DashboardChart extends StatelessWidget {
     final contractDemand = AppConstants.defaultContractDemandKva;
     final chartMaxY = (maxY > contractDemand ? maxY : contractDemand) * 1.15;
 
-    return SizedBox(
-      height: 260,
-      child: LineChart(LineChartData(
-        minX: 0, maxX: (sorted.length - 1).toDouble().clamp(0, double.infinity), minY: 0, maxY: chartMaxY,
-        gridData: FlGridData(show: true, drawVerticalLine: false,
-          horizontalInterval: (chartMaxY / 4).ceilToDouble().clamp(1, double.infinity),
-          getDrawingHorizontalLine: (value) => FlLine(color: AppColors.borderLight, strokeWidth: 1)),
-        titlesData: FlTitlesData(
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 48,
-            getTitlesWidget: (value, meta) {
-              if (value == meta.max) return const SizedBox.shrink();
-              return Padding(padding: const EdgeInsets.only(right: 4),
-                child: Text('${value.toInt()}', style: TextStyle(fontSize: 10, color: AppColors.textSecondary, fontFamily: 'JetBrains Mono')));
-            })),
-          bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 32,
-            interval: _bottomInterval(sorted.length),
-            getTitlesWidget: (value, meta) {
-              final idx = value.toInt();
-              if (idx < 0 || idx >= sorted.length) return const SizedBox.shrink();
-              final date = sorted[idx].loggedAt;
-              return Padding(padding: const EdgeInsets.only(top: 4),
-                child: Text('${date.day}/${date.hour}h', style: TextStyle(fontSize: 9, color: AppColors.textSecondary)));
-            })),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _legendItem(AppColors.primary, 'Consumption (kWh)'),
+            const SizedBox(width: 16),
+            _legendItem(AppColors.warning, 'Max Demand (kVA)'),
+          ],
         ),
-        borderData: FlBorderData(show: false),
-        lineBarsData: [
-          _line(spots: kwhSpots, color: AppColors.primary),
-          _line(spots: mdSpots, color: AppColors.warning),
-        ],
-        extraLinesData: ExtraLinesData(horizontalLines: [
-          HorizontalLine(y: contractDemand, color: AppColors.danger, strokeWidth: 1.5, dashArray: [6, 4],
-            label: HorizontalLineLabel(show: true, alignment: Alignment.topRight,
-              style: TextStyle(color: AppColors.danger, fontSize: 10, fontWeight: FontWeight.w500),
-              labelResolver: (_) => 'Contract Demand (${contractDemand.toInt()} kVA)')),
-        ]),
-        lineTouchData: LineTouchData(touchTooltipData: LineTouchTooltipData(
-          getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
-            final isKwh = spot.barIndex == 0;
-            return LineTooltipItem('${isKwh ? 'kWh' : 'kVA'}: ${spot.y.toStringAsFixed(1)}',
-              TextStyle(color: isKwh ? AppColors.primary : AppColors.warning, fontWeight: FontWeight.bold, fontSize: 12));
-          }).toList(),
-        )),
-      )),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 260,
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: (sorted.length - 1).toDouble().clamp(0, double.infinity),
+              minY: 0,
+              maxY: chartMaxY,
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: (chartMaxY / 4).ceilToDouble().clamp(
+                  1,
+                  double.infinity,
+                ),
+                getDrawingHorizontalLine: (value) =>
+                    FlLine(color: AppColors.borderLight, strokeWidth: 1),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 48,
+                    getTitlesWidget: (value, meta) {
+                      if (value == meta.max) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Text(
+                          '${value.toInt()}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
+                            fontFamily: 'JetBrains Mono',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 32,
+                    interval: _bottomInterval(sorted.length),
+                    getTitlesWidget: (value, meta) {
+                      final idx = value.toInt();
+                      if (idx < 0 || idx >= sorted.length) {
+                        return const SizedBox.shrink();
+                      }
+                      final date = sorted[idx].loggedAt;
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          '${date.day}/${date.hour}h',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              lineBarsData: [
+                _line(spots: kwhSpots, color: AppColors.primary),
+                _line(spots: mdSpots, color: AppColors.warning),
+              ],
+              extraLinesData: ExtraLinesData(
+                horizontalLines: [
+                  HorizontalLine(
+                    y: contractDemand,
+                    color: AppColors.danger,
+                    strokeWidth: 1.5,
+                    dashArray: [6, 4],
+                    label: HorizontalLineLabel(
+                      show: true,
+                      alignment: Alignment.topRight,
+                      style: TextStyle(
+                        color: AppColors.danger,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      labelResolver: (_) =>
+                          'Contract Demand (${contractDemand.toInt()} kVA)',
+                    ),
+                  ),
+                ],
+              ),
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+                    final isKwh = spot.barIndex == 0;
+                    return LineTooltipItem(
+                      '${isKwh ? 'kWh' : 'kVA'}: ${spot.y.toStringAsFixed(1)}',
+                      TextStyle(
+                        color: isKwh ? AppColors.primary : AppColors.warning,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _legendItem(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        ),
+      ],
     );
   }
 
   LineChartBarData _line({required List<FlSpot> spots, required Color color}) {
-    return LineChartBarData(spots: spots, isCurved: true, curveSmoothness: 0.25, color: color, barWidth: 2.5, isStrokeCapRound: true,
-      dotData: const FlDotData(show: false), belowBarData: BarAreaData(show: true, color: color.withValues(alpha: 0.08)));
+    return LineChartBarData(
+      spots: spots,
+      isCurved: true,
+      curveSmoothness: 0.25,
+      color: color,
+      barWidth: 2.5,
+      isStrokeCapRound: true,
+      dotData: const FlDotData(show: false),
+      belowBarData: BarAreaData(
+        show: true,
+        color: color.withValues(alpha: 0.08),
+      ),
+    );
   }
 
   double _bottomInterval(int count) {
