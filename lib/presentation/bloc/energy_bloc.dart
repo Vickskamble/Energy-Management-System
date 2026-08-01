@@ -26,7 +26,10 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
     LoadInitialDashboardData event,
     Emitter<EnergyState> emit,
   ) async {
-    emit(const EnergyLoading());
+    // Silent refresh: when data already exists, skip the loading state so
+    // periodic refreshes never flicker the screens.
+    final hasData = state is EnergySuccess;
+    if (!hasData) emit(const EnergyLoading());
     try {
       final dashboard = await _repository.getDashboardData();
 
@@ -44,13 +47,15 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
         ),
       );
     } on AppException catch (e) {
-      emit(EnergyOperationFailure(e.message));
+      if (!hasData) emit(EnergyOperationFailure(e.message));
     } catch (_) {
-      emit(
-        const EnergyOperationFailure(
-          'Failed to load dashboard. Check your connection and try again.',
-        ),
-      );
+      if (!hasData) {
+        emit(
+          const EnergyOperationFailure(
+            'Failed to load dashboard. Check your connection and try again.',
+          ),
+        );
+      }
     }
   }
 

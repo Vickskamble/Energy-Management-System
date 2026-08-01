@@ -30,14 +30,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     context.read<EnergyBloc>().add(const LoadInitialDashboardData());
   }
 
-  final List<Widget> _pages = const [
-    DashboardPage(),
-    ReadingEntryPage(),
-    AnalysisPage(),
-    ReportsPage(),
-    MeterManagementPage(),
-  ];
-
   void _onItemTapped(int index) {
     if (index == 5) {
       Navigator.push(
@@ -78,7 +70,17 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       title: hubTitle,
       selectedIndex: _selectedIndex,
       onItemSelected: _onItemTapped,
-      body: IndexedStack(index: _selectedIndex, children: _pages),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          // Dashboard auto-refreshes only while its tab is visible.
+          DashboardPage(isActive: _selectedIndex == 0),
+          const ReadingEntryPage(),
+          const AnalysisPage(),
+          const ReportsPage(),
+          const MeterManagementPage(),
+        ],
+      ),
       userName: name,
       userEmail: email,
       onLogout: () =>

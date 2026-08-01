@@ -24,7 +24,10 @@ import '../widgets/dashboard_chart.dart';
 import '../widgets/monthly_consumption_chart.dart';
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  /// Only refresh automatically while this tab is visible.
+  final bool isActive;
+
+  const DashboardPage({super.key, this.isActive = true});
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -36,15 +39,36 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.isActive) _startAutoRefresh();
+  }
+
+  @override
+  void didUpdateWidget(covariant DashboardPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive == widget.isActive) return;
+    if (widget.isActive) {
+      _startAutoRefresh();
+    } else {
+      _stopAutoRefresh();
+    }
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer?.cancel();
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted) return;
       context.read<EnergyBloc>().add(const LoadInitialDashboardData());
     });
   }
 
+  void _stopAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+  }
+
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    _stopAutoRefresh();
     super.dispose();
   }
 
