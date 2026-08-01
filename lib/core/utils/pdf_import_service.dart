@@ -140,7 +140,7 @@ class PdfImportService {
   static double? _findMaxDemand(List<String> lines) {
     return _numberForLabel(
       lines,
-      RegExp(r'max(imum)?\s*demand|recorded\s*demand|\bmd\b',
+      RegExp(r'max(imum)?\s*demand|recorded\s*demand|demand\s*\(kva\)|\bmdi\b|\bmd\b',
           caseSensitive: false),
       skipDateLines: true,
     );
@@ -156,7 +156,7 @@ class PdfImportService {
 
   static double? _findPowerFactor(List<String> lines) {
     for (final line in lines) {
-      if (!RegExp(r'power\s*factor|\bpf\b', caseSensitive: false)
+      if (!RegExp(r'power\s*factor|\bpf\b|p\.?\s*f\.?', caseSensitive: false)
           .hasMatch(line)) {
         continue;
       }
