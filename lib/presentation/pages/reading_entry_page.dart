@@ -45,6 +45,20 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
   void initState() {
     super.initState();
     _loadMeters();
+    context.read<MeterRepository>().addListener(_loadMeters);
+  }
+
+  @override
+  void dispose() {
+    context.read<MeterRepository>().removeListener(_loadMeters);
+    _currentKwhCtrl.dispose();
+    _previousKwhCtrl.dispose();
+    _currentKvahCtrl.dispose();
+    _previousKvahCtrl.dispose();
+    _rkvarhLagCtrl.dispose();
+    _rkvarhLeadCtrl.dispose();
+    _mdRecordedCtrl.dispose();
+    super.dispose();
   }
 
   double _selectedMeterContractKva() {
@@ -81,18 +95,6 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     } finally {
       if (mounted) setState(() => _fetchingPrevious = false);
     }
-  }
-
-  @override
-  void dispose() {
-    _currentKwhCtrl.dispose();
-    _previousKwhCtrl.dispose();
-    _currentKvahCtrl.dispose();
-    _previousKvahCtrl.dispose();
-    _rkvarhLagCtrl.dispose();
-    _rkvarhLeadCtrl.dispose();
-    _mdRecordedCtrl.dispose();
-    super.dispose();
   }
 
   void _clearForm() {

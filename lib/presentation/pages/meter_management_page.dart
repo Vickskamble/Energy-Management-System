@@ -125,6 +125,13 @@ class _MeterListState extends State<_MeterList> {
   void initState() {
     super.initState();
     _load();
+    context.read<MeterRepository>().addListener(_load);
+  }
+
+  @override
+  void dispose() {
+    context.read<MeterRepository>().removeListener(_load);
+    super.dispose();
   }
 
   Future<void> _load() async {

@@ -102,7 +102,7 @@ class EnergyRepository {
     final now = DateTime.now();
     final nextMonthStart = DateTime(now.year, now.month + 1, 1);
 
-    final allLogs = await _local.getAllLogs(limit: 100);
+    final allLogs = await _local.getAllLogs();
     final todayLogs = await _local.getLogsInRange(
       from: todayStart,
       to: tomorrowStart,
