@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/network/supabase_client.dart';
+import '../../core/utils/app_logger.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 export 'auth_event.dart';
@@ -105,7 +106,8 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
     } on AuthException catch (e) {
       emit(AppAuthError(e.message));
     } catch (e) {
-      emit(AppAuthError('Login failed: $e'));
+      AppLogger.e('Login failed', e);
+      emit(const AppAuthError('Unable to sign in. Please check your credentials.'));
     }
   }
 
@@ -131,7 +133,8 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
     } on AuthException catch (e) {
       emit(AppAuthError(e.message));
     } catch (e) {
-      emit(AppAuthError('Registration failed: $e'));
+      AppLogger.e('Registration failed', e);
+      emit(const AppAuthError('Registration failed. Please try again.'));
     }
   }
 
@@ -150,7 +153,8 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
     } on AuthException catch (e) {
       emit(AppAuthError(e.message));
     } catch (e) {
-      emit(AppAuthError('Logout failed: $e'));
+      AppLogger.e('Logout failed', e);
+      emit(const AppAuthError('Unable to sign out right now.'));
     }
   }
 
@@ -173,7 +177,8 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
     } on AuthException catch (e) {
       emit(AppAuthError(e.message));
     } catch (e) {
-      emit(AppAuthError('Password reset failed: $e'));
+      AppLogger.e('Password reset failed', e);
+      emit(const AppAuthError('Unable to send the reset link. Please try again.'));
     }
   }
 

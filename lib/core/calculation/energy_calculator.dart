@@ -1,4 +1,5 @@
 import 'dart:math';
+import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 
 class EnergyCalculator {
@@ -97,9 +98,9 @@ class EnergyCalculator {
         energyCharges + demandCharges + facCharges + wheelingCharges;
     final duty = calculateElectricityDuty(
       subtotal,
-      AppConstants.electricityDutyPercent,
+      AppConfig.electricityDutyPercent,
     );
-    final tax = calculateTaxes(subtotal + duty, AppConstants.taxPercent);
+    final tax = calculateTaxes(subtotal + duty, AppConfig.taxPercent);
     return (subtotal + duty + tax + pfSurcharge) - pfRebate - subsidy;
   }
 

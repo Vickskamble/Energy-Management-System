@@ -100,7 +100,10 @@ class _EmsAppState extends State<EmsApp> {
         providers: [
           BlocProvider<AuthBloc>(create: (_) => AuthBloc()),
           BlocProvider<EnergyBloc>(
-            create: (_) => EnergyBloc(repository: widget.repository),
+            create: (_) => EnergyBloc(
+              repository: widget.repository,
+              meterRepository: MeterRepository(),
+            ),
           ),
         ],
         child: _AppEntry(themeMode: _themeMode, onToggleTheme: _toggleTheme),

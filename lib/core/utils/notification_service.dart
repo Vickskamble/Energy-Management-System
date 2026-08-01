@@ -106,4 +106,12 @@ class NotificationService {
     title: '☁️ Sync Complete',
     body: '$count offline reading(s) synced to cloud.',
   );
+
+  Future<void> showReadingReminder() => showAlert(
+    id: 4,
+    title: '📝 Reading Due',
+    body:
+        'Month is ending and no reading has been recorded yet — '
+        'record today to keep the bill estimate accurate.',
+  );
 }

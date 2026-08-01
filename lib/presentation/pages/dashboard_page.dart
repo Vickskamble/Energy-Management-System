@@ -16,6 +16,7 @@ import '../../core/calculation/bill_forecast.dart';
 import '../../core/calculation/savings_opportunity.dart';
 import '../../core/insights/insight_generator.dart';
 import '../../core/recommendations/recommendation_engine.dart';
+import '../../data/repositories/meter_repository.dart';
 import '../../domain/entities/energy_log_entity.dart';
 import '../bloc/energy_bloc.dart';
 import '../bloc/energy_event.dart';
@@ -129,7 +130,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-class _DashboardContent extends StatelessWidget {
+class _DashboardContent extends StatefulWidget {
   final List<dynamic> logs;
   final double estimatedBill;
   final double totalConsumption;
@@ -147,8 +148,117 @@ class _DashboardContent extends StatelessWidget {
   });
 
   @override
+  State<_DashboardContent> createState() => _DashboardContentState();
+}
+
+class _DashboardContentState extends State<_DashboardContent> {
+  String? _site;
+  Map<String, String> _meterSites = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMeterSites();
+  }
+
+  Future<void> _loadMeterSites() async {
+    try {
+      final meters = await context.read<MeterRepository>().getAllMeters();
+      if (!mounted) return;
+      setState(() {
+        _meterSites = {for (final m in meters) m.name: m.site};
+      });
+    } catch (_) {
+      // Best-effort — dashboard still renders without site filter.
+    }
+  }
+
+  List<String> get _siteNames {
+    final names = _meterSites.values.toSet().toList()..sort();
+    return names;
+  }
+
+  /// Logs filtered by the selected site (Issue 7E).
+  List<EnergyLogEntity> get _siteLogs {
+    if (_site == null) return widget.logs.cast<EnergyLogEntity>();
+    final meterNames = <String>{
+      for (final e in _meterSites.entries)
+        if (e.value == _site) e.key,
+    };
+    if (meterNames.isEmpty) return const [];
+    return widget.logs
+        .cast<EnergyLogEntity>()
+        .where((e) => meterNames.contains(e.meterName))
+        .toList();
+  }
+
+  List<EnergyLogEntity> get _currentMonthLogs {
+    final now = DateTime.now();
+    return _siteLogs
+        .where(
+          (l) => l.loggedAt.year == now.year && l.loggedAt.month == now.month,
+        )
+        .toList();
+  }
+
+  /// Site-aware KPI values — full-data values when "All Sites".
+  double get _siteEstimatedBill {
+    if (_site == null) return widget.estimatedBill;
+    return _currentMonthLogs.fold(0.0, (s, e) => s + e.estimatedBill);
+  }
+
+  double get _siteTotalConsumption {
+    if (_site == null) return widget.totalConsumption;
+    return _currentMonthLogs.fold(0.0, (s, e) => s + e.kwh * e.multiplyingFactor);
+  }
+
+  double get _siteMaxDemandPeak {
+    if (_site == null) return widget.maxDemandPeak;
+    return _siteLogs.fold(0.0, (s, e) => e.mdRecorded > s ? e.mdRecorded : s);
+  }
+
+  double get _sitePowerFactor {
+    if (_site == null) return widget.currentPowerFactor;
+    return BillCalculator.calculate(logs: _siteLogs).powerFactor;
+  }
+
+  Widget _buildSiteSelector() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _siteChip('All Sites', null),
+          for (final site in _siteNames) _siteChip(site, site),
+        ],
+      ),
+    );
+  }
+
+  Widget _siteChip(String label, String? value) {
+    final selected = _site == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => setState(() => _site = value),
+        selectedColor: AppColors.kpiSavings.withValues(alpha: 0.15),
+        labelStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          color: selected ? AppColors.kpiSavings : AppColors.textSecondary,
+        ),
+        side: BorderSide(
+          color: selected ? AppColors.kpiSavings : AppColors.borderLight,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final entityLogs = logs.cast<EnergyLogEntity>();
+    final entityLogs = _siteLogs;
     final breakdown = BillCalculator.calculate(logs: entityLogs);
     final kpis = BillCalculator.calculateKpis(breakdown);
     final now = DateTime.now();
@@ -178,6 +288,17 @@ class _DashboardContent extends StatelessWidget {
       monthLogs: currentMonthLogs,
     );
     final opportunities = SavingOpportunityGenerator.generate(breakdown);
+    final contractOptimizer = SavingOpportunityGenerator
+        .generateContractDemandOptimizer(
+          logs: entityLogs,
+          contractDemand: breakdown.contractDemand,
+        );
+    if (contractOptimizer != null) {
+      opportunities.add(contractOptimizer);
+      opportunities.sort(
+        (a, b) => b.monthlySavings.compareTo(a.monthlySavings),
+      );
+    }
     final insights = InsightGenerator.generate(
       breakdown: breakdown,
       comparison: comparison,
@@ -197,6 +318,10 @@ class _DashboardContent extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.page),
         children: [
+          if (_siteNames.isNotEmpty) ...[
+            _buildSiteSelector(),
+            const SizedBox(height: AppSpacing.lg),
+          ],
           AppSectionHeader(
             title: 'Energy Overview',
             subtitle: 'Bill analysis and monitoring dashboard',
@@ -213,7 +338,7 @@ class _DashboardContent extends StatelessWidget {
             cards: [
               AppKpiCard(
                 title: 'Est. Monthly Bill',
-                value: estimatedBill,
+                value: _siteEstimatedBill,
                 suffix: '₹',
                 icon: Icons.account_balance_wallet_rounded,
                 color: AppColors.kpiCost,
@@ -223,7 +348,7 @@ class _DashboardContent extends StatelessWidget {
               ),
               AppKpiCard(
                 title: 'Total Consumption',
-                value: totalConsumption,
+                value: _siteTotalConsumption,
                 suffix: 'kWh',
                 icon: Icons.bolt_rounded,
                 color: AppColors.kpiEnergy,
@@ -233,10 +358,10 @@ class _DashboardContent extends StatelessWidget {
               ),
               AppKpiCard(
                 title: 'Max Demand',
-                value: maxDemandPeak,
+                value: _siteMaxDemandPeak,
                 suffix: 'kVA',
                 icon: Icons.trending_up_rounded,
-                color: maxDemandPeak >= AppConstants.mdWarningThresholdKva
+                color: _siteMaxDemandPeak >= AppConstants.mdWarningThresholdKva
                     ? AppColors.warning
                     : AppColors.kpiDemand,
                 description:
@@ -244,17 +369,17 @@ class _DashboardContent extends StatelessWidget {
               ),
               AppKpiCard(
                 title: 'Power Factor',
-                value: currentPowerFactor,
+                value: _sitePowerFactor,
                 suffix: 'PF',
                 icon: Icons.waves_rounded,
-                color: currentPowerFactor < AppConstants.pfPenaltyThreshold
+                color: _sitePowerFactor < AppConstants.pfPenaltyThreshold
                     ? AppColors.danger
                     : AppColors.kpiPower,
                 decimals: 3,
                 description:
-                    currentPowerFactor >= AppConstants.pfRebateThreshold
+                    _sitePowerFactor >= AppConstants.pfRebateThreshold
                     ? 'Rebate earned'
-                    : (currentPowerFactor >= AppConstants.pfSurchargeThreshold
+                    : (_sitePowerFactor >= AppConstants.pfSurchargeThreshold
                           ? 'Near rebate'
                           : 'Penalty applies'),
               ),
@@ -297,7 +422,7 @@ class _DashboardContent extends StatelessWidget {
               ),
               AppKpiCard(
                 title: "Today's Usage",
-                value: activeConsumptionToday,
+                value: widget.activeConsumptionToday,
                 suffix: 'kWh',
                 icon: Icons.today_rounded,
                 color: AppColors.kpiSavings,
@@ -1005,8 +1130,8 @@ class _DashboardContent extends StatelessWidget {
   }
 
   Widget _buildAlertsSection(BuildContext context) {
-    final hasPfIssue = currentPowerFactor < AppConstants.pfPenaltyThreshold;
-    final hasMdIssue = maxDemandPeak >= AppConstants.mdWarningThresholdKva;
+    final hasPfIssue = _sitePowerFactor < AppConstants.pfPenaltyThreshold;
+    final hasMdIssue = _siteMaxDemandPeak >= AppConstants.mdWarningThresholdKva;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1084,7 +1209,7 @@ class _DashboardContent extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'PF is ${currentPowerFactor.toStringAsFixed(3)} (below 0.95). A 5% reactive penalty applies.',
+                          'PF is ${_sitePowerFactor.toStringAsFixed(3)} (below 0.95). A 5% reactive penalty applies.',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppColors.danger.withValues(alpha: 0.8),
@@ -1139,7 +1264,7 @@ class _DashboardContent extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Max demand at ${maxDemandPeak.toStringAsFixed(1)} kVA, approaching ${AppConstants.mdWarningThresholdKva.toInt()} kVA contract limit.',
+                        'Max demand at ${_siteMaxDemandPeak.toStringAsFixed(1)} kVA, approaching ${AppConstants.mdWarningThresholdKva.toInt()} kVA contract limit.',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.warning.withValues(alpha: 0.8),
@@ -1174,6 +1299,10 @@ class _SavingOpportunityCard extends StatelessWidget {
       SavingType.loadSmoothing => (
         Icons.linear_scale_rounded,
         AppColors.kpiEnergy,
+      ),
+      SavingType.contractDemandOptimization => (
+        Icons.description_rounded,
+        AppColors.kpiCost,
       ),
     };
     return AppCard(

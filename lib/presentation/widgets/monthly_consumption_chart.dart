@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/entities/energy_log_entity.dart';
 
@@ -18,8 +17,8 @@ class MonthlyConsumptionChart extends StatelessWidget {
         final month = log.loggedAt.month;
         monthlyMap.update(
           month,
-          (v) => v + log.kwh * AppConstants.multiplyingFactor,
-          ifAbsent: () => log.kwh * AppConstants.multiplyingFactor,
+          (v) => v + log.kwh * log.multiplyingFactor,
+          ifAbsent: () => log.kwh * log.multiplyingFactor,
         );
       }
     }

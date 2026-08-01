@@ -1,6 +1,5 @@
 import '../../domain/entities/energy_log_entity.dart';
 import '../config/app_config.dart';
-import '../constants/app_constants.dart';
 import 'bill_calculator.dart';
 import 'energy_calculator.dart';
 
@@ -37,19 +36,20 @@ class BillForecastCalculator {
 
     final projectedUnits = monthBreakdown.totalUnits * scale;
     final energyCharges = projectedUnits * AppConfig.tariffPerUnit;
-    final facCharges = projectedUnits * AppConstants.facRatePerUnit;
-    final wheelingCharges = projectedUnits * AppConstants.wheelingChargePerUnit;
+    final facCharges = projectedUnits * AppConfig.facRatePerUnit;
+    final wheelingCharges =
+        projectedUnits * AppConfig.wheelingChargePerUnit;
     final demandCharges =
-        monthBreakdown.billingDemand * AppConstants.demandChargePerKva;
+        monthBreakdown.billingDemand * AppConfig.demandChargePerKva;
     final subtotal =
         energyCharges + demandCharges + facCharges + wheelingCharges;
     final duty = EnergyCalculator.calculateElectricityDuty(
       subtotal,
-      AppConstants.electricityDutyPercent,
+      AppConfig.electricityDutyPercent,
     );
     final taxes = EnergyCalculator.calculateTaxes(
       subtotal + duty,
-      AppConstants.taxPercent,
+      AppConfig.taxPercent,
     );
     final rebate = EnergyCalculator.calculatePfRebate(
       energyCharges,
@@ -61,8 +61,8 @@ class BillForecastCalculator {
       demandCharges,
       monthBreakdown.powerFactor,
     );
-    final subsidy = AppConstants.subsidyPercent > 0
-        ? subtotal * AppConstants.subsidyPercent / 100
+    final subsidy = AppConfig.subsidyPercent > 0
+        ? subtotal * AppConfig.subsidyPercent / 100
         : 0.0;
     final projectedBill =
         subtotal + duty + taxes + surcharge - rebate - subsidy;

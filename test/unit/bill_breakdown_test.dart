@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ems/core/calculation/bill_breakdown.dart';
 import 'package:ems/core/calculation/bill_calculator.dart';
 import 'package:ems/domain/entities/energy_log_entity.dart';
 
@@ -9,9 +8,10 @@ EnergyLogEntity _log({
   required double md,
   double contractDemand = 400,
   String meterName = 'Meter-01',
+  double multiplyingFactor = 5,
 }) {
   return EnergyLogEntity(
-    id: '${meterName}-$kwh-$kvah-$md',
+    id: '$meterName-$kwh-$kvah-$md',
     meterName: meterName,
     kwh: kwh,
     kvah: kvah,
@@ -22,6 +22,7 @@ EnergyLogEntity _log({
     contractDemand: contractDemand,
     estimatedBill: 0,
     loggedAt: DateTime(2026, 1, 10),
+    multiplyingFactor: multiplyingFactor,
   );
 }
 

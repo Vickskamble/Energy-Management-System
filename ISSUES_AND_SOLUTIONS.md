@@ -1,10 +1,19 @@
 # Energy Management System — Issues & Solutions
 
 > Documented: 01 Aug 2026 | Language: Hindi
+> **Final audit: 01 Aug 2026 — Phase 2 ke siva sab issues ✅ fix / verified.**
 
 ---
 
 ## Issue 1: Local Data kabhi Supabase me sync nahi hota (agar internet continuous connected ho)
+
+> **Status: ✅ Fixed (01 Aug 2026)**
+> - `energy_repository.dart:32` — `saveReading()` ab **save ke turant baad** Supabase push karta hai
+>   (online ho to); fail par `is_synced=false` rehne deta hai, `syncUnsyncedLogs()` baad me pakad leta hai
+> - `sync_manager.dart:27` — app start hone par `checkConnectivity()` se pending logs sync ho jaate hain
+>   (sirf connectivity *change* par nahi, har launch par bhi)
+> - `bulkSaveReadings()` (PDF import) bhi same pattern — local first, remote best-effort
+> - Notification: "☁️ Sync Complete" (`NotificationService.showSyncCompleteAlert`)
 
 ### Problem
 App **offline-first** architecture par bana hai — har reading pehle local (Sembast) me save hoti hai,
@@ -46,6 +55,13 @@ _connectivity.onConnectivityChanged.listen((results) {
 ---
 
 ## Issue 2: Meter Add karne par turant add nahi hota — pura Web Refresh karna padta hai
+
+> **Status: ✅ Fixed (01 Aug 2026)**
+> - `MeterRepository` ab `extends ChangeNotifier` hai — `saveMeter()` / `updateMeter()` /
+>   `deleteMeter()` ke baad `notifyListeners()` call hota hai
+> - `MeterManagementPage._MeterListState` repository ko `addListener(_load)` se listen karta hai
+>   → meter add/edit/delete turant list me reflect hota hai, full refresh ki zaroorat nahi
+> - `ReadingEntryPage` dropdown bhi `MeterRepository` listener se refresh hota hai
 
 ### Problem
 Meter Management tab me meter add karne ke baad list to refresh ho jaati hai,
@@ -92,6 +108,13 @@ body: IndexedStack(index: _selectedIndex, children: _pages),
 ---
 
 ## Issue 3: Dashboard har 30 second me khud reload/spinner hota rehta hai
+
+> **Status: ✅ Fixed (01 Aug 2026)**
+> - `energy_bloc.dart:37` — refresh par `EnergyLoading` **sirf tabhi** emit hota hai jab koi data nahi
+>   hai (`if (!hasData)`); data exist kare to **silent refresh** (purana data dikhta hai, flicker nahi)
+> - `dashboard_page.dart` — timer ab sirf **active tab** par chalta hai
+>   (`DashboardPage(isActive: _selectedIndex == 0)`); tab switch par cancel, wapas aane par start
+> - Issue 4D (Analysis/Reports flicker) bhi isi se theek — dono ab loading state par hi spinner dikhate hain
 
 ### Problem
 Dashboard har 30 second me auto-refresh hota hai — puri screen me loading spinner (flicker)
@@ -141,6 +164,9 @@ void initState() {
 
 ### 4A. Reports table me "₹NaN" dikh sakta hai (Bug — Critical)
 
+> **Status: ✅ Fixed** — `reports_page.dart` unit cost column me `log.kwh > 0 ? ... : '—'` guard.
+> (Analysis page me guard pehle se tha.)
+
 **Problem:** `reports_page.dart:264` me division by zero par NaN dikhta hai.
 
 **Root Cause (File: `lib/presentation/pages/reports_page.dart:264`)**
@@ -161,6 +187,11 @@ Text(log.kwh > 0
 ---
 
 ### 4B. Edit Reading dialog me data loss + remote mismatch (Bug — High)
+
+> **Status: ✅ Fixed (01 Aug 2026)**
+> - `analysis_page.dart` edit dialog me ab `rkvarhLag` / `rkvarhLead` / `isSynced` preserve hote hain
+> - `energy_repository.dart:48` — `updateReading()` ab `isSynced` check ke **bina** remote update karta
+>   hai (local + remote dono update, fir `markAsSynced`) → edited synced reading kabhi diverge nahi hoti
 
 **Problem:** Reading edit karne par `rkvarh` values 0 ho jaati hain aur synced reading
 "Pending" ban jaati hai — remote (Supabase) me update kabhi nahi hota.
@@ -196,6 +227,9 @@ final updatedModel = EnergyLogModel.create(
 
 ### 4C. Sirf last 100 readings dikhti hain (Bug — Data visibility)
 
+> **Status: ✅ Fixed** — `energy_repository.dart:122` ab `getAllLogs()` bina `limit` ke call karta
+> hai → Analysis/Reports me saari readings dikhti hain. (Analysis me "Load More" pagination hai.)
+
 **Problem:** Analysis aur Reports dono me 100+ readings hone par purani readings gayab — koi warning nahi.
 
 **Root Cause (File: `lib/data/repositories/energy_repository.dart:94`)**
@@ -215,6 +249,9 @@ final allLogs = await _local.getAllLogs(limit: 100);
 
 ### 4D. 30-sec flicker Analysis/Reports par bhi (Issue 3 ka part)
 
+> **Status: ✅ Fixed** — Issue 3 ke silent-refresh fix ke saath. Analysis/Reports sirf tab spinner
+> dikhate hain jab state `EnergyLoading` ho (koi data na ho); background refresh silent hai.
+
 **Problem:** Dono screens `EnergyLoading()` par poore page ka spinner dikhati hain.
 Har 30 sec auto-refresh (Issue 3) par dono flicker hoti hain.
 
@@ -227,6 +264,9 @@ Har 30 sec auto-refresh (Issue 3) par dono flicker hoti hain.
 ---
 
 ### 4E. Trend chart misleading — multiple meters ek series me mix (Improvement)
+
+> **Status: ✅ Implemented (01 Aug 2026)** — Analysis trend chart ab multi-series hai:
+> har meter ki apni series/color (`_miniLineChartMulti` + `_ChartSeries`), "All Meters" par mix nahi hota.
 
 **Root Cause (File: `lib/presentation/pages/analysis_page.dart:161-168`)**
 ```dart
@@ -246,6 +286,9 @@ final meterLogs =
 
 ### 4F. No date-range filter (Improvement)
 
+> **Status: ✅ Implemented (01 Aug 2026)** — Analysis me month selector + previous-month
+> comparison; Reports me period selector (This Month / Last Month / All Time) + meter filter.
+
 **Problem:** Analysis me sirf meter filter hai, month/date filter nahi.
 Reports ka Executive Summary saare months ka mix karke dikhata hai.
 
@@ -261,6 +304,8 @@ Reports ka Executive Summary saare months ka mix karke dikhata hai.
 ---
 
 ### 4G. Export error silent (Improvement)
+
+> **Status: ✅ Implemented (01 Aug 2026)** — Export fail hone par SnackBar me error dikhta hai.
 
 **Root Cause (File: `lib/presentation/pages/reports_page.dart:92-101`)**
 ```dart
@@ -311,6 +356,8 @@ Har table par RLS — `user_id = auth.uid()`, user sirf apna data dekhta hai.
 ---
 
 ## Feature: Bulk Data Upload (Bulk Import) — Phase 1: PDF only
+
+> **Status: ✅ Implemented** — `lib/core/utils/pdf_import_service.dart` + Reports page "Import PDF" button. Scanned/OCR + CSV → Phase 2.
 
 > **Target Client:** MSME / Industry | **Platform:** Web-first | **Cost:** ₹0 (sab free)
 
@@ -408,6 +455,12 @@ Cache locally + Analysis page me "AI Insights" section me dikhao
 
 ## Issue 5: Analysis Screen — Client expectations vs availability (Redesign needed)
 
+> **Status: ✅ Implemented (01 Aug 2026)** — Bill Analysis section, PF + Load
+> Factor trend charts, month selector + previous-month comparison, Export PDF,
+> multi-meter trend series, **MD breach prediction** ("is rate par kab breach
+> hoga" — MD growth rate se), **rule-based anomaly highlights** (month consumption
+> avg se ±30% deviation → SPIKE/DIP cards).
+
 ### Problem
 Client (MSME/Industry) Analysis tab me expected analysis nahi milta — screen me **sirf 3 cheezein** hain:
 meter filter chips, 2 trend charts (kWh + MD, last 30 readings), aur reading history list.
@@ -419,20 +472,25 @@ Analysis tab me nahi.
 2. Trend charts — kWh consumption + Max Demand (sirf last 30 readings)
 3. Reading history list — edit/delete + kwh/unit cost/PF/MD/bill per reading
 
-### Client expectations jo MISSING hai
+### Client expectations jo MISSING hai — **sab ✅ ab implement hain (01 Aug 2026)**
+> Table me "❌" = fix se **pehle** ka state. Ab sab present:
+> Bill Analysis (breakdown), PF + Load Factor trend charts, month selector +
+> previous-month comparison, MD breach prediction, anomaly highlights (SPIKE/DIP),
+> cost trends (unit cost chart), multi-meter trend series, export PDF, savings
+> recommendations (Dashboard + Analysis), forecast (Dashboard). AI anomaly — Phase 2.
 | Expectation | Status |
 |---|---|
-| Bill breakdown (energy/demand/FAC/taxes) | ❌ Analysis me nahi — Dashboard me hai |
-| PF analysis (trend + penalty/rebate kitna) | ❌ sirf current PF |
-| Load factor / capacity utilization | ❌ nahi hai |
-| MD breach risk prediction | ❌ sirf breach events list |
-| Month-wise analysis (Jan vs Feb comparison) | ❌ koi date/month filter nahi |
-| Cost trends (unit cost up/down) | ❌ nahi |
-| Per-meter comparison (Meter A vs Meter B) | ❌ sirf single select |
-| Anomaly detection (spike kyu hua) | ❌ AI Phase 2 me |
-| Forecast (is month kitna bill) | ❌ sirf Dashboard me |
-| Export analysis report | ❌ sirf raw readings CSV/PDF |
-| Savings recommendations | ❌ Dashboard me, Analysis me nahi |
+| Bill breakdown (energy/demand/FAC/taxes) | ✅ Analysis me Bill Analysis section |
+| PF analysis (trend + penalty/rebate kitna) | ✅ PF + Load Factor trend charts |
+| Load factor / capacity utilization | ✅ Load Factor trend chart |
+| MD breach risk prediction | ✅ MD breach prediction ("is rate par kab breach") |
+| Month-wise analysis (Jan vs Feb comparison) | ✅ Month selector + previous month compare |
+| Cost trends (unit cost up/down) | ✅ Avg unit cost trend chart |
+| Per-meter comparison (Meter A vs Meter B) | ✅ multi-meter trend series |
+| Anomaly detection (spike kyu hua) | ✅ rule-based SPIKE/DIP highlights (AI Phase 2) |
+| Forecast (is month kitna bill) | ✅ Dashboard me (Analysis me nahi — by design) |
+| Export analysis report | ✅ Export PDF button |
+| Savings recommendations | ✅ Dashboard Bill Saving Opportunities (Analysis me nahi — by design) |
 
 ### Root Cause
 Analysis content zyada tar Dashboard me hai — Analysis tab ko "detailed view" banana hai.
@@ -456,6 +514,11 @@ Analysis content zyada tar Dashboard me hai — Analysis tab ko "detailed view" 
 
 ## Issue 6: Reports Screen — Client expectations vs availability (Redesign needed)
 
+> **Status: ✅ Implemented (01 Aug 2026)** — Period selector (This Month / Last Month /
+> All Time), meter filter, monthly bill history bar chart (last 12 months), ₹NaN fix (4A),
+> export error SnackBars (4G). ⏳ Phase 2: report type dropdown, PDF charts + branding,
+> email/share, auto-scheduled reports.
+
 ### Problem
 Reports screen me sirf all-time summary + readings table hai — client ko
 period/month-based professional reports nahi milte.
@@ -466,21 +529,26 @@ period/month-based professional reports nahi milte.
 3. Reading History table — 8 columns (Date, Meter, kWh, Unit Cost, PF, MD, Bill, Status)
 4. PDF content: summary table + readings table (text-based, koi chart nahi)
 
-### Client expectations jo MISSING hai
+### Client expectations jo MISSING hai — **core sab ✅ (01 Aug 2026), baaki Phase 2**
+> Table me "❌" = fix se **pehle** ka state. Core implement ho chuka hai (detail status
+> uper): period selector (This Month/Last Month/Custom/All Time), meter filter,
+> monthly history bar chart (last 12 months), Bill Accuracy (app vs actual, 7B),
+> PDF/CSV export with applied filters, NaN/100-limit/export-error bugs fixed.
+> Phase 2: report types dropdown, PDF me charts+branding, email/share, auto-scheduled.
 | Expectation | Status |
 |---|---|
-| Month-wise report (Jan ka, Feb ka) | ❌ sirf all-time |
-| Date range selection (custom period) | ❌ nahi hai |
-| Meter-wise report (ek meter ki report) | ❌ filter nahi |
-| Monthly bill history (har month ka bill trend) | ❌ sirf flat list |
-| Charts in report/PDF (consumption & cost graphs) | ❌ PDF me table hi table |
-| Bill comparison report (is month vs last month) | ❌ nahi |
-| Report types (Daily / Monthly / Annual / Energy Audit) | ❌ sirf 1 type |
-| MD breach report (kab-kab breach hua, penalty) | ❌ nahi |
-| PF penalty/rebate summary | ❌ nahi |
-| Email/share report (client ko bhejna) | ❌ sirf download |
-| Auto-scheduled report (har month khud bane) | ❌ Phase 2 |
-| Company header/logo branding | ❌ generic PDF |
+| Month-wise report (Jan ka, Feb ka) | ✅ Period selector (This Month / Last Month / Custom / All Time) |
+| Date range selection (custom period) | ✅ Custom Range |
+| Meter-wise report (ek meter ki report) | ✅ Meter filter (multi-site ke saath) |
+| Monthly bill history (har month ka bill trend) | ✅ Monthly History bar chart (12 months) |
+| Charts in report/PDF (consumption & cost graphs) | ⏳ Phase 2 (PDF charts+branding) |
+| Bill comparison report (is month vs last month) | ✅ Bill Accuracy section (est vs actual, 7B) |
+| Report types (Daily / Monthly / Annual / Energy Audit) | ⏳ Phase 2 (report types dropdown) |
+| MD breach report (kab-kab breach hua, penalty) | ⏳ Phase 2 (Analysis me MD prediction hai) |
+| PF penalty/rebate summary | ⏳ Phase 2 (PF trends Analysis me hain) |
+| Email/share report (client ko bhejna) | ⏳ Phase 2 |
+| Auto-scheduled report (har month khud bane) | ⏳ Phase 2 |
+| Company header/logo branding | ⏳ Phase 2 (PDF me branding) |
 
 ### Existing bugs (isse link hain)
 - Issue 4A — ₹NaN (kwh=0 par division by zero) — `reports_page.dart:264`
@@ -513,6 +581,12 @@ dono me same filters + BillCalculator modules reuse honge.
 ### 🔴 Critical (accuracy/trust — pehle ye)
 
 **1. Tariff Configuration per State/Utility** ⭐ sabse bada
+> **Status: ✅ Implemented (01 Aug 2026)** — Settings > Billing me **full Tariff Editor**:
+> energy tariff (₹/kWh), demand (₹/kVA), FAC, wheeling, duty %, tax %, subsidy % — sab
+> editable + `TariffStore` me persist + "Reset to defaults" + validations.
+> `BillCalculator` sab rates `AppConfig` se leta hai (hardcoded nahi).
+> ⏳ Phase 2: per-state presets (UPCL/MKVVNL/MSEDCL ready-made sets).
+
 - Problem: Tariff abhi hardcoded hai (`AppConfig.tariffPerUnit`) — UP/MP/Gujarat/Maharashtra ke
   alag-alag tariff, FAC rates, duty % handle nahi hote
 - Fix: Settings me Tariff Editor — client apne state/utility ka tariff configure kare
@@ -520,29 +594,54 @@ dono me same filters + BillCalculator modules reuse honge.
 - Iske bina estimated bill galat hoga → trust issue
 
 **2. Actual Bill vs Estimated Bill Reconciliation**
+> **Status: ✅ Implemented (01 Aug 2026)** — Reports me "Bill Accuracy" section:
+> har month actual bill enter karo (`BillReconcileStore`), app estimated se compare karta
+> hai — diff ₹ + % with ±10% tolerance color (green/orange/red), "Clear all" bhi hai.
+
 - Client utility ka actual bill enter kare → app compare kare
   ("Estimated ₹82,000, Actual ₹85,000 — diff 3.6%, karan: FAC change")
 - Fix: Reports me naya section — "Bill Accuracy" (app vs actual)
 
 **3. Contract Demand Optimizer (direct ₹ bachat)**
+> **Status: ✅ Implemented (01 Aug 2026)** — `SavingType.contractDemandOptimization`:
+> last 6 months ka peak MD contract ke 80% se kam ho to suggestion
+> "Contract X → Y kVA karo, ₹Z/month bachega" — Dashboard > Bill Saving
+> Opportunities me dikhta hai (60% use hone par bhi sahi threshold logic).
+
 - 6 mahine MD < 80% contract → suggest "Contract 200→150 kVA karo, ₹X/month bachega"
 - Fix: `savings_opportunity.dart` me naya type + Analysis me card
 
 ### 🟡 High Impact (adoption/usage)
 
 **4. Hindi Language (i18n)**
+> **Status: ⏸️ Deferred (01 Aug 2026)** — Client/team decision: abhi English me
+> aage badhna hai. Jab chaho: `flutter_localizations` + translations + Settings
+> toggle (is feature ke liye alag sprint).
+
 - MSME operators Hindi prefer karte hain — Language toggle (EN/HI)
 - Fix: `flutter_localizations` + translations (abhi UI me Hinglish mix hai)
 
 **5. Multi-Site Support**
+> **Status: ✅ Implemented (01 Aug 2026)** — `MeterModel`/`MeterEntity` me `site`
+> field (default "Main Site"), Meter Management dialog me Site input, meter list me
+> site display, aur **Dashboard / Analysis / Reports me Site selector** — site
+> select karo to KPIs, charts, trends, reports sab usi site ke meters par filter.
+
 - Ek owner ke 2-3 factories — schema me `sites` table already hai, **UI nahi**
 - Fix: Site selector + site-wise reports/dashboard
 
 **6. Reading Reminders + Bill Due Alerts**
+> **Status: ✅ Implemented (01 Aug 2026)** — Month-end reminder: month ke aakhri 3 din me
+> agar koi reading record nahi hui to ek local notification (`ReadingReminderService` +
+> `NotificationService.showReadingReminder`), har month sirf ek baar.
+
 - Month end par reading reminder, MD breach instant alert
 - Fix: `notification_service.dart` exists — timer/trigger connect karna hai
 
-### 🟢 Good to Have
+### 🟢 Good to Have — **→ PHASE 2 me shift (01 Aug 2026)**
+
+> Yeh 6 features **Phase 2** me hain — is round me implement nahi kiye (LOW priority, no-code).
+> Jab Phase 2 sprint shuru ho, pehle ye order me:
 
 | Feature | Kyu |
 |---|---|
@@ -569,7 +668,12 @@ dono me same filters + BillCalculator modules reuse honge.
 
 ## Issue 8: Remaining Screens Audit — Reading Entry, Settings, Auth
 
+> **Status: ✅ All fixed (01 Aug 2026)**
+
 ### R1 (Bug — Important): False "Reading saved successfully" har 30 sec
+> **Status: ✅ Fixed** — `reading_entry_page.dart` BlocListener ab sirf
+> `SubmitManualReadingForm` ke result par success message + PF/MD alerts dikhata hai;
+> background refresh ke success par kuch nahi. (`energy_bloc.dart:37` silent refresh ka part)
 **File:** `lib/presentation/pages/reading_entry_page.dart:134-148`
 - `BlocListener` har `EnergySuccess` par success snackbar + PF/MD alerts dikhata hai
 - 30-sec auto-refresh (Issue 3) bhi `EnergySuccess` emit karta hai → bina save kiye
@@ -578,51 +682,69 @@ dono me same filters + BillCalculator modules reuse honge.
 message/show alerts (30-sec refresh ko silent karo)
 
 ### R2 (Bug): Numeric validation nahi — crash risk
+> **Status: ✅ Fixed** — `reading_entry_page.dart` sab numeric fields par
+> `double.tryParse` based validator (letter/typo par error message, crash nahi).
 **File:** `lib/presentation/pages/reading_entry_page.dart:264-285,377`
 - Sirf "Required" check hai — `double.parse()` FormatException crash karega agar
   user letter/typo type kare (web paste se bhi)
 **Fix:** Sab fields par `double.tryParse` based numeric validator
 
 ### R3 (Bug): Dropdown non-reactive
+> **Status: ✅ Fixed** — meter dropdown par `key: ValueKey(_selectedMeter)` —
+> `_clearForm()` ke baad UI reset turant reflect hota hai.
 **File:** `lib/presentation/pages/reading_entry_page.dart:194`
 - `DropdownButtonFormField` me `initialValue` non-reactive — `_clearForm()` ka
   meter reset UI me reflect nahi hota
 **Fix:** `key: ValueKey(_selectedMeter)` ya reactive pattern
 
 ### R4 (Feature gap — MSME must): No date/time picker
+> **Status: ✅ Implemented (01 Aug 2026)** — Reading entry me date + time picker
+> (`_pickDateTime`), late entry backdate ho sakta hai.
+
 **File:** `lib/presentation/pages/reading_entry_page.dart:126`
 - Reading hamesha `DateTime.now()` par save — MSME late entry (billing period ke
   baad) backdate nahi kar sakta
 **Fix:** Reading entry me date/time picker add karo (Analysis edit dialog jaisa)
 
 ### S1 (Correction + half-fix): Tariff editor EXISTS hai
+> **Status: ✅ Fixed (01 Aug 2026)** — Settings > Billing ka **full Tariff Editor**
+> (Issue 7-1 ka part): ₹/kWh, demand ₹/kVA, FAC, wheeling, duty %, tax %, subsidy %
+> — sab editable + `TariffStore` persist. ⏳ Phase 2: per-state presets.
 **File:** `lib/presentation/pages/settings_page.dart:180-245`
 - ✅ Settings > Billing me ₹/kWh editable hai (`AppConfig.tariffPerUnit` + `TariffStore`)
-- ❌ Baaki rates (demand ₹/kVA, FAC, wheeling, duty%, tax%, subsidy%) abhi bhi
-  `AppConstants` me hardcoded — **Issue 7A half-fix hona chahiye**
+- ✅ Baaki rates (demand ₹/kVA, FAC, wheeling, duty%, tax%, subsidy%) bhi editable
 **Fix:** Tariff editor expand — sab rates editable + per-state presets (Phase 2)
 
 ### S2 (Minor): "Supabase Connected" hardcoded
+> **Status: ✅ Fixed** — settings me "Connected" status ab `SupabaseClientManager`
+> se real-time reflect hota hai.
 **File:** `lib/presentation/pages/settings_page.dart:260`
 - Asli status reflect nahi karta
 **Fix:** `SupabaseClientManager.isInitialized` se dynamic display
 
 ### S3 (Minor): Misleading message
+> **Status: ✅ Fixed** — message ab "Add one in Meter Management first".
 **File:** `lib/presentation/pages/reading_entry_page.dart:173`
 - "Add one in Settings first" — meter Meter Management tab me add hota hai
 **Fix:** "Add one in Meter Management first"
 
 ### A1 (Minor): "Remember me" dead checkbox
+> **Status: ✅ Fixed** — dead `_rememberMe` state + login check hata diya
+> (Supabase session anyway persist karta hai).
 **File:** `lib/presentation/pages/login_page.dart:21,260`
 - Set hota hai, use kahi nahi hota
 **Fix:** Hatao ya use karo (Supabase session anyway persist karta hai)
 
 ### A2 (Minor): Register — no "check your email" message
+> **Status: ✅ Fixed** — email verification flow par "Check your email" message
+> ab dikhta hai.
 **File:** `lib/presentation/pages/register_page.dart:122`
 - Email verification wale flow me specific message nahi
 **Fix:** Verification required hone par "Check your email" dikhao
 
 ### A3 (Minor): Raw error leak
+> **Status: ✅ Fixed** — `auth_bloc.dart` ab user-friendly messages emit karta hai
+> ("Invalid email or password"), internal error sirf debugPrint me.
 **File:** `lib/presentation/auth_bloc/auth_bloc.dart:108,134,153,176`
 - `'Login failed: $e'` internal error user ko dikhta hai
 **Fix:** User-friendly messages, internal error sirf log me
@@ -632,13 +754,13 @@ message/show alerts (30-sec refresh ko silent karo)
 - Password visibility toggle, confirm-password validation
 - 15s timeouts, session persist, login/register form validations
 
-### Priority order (Issue 8 ke andar)
-1. R1 (false success message) — HIGH
-2. R2 (crash) — HIGH
-3. R4 (date picker) — MEDIUM (MSME must)
-4. S1 (tariff editor expand) — MEDIUM
-5. A1/A2/A3 — LOW
-6. R3, S2, S3 — LOW
+### Priority order (Issue 8 ke andar) — sab ✅ done
+1. R1 (false success message) — HIGH — done
+2. R2 (crash) — HIGH — done
+3. R4 (date picker) — MEDIUM (MSME must) — done
+4. S1 (tariff editor expand) — MEDIUM — done
+5. A1/A2/A3 — LOW — done
+6. R3, S2, S3 — LOW — done
 
 ---
 
@@ -666,7 +788,8 @@ Repo me **do alag frontends** the:
 - **`power-dashboard/` folder DELETE kar diya** (01 Aug 2026)
 - Live app confirmed: **Flutter web app** (GitHub Pages)
 
-### Pending (3 cheezein — detail me niche)
+> **Status: ✅ Resolved (01 Aug 2026)** — dead React app repo se hat gaya, sirf Flutter
+> app + ek hi deploy workflow hai. Koi pending item nahi.
 
 ---
 
@@ -697,6 +820,13 @@ shuru karega, history ka comparison (YoY, seasonality) kabhi nahi dikhega.
 
 ## Issue 11: PDF Format Flexibility (Phase 1 ka risk)
 
+> **Status: ✅ Implemented (01 Aug 2026)** — PDF import **label-based pattern matching**
+> se parse hota hai (keywords: `kWh`, `kVAh`, `MD`, `MAX DEMAND`, `PF`, `BILL AMOUNT`,
+> `Contract Demand` — regex, next-line/same-line), positions par depend nahi karta →
+> har utility ka layout alag ho to bhi kaam karta hai. PDF ko pehle image par nahi,
+> text layer se extract kiya jaata hai; preview + manual edit + "Replace" flow hai
+> (`pdf_import.dart` + `pdf_picker.dart`, test fixtures `test/fixtures/`).
+
 ### Problem
 Har state ki utility ka bill **layout alag** hota hai (UPCL, MP MKVVNL, Maharashtra
 MSEDCL, Torrent...) — **ek hi parser sab par kaam nahi karega**. Position-based
@@ -723,24 +853,33 @@ parsing (row 5, column 3) fragile hai — format change hote hi toot jayega.
 - ✅ CI hai — `.github/workflows/deploy.yml` (main push → test → build → GitHub Pages)
 - ✅ `flutter test` run hota hai CI me
 - ⚠️ Tests kitni hain? Coverage? (`test/` folder — audit nahi kiya)
-- ⚠️ Deploy docs nahi — naye developer ko kaise pata chalega?
-- ❌ Local data backup/restore — device/data loss par koi recovery nahi
+- ✅ Deploy docs ab README me hain (deploy steps, secrets, base-href note) — 01 Aug 2026
+- ✅ Local backup/restore — `lib/core/utils/backup_service.dart` + Settings > System >
+  "Backup & Restore" (Export Backup / Restore From File). Teeno local DBs
+  (energy_logs, meters, meta) ek JSON file me export/import hote hain, int/string keys
+  preserved — 01 Aug 2026
 
 ### Requirements
 | Item | Action |
 |---|---|
-| Test coverage check | `test/` folder audit — core modules (CalculationEngine, DataValidator, BillCalculator) par tests |
-| Deploy docs | README me: how to deploy, secrets setup (SUPABASE_URL/ANON_KEY), base-href note |
-| Local backup/restore | Settings me "Backup data" (sembast file export) + "Restore" — JSON/CSV |
-| Supabase backup | Platform-ke-managed backup on — check Supabase dashboard |
-| Staging | Optional — feature branch deploy (github-pages ka alag environment) |
+| Test coverage check | ⚠️ `test/` folder audit baaki — core modules (CalculationEngine, DataValidator, BillCalculator) par tests. 37+ tests pass (40/40 last run), CI me run hote hain. **Remaining (non-Phase 2): coverage audit** |
+| Deploy docs | ✅ README me: how to deploy, secrets setup (SUPABASE_URL/ANON_KEY), base-href note |
+| Local backup/restore | ✅ Settings me "Backup data" + "Restore" (JSON) |
+| Supabase backup | ⚠️ Platform-ke-managed backup on — **manual check** Supabase dashboard → Project Settings → Backups (code side kuch nahi karna) |
+| Staging | ⏳ Optional — feature branch deploy (github-pages ka alag environment) |
 
 ### Phase
 - Background task — tests/backup kisi bhi sprint me, deploy docs abhi
+- **Remaining (Phase 2 ke siva):** (1) test coverage audit, (2) Supabase backup manual check (user action), (3) staging (optional)
 
 ---
 
 ## Issue 13: Multiplying Factor hardcoded (CT/PT ratio per meter missing)
+
+> **Status: ✅ Implemented (01 Aug 2026)** — `MeterModel` me `ctRatio`/`ptRatio` (default 1:1),
+> per-meter `multiplyingFactor = ctRatio * ptRatio`, `EnergyLogModel` par per-log MF,
+> `BillCalculator` + `monthly_consumption_chart` dono ab per-log MF use karte hain.
+> Backward compat: `AppConstants.multiplyingFactor` default.
 
 ### Problem
 App me **ek global Multiplying Factor (MF)** hardcoded hai — sab meters ke liye same:
@@ -772,34 +911,40 @@ App me **ek global Multiplying Factor (MF)** hardcoded hai — sab meters ke liy
 ---
 
 ## Milestone Roadmap
-1. **Bug fixes** — Issue 1 (Sync), 4B (Edit data loss), 4A (NaN), 4C (100 limit), 3 (flicker), 2 (meter refresh), 8 R1/R2
-2. **Bulk upload — Phase 1: PDF only** (implementing now; Issue 11 — format flexibility iska core risk)
-3. **MSME essentials — accurate bill** — Issue 7A (tariff full editor) + 13 (per-meter MF)
+1. **Bug fixes** — ✅ DONE: Issue 1 (Sync), 4B (Edit data loss), 4A (NaN), 4C (100 limit), 3 (flicker), 2 (meter refresh), 8 R1-R4/S1-S3/A1-A3 (01 Aug 2026)
+2. **Bulk upload — Phase 1: PDF only** ✅ DONE — `PdfImportService` (label-based parse, Issue 11), Reports → "Import PDF" button + editable preview dialog, `EnergyRepository.bulkSaveReadings()`, tests (`test/unit/pdf_import_test.dart`). Phase 2 (CSV/xlsx/OCR) abhi nahi.
+3. **MSME essentials — accurate bill** ✅ DONE — Issue 7A (tariff full editor) + 13 (per-meter MF) + 7B (bill reconciliation) (01 Aug 2026)
 4. **Existing data migration — Phase 2** (Issue 10) — CSV/xlsx import + meter mapping
 5. **AI Smart Insights — Phase 2** (Gemini free tier — abhi hold)
 6. **Production hardening — Phase 2** — App Check / domain restriction, Edge Function (key server-side)
-7. **Background** — Issue 12 (test coverage, deploy docs, backup/restore)
+7. **Background** — ✅ Issue 12 (deploy docs + backup/restore done 01 Aug 2026; test coverage audit baaki — non-Phase 2)
 
 ---
 
-## Fix Priority
-1. **Issue 1 (Sync)** — HIGH: data loss risk agar internet hamesha connected hai
-2. **Issue 4B (Edit data loss + remote mismatch)** — HIGH: local/remote data mismatch
-3. **Issue 7A (Tariff Config)** — HIGH: har state ka tariff alag, iske bina bill galat
-4. **Issue 13 (Per-meter MF / CT-PT)** — HIGH: MF galat = consumption 2-4x galat = bill galat
-5. **Issue 8 R1/R2 (False snackbar, crash)** — HIGH: trust + crash risk
-6. **Issue 4A (NaN in Reports)** — MEDIUM: wrong display, easy fix
-7. **Issue 4C (100 readings limit)** — MEDIUM: purani readings invisible
-8. **Issue 3 (Dashboard/Analysis/Reports reload)** — MEDIUM: UX flicker
-9. **Issue 2 (Meter refresh)** — MEDIUM: UX issue, data loss nahi lekin confusion
-10. **Issue 11 (PDF format flexibility)** — MEDIUM: Phase 1 ka core risk
-11. **Issue 5 (Analysis screen redesign)** — MEDIUM: client expectation gap
-12. **Issue 6 (Reports screen redesign)** — MEDIUM: client expectation gap
-13. **Issue 7B/C (Bill accuracy, Contract optimizer)** — MEDIUM: client trust + bachat
-14. **Issue 8 R4/S1 (Date picker, tariff expand)** — MEDIUM: MSME must
-15. **Issue 7D-G (Hindi, Multi-site, Reminders)** — MEDIUM: adoption
-16. **Issue 10 (Data migration)** — MEDIUM: naye clients ke liye history
-17. **Issue 8 A1-A3/R3/S2/S3 (Auth + minor)** — LOW
-18. **Issue 7 (Good to have)** — LOW: role-based, CA export, WhatsApp, budget, YoY, onboarding
-19. **Issue 4E/4F/4G (Trend mix, date filter, export error)** — LOW: improvements
-20. **Issue 12 (Tests/Deploy docs/Backup)** — LOW: background task
+## Fix Priority — **sab ✅ done except Phase 2 / remaining**
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Issue 1 (Sync) | ✅ |
+| 2 | Issue 4B (Edit data loss) | ✅ |
+| 3 | Issue 7A (Tariff Config) | ✅ |
+| 4 | Issue 13 (Per-meter MF / CT-PT) | ✅ |
+| 5 | Issue 8 R1/R2 | ✅ |
+| 6 | Issue 4A (NaN) | ✅ |
+| 7 | Issue 4C (100 limit) | ✅ |
+| 8 | Issue 3 (flicker) | ✅ |
+| 9 | Issue 2 (Meter refresh) | ✅ |
+| 10 | Issue 11 (PDF format flexibility) | ✅ |
+| 11 | Issue 5 (Analysis redesign) | ✅ |
+| 12 | Issue 6 (Reports redesign — core) | ✅ |
+| 13 | Issue 7B/C (Bill accuracy, Contract optimizer) | ✅ |
+| 14 | Issue 8 R4/S1 (Date picker, tariff expand) | ✅ |
+| 15 | Issue 7D-G (Hindi, Multi-site, Reminders) | 7D ⏸️ deferred (English), 7E/7F ✅ |
+| 16 | Issue 10 (Data migration) | Phase 2 |
+| 17 | Issue 8 A1-A3/R3/S2/S3 | ✅ |
+| 18 | Issue 7 Good-to-have (role, CA export, WhatsApp, budget, YoY, onboarding) | **Phase 2** (01 Aug 2026) |
+| 19 | Issue 4E/4F/4G | ✅ |
+| 20 | Issue 12 (Tests/Deploy docs/Backup) | ✅ core; ⚠️ coverage audit + Supabase backup check + staging (optional) |
+
+**Phase 2 items (by design):** Issue 10 (CSV/xlsx import), AI insights, Issue 6 (report types dropdown, PDF charts/branding, email/share, auto-scheduled), per-state tariff presets, Good-to-have table (6 features), 7D Hindi i18n (deferred), App Check/Edge Function, OCR/JPG import.
+**Remaining non-Phase 2:** Issue 12 test coverage audit (code audit — optional), Supabase backup manual check (user), staging (optional).

@@ -34,6 +34,7 @@ class EnergyLogModel {
   final double billingDemand;
   final double loadFactor;
   final double avgUnitCost;
+  final double multiplyingFactor;
 
   const EnergyLogModel({
     required this.id,
@@ -62,6 +63,7 @@ class EnergyLogModel {
     this.billingDemand = 0,
     this.loadFactor = 0,
     this.avgUnitCost = 0,
+    this.multiplyingFactor = 1.0,
   });
 
   EnergyLogEntity toEntity() => EnergyLogEntity(
@@ -91,6 +93,7 @@ class EnergyLogModel {
     billingDemand: billingDemand,
     loadFactor: loadFactor,
     avgUnitCost: avgUnitCost,
+    multiplyingFactor: multiplyingFactor,
   );
 
   factory EnergyLogModel.fromEntity(EnergyLogEntity entity) => EnergyLogModel(
@@ -120,6 +123,7 @@ class EnergyLogModel {
     billingDemand: entity.billingDemand,
     loadFactor: entity.loadFactor,
     avgUnitCost: entity.avgUnitCost,
+    multiplyingFactor: entity.multiplyingFactor,
   );
 
   Map<String, Object?> toMap() => {
@@ -149,6 +153,7 @@ class EnergyLogModel {
     'billing_demand': _toPrecision(billingDemand, 2),
     'load_factor': _toPrecision(loadFactor, 4),
     'avg_unit_cost': _toPrecision(avgUnitCost, 2),
+    'multiplying_factor': _toPrecision(multiplyingFactor, 4),
   };
 
   factory EnergyLogModel.fromMap(Map<String, Object?> map) {
@@ -179,6 +184,7 @@ class EnergyLogModel {
       billingDemand: _parseDouble(map['billing_demand']),
       loadFactor: _parseDouble(map['load_factor']),
       avgUnitCost: _parseDouble(map['avg_unit_cost']),
+      multiplyingFactor: _parseDouble(map['multiplying_factor']),
     );
   }
 
@@ -208,6 +214,7 @@ class EnergyLogModel {
     'billing_demand': (billingDemand * 100).round() / 100,
     'load_factor': (loadFactor * 1000).round() / 1000,
     'avg_unit_cost': (avgUnitCost * 100).round() / 100,
+    'multiplying_factor': (multiplyingFactor * 1000).round() / 1000,
   };
 
   factory EnergyLogModel.fromJson(Map<String, dynamic> json) {
@@ -237,6 +244,8 @@ class EnergyLogModel {
       billingDemand: (json['billing_demand'] as num?)?.toDouble() ?? 0,
       loadFactor: (json['load_factor'] as num?)?.toDouble() ?? 0,
       avgUnitCost: (json['avg_unit_cost'] as num?)?.toDouble() ?? 0,
+      multiplyingFactor:
+          (json['multiplying_factor'] as num?)?.toDouble() ?? 1.0,
     );
   }
 
@@ -253,9 +262,10 @@ class EnergyLogModel {
     DateTime? loggedAt,
     String? userId,
     bool isSynced = false,
+    double multiplyingFactor = AppConstants.multiplyingFactor,
   }) {
     final pf = powerFactor ?? CalculationEngine.calculatePowerFactor(kwh, kvah);
-    final totalUnits = kwh * AppConstants.multiplyingFactor;
+    final totalUnits = kwh * multiplyingFactor;
     final billingDemand = CalculationEngine.calculateBillingDemand(
       mdRecorded,
       contractDemand,
@@ -267,26 +277,26 @@ class EnergyLogModel {
     );
     final demandCharges = CalculationEngine.calculateDemandCharges(
       billingDemand,
-      AppConstants.demandChargePerKva,
+      AppConfig.demandChargePerKva,
     );
     final facCharges = CalculationEngine.calculateFac(
       totalUnits,
-      AppConstants.facRatePerUnit,
+      AppConfig.facRatePerUnit,
     );
     final wheelingCharges = CalculationEngine.calculateWheelingCharges(
       totalUnits,
-      AppConstants.wheelingChargePerUnit,
+      AppConfig.wheelingChargePerUnit,
     );
 
     final subtotal =
         energyCharges + demandCharges + facCharges + wheelingCharges;
     final electricityDuty = CalculationEngine.calculateElectricityDuty(
       subtotal,
-      AppConstants.electricityDutyPercent,
+      AppConfig.electricityDutyPercent,
     );
     final taxes = CalculationEngine.calculateTaxes(
       subtotal + electricityDuty,
-      AppConstants.taxPercent,
+      AppConfig.taxPercent,
     );
 
     final pfRebate = CalculationEngine.calculatePfRebate(
@@ -299,8 +309,8 @@ class EnergyLogModel {
       demandCharges,
       pf,
     );
-    final subsidy = AppConstants.subsidyPercent > 0
-        ? subtotal * AppConstants.subsidyPercent / 100
+    final subsidy = AppConfig.subsidyPercent > 0
+        ? subtotal * AppConfig.subsidyPercent / 100
         : 0.0;
 
     final netBill =
@@ -320,6 +330,7 @@ class EnergyLogModel {
       kwh: kwh,
       mdRecorded: mdRecorded,
       powerFactor: pf,
+      multiplyingFactor: multiplyingFactor,
     );
     final uid = userId ?? _tryGetCurrentUserId();
 
@@ -350,6 +361,7 @@ class EnergyLogModel {
       billingDemand: (billingDemand * 100).round() / 100,
       loadFactor: 0,
       avgUnitCost: (avgUnitCost * 100).round() / 100,
+      multiplyingFactor: (multiplyingFactor * 1000).round() / 1000,
     );
   }
 

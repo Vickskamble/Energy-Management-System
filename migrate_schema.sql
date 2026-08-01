@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS energy_logs (
   net_bill DOUBLE PRECISION DEFAULT 0,
   billing_demand DOUBLE PRECISION DEFAULT 0,
   load_factor DOUBLE PRECISION DEFAULT 0,
-  avg_unit_cost DOUBLE PRECISION DEFAULT 0
+  avg_unit_cost DOUBLE PRECISION DEFAULT 0,
+  multiplying_factor DOUBLE PRECISION DEFAULT 5
 );
 -- Add any missing columns (safe for existing tables)
 ALTER TABLE energy_logs ADD COLUMN IF NOT EXISTS rkvarh_lag DOUBLE PRECISION DEFAULT 0;
@@ -51,6 +52,7 @@ ALTER TABLE energy_logs ADD COLUMN IF NOT EXISTS net_bill DOUBLE PRECISION DEFAU
 ALTER TABLE energy_logs ADD COLUMN IF NOT EXISTS billing_demand DOUBLE PRECISION DEFAULT 0;
 ALTER TABLE energy_logs ADD COLUMN IF NOT EXISTS load_factor DOUBLE PRECISION DEFAULT 0;
 ALTER TABLE energy_logs ADD COLUMN IF NOT EXISTS avg_unit_cost DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE energy_logs ADD COLUMN IF NOT EXISTS multiplying_factor DOUBLE PRECISION DEFAULT 5;
 CREATE INDEX IF NOT EXISTS idx_energy_logs_meter ON energy_logs(meter_name);
 CREATE INDEX IF NOT EXISTS idx_energy_logs_logged_at ON energy_logs(logged_at);
 

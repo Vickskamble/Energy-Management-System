@@ -1,6 +1,5 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../core/config/app_config.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/network/supabase_client.dart';
 import '../../core/utils/app_logger.dart';
@@ -88,6 +87,24 @@ class EnergyRepository {
     }
   }
 
+  /// Bulk-save imported readings (PDF import): local first (offline-first),
+  /// then best-effort remote push so imported history is never lost locally.
+  Future<int> bulkSaveReadings(List<EnergyLogModel> models) async {
+    if (models.isEmpty) return 0;
+    await _local.insertLogs(models);
+    if (SupabaseClientManager.isInitialized) {
+      try {
+        await _remote.pushLogs(models);
+        for (final model in models) {
+          await _local.markAsSynced(model.id);
+        }
+      } catch (e) {
+        AppLogger.w('Bulk sync deferred (will sync later): $e');
+      }
+    }
+    return models.length;
+  }
+
   /// Get dashboard aggregate data from local storage
   Future<DashboardData> getDashboardData() async {
     await _ensureLocalDataSynced();
@@ -113,7 +130,6 @@ class EnergyRepository {
     );
 
     double activeConsumptionToday = 0;
-    double totalKwhMonth = 0;
     double maxDemandPeak = 0;
     double totalKwh = 0;
     double totalKvah = 0;
@@ -124,7 +140,6 @@ class EnergyRepository {
     }
 
     for (final log in monthLogs) {
-      totalKwhMonth += log.kwh;
       totalKwh += log.kwh;
       totalKvah += log.kvah;
       if (log.mdRecorded > maxDemandPeak) {
@@ -136,10 +151,13 @@ class EnergyRepository {
       latestPf = (totalKwh / totalKvah).clamp(0.0, 1.0);
     }
 
-    // Actual units after applying multiplying factor
-    final totalConsumption =
-        (totalKwhMonth * AppConstants.multiplyingFactor * 100).roundToDouble() /
-        100;
+    // Actual units after applying each reading's own multiplying factor
+    // (CT ratio × PT ratio of the meter it was recorded against).
+    var totalConsumption = 0.0;
+    for (final log in monthLogs) {
+      totalConsumption += log.kwh * log.multiplyingFactor;
+    }
+    totalConsumption = (totalConsumption * 100).roundToDouble() / 100;
 
     return DashboardData(
       logs: allLogs.map((m) => m.toEntity()).toList(),

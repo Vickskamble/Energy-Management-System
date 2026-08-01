@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -33,6 +34,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
   bool _lastSubmitWasManual = false;
 
   String _selectedMeter = '';
+  DateTime _loggedAt = DateTime.now();
   final _currentKwhCtrl = TextEditingController();
   final _previousKwhCtrl = TextEditingController();
   final _currentKvahCtrl = TextEditingController();
@@ -97,6 +99,30 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     }
   }
 
+  Future<void> _pickDateTime() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _loggedAt,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_loggedAt),
+    );
+    if (time == null) return;
+    setState(() {
+      _loggedAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+    });
+  }
+
   void _clearForm() {
     _formKey.currentState?.reset();
     _currentKwhCtrl.clear();
@@ -107,6 +133,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     _rkvarhLeadCtrl.clear();
     _mdRecordedCtrl.clear();
     setState(() {
+      _loggedAt = DateTime.now();
       if (_meters.isNotEmpty) {
         _selectedMeter = _meters.first.name;
         _fetchPreviousReading(_selectedMeter);
@@ -137,7 +164,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
         rkvarhLag: double.tryParse(_rkvarhLagCtrl.text.trim()) ?? 0,
         rkvarhLead: double.tryParse(_rkvarhLeadCtrl.text.trim()) ?? 0,
         mdRecorded: double.parse(_mdRecordedCtrl.text.trim()),
-        loggedAt: DateTime.now(),
+        loggedAt: _loggedAt,
       ),
     );
   }
@@ -255,6 +282,51 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                   ],
                                 ),
                               ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      AppCard(
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.event,
+                              size: 20,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Reading Date & Time',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    DateFormat('dd/MM/yyyy, hh:mm a').format(
+                                      _loggedAt,
+                                    ),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _pickDateTime,
+                              icon: const Icon(
+                                Icons.edit_calendar_outlined,
+                                size: 18,
+                              ),
+                              label: const Text('Change'),
+                            ),
                           ],
                         ),
                       ),

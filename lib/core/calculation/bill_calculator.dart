@@ -11,11 +11,14 @@ class BillCalculator {
     required List<EnergyLogEntity> logs,
     double contractDemand = AppConstants.defaultContractDemandKva,
     double? energyRate,
-    double demandRate = AppConstants.demandChargePerKva,
-    double facRate = AppConstants.facRatePerUnit,
-    double wheelingRate = AppConstants.wheelingChargePerUnit,
+    double? demandRate,
+    double? facRate,
+    double? wheelingRate,
   }) {
     final effectiveEnergyRate = energyRate ?? AppConfig.tariffPerUnit;
+    final effectiveDemandRate = demandRate ?? AppConfig.demandChargePerKva;
+    final effectiveFacRate = facRate ?? AppConfig.facRatePerUnit;
+    final effectiveWheelingRate = wheelingRate ?? AppConfig.wheelingChargePerUnit;
     if (logs.isEmpty) return _emptyBreakdown(contractDemand);
 
     double totalKwh = 0;
@@ -35,7 +38,12 @@ class BillCalculator {
     final powerFactor = totalKvah > 0
         ? EnergyCalculator.calculatePowerFactor(totalKwh, totalKvah)
         : 0.0;
-    final totalUnits = totalKwh * AppConstants.multiplyingFactor;
+    // Units use each reading's own multiplying factor (CT ratio × PT ratio)
+    // so meters with different MF never distort the bill (Issue 13).
+    double totalUnits = 0;
+    for (final log in logs) {
+      totalUnits += log.kwh * log.multiplyingFactor;
+    }
     final billingDemand = EnergyCalculator.calculateBillingDemand(
       peakMd,
       contractDemand,
@@ -49,23 +57,26 @@ class BillCalculator {
     );
     final demandCharges = EnergyCalculator.calculateDemandCharges(
       billingDemand,
-      demandRate,
+      effectiveDemandRate,
     );
-    final facCharges = EnergyCalculator.calculateFac(totalUnits, facRate);
+    final facCharges = EnergyCalculator.calculateFac(
+      totalUnits,
+      effectiveFacRate,
+    );
     final wheelingCharges = EnergyCalculator.calculateWheelingCharges(
       totalUnits,
-      wheelingRate,
+      effectiveWheelingRate,
     );
 
     final subtotal =
         energyCharges + demandCharges + facCharges + wheelingCharges;
     final electricityDuty = EnergyCalculator.calculateElectricityDuty(
       subtotal,
-      AppConstants.electricityDutyPercent,
+      AppConfig.electricityDutyPercent,
     );
     final taxes = EnergyCalculator.calculateTaxes(
       subtotal + electricityDuty,
-      AppConstants.taxPercent,
+      AppConfig.taxPercent,
     );
 
     final pfRebate = EnergyCalculator.calculatePfRebate(
@@ -78,8 +89,8 @@ class BillCalculator {
       demandCharges,
       powerFactor,
     );
-    final subsidy = AppConstants.subsidyPercent > 0
-        ? subtotal * AppConstants.subsidyPercent / 100
+    final subsidy = AppConfig.subsidyPercent > 0
+        ? subtotal * AppConfig.subsidyPercent / 100
         : 0.0;
 
     final netBill = EnergyCalculator.calculateTotalBill(

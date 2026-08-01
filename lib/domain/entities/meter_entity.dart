@@ -4,6 +4,9 @@ class MeterEntity {
   final String? location;
   final double contractDemandKw;
   final bool isActive;
+  final double ctRatio;
+  final double ptRatio;
+  final String site;
 
   const MeterEntity({
     required this.id,
@@ -11,5 +14,11 @@ class MeterEntity {
     this.location,
     this.contractDemandKw = 400.0,
     this.isActive = true,
+    this.ctRatio = 1.0,
+    this.ptRatio = 1.0,
+    this.site = 'Main Site',
   });
+
+  /// Multiplying factor = CT ratio × PT ratio (defaults to 1 when unset).
+  double get multiplyingFactor => ctRatio * ptRatio;
 }

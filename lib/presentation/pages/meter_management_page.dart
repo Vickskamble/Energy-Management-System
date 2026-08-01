@@ -27,6 +27,13 @@ class MeterManagementPage extends StatelessWidget {
     final demandCtrl = TextEditingController(
       text: existing?.contractDemandKw.toStringAsFixed(0) ?? '400',
     );
+    final ctCtrl = TextEditingController(
+      text: existing?.ctRatio.toStringAsFixed(2) ?? '1',
+    );
+    final ptCtrl = TextEditingController(
+      text: existing?.ptRatio.toStringAsFixed(2) ?? '1',
+    );
+    final siteCtrl = TextEditingController(text: existing?.site ?? 'Main Site');
     final formKey = GlobalKey<FormState>();
 
     await showDialog<bool>(
@@ -67,6 +74,57 @@ class MeterManagementPage extends StatelessWidget {
                   return null;
                 },
               ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppTextField(
+                      controller: ctCtrl,
+                      label: 'CT Ratio',
+                      hint: 'e.g. 100/5 = 20',
+                      prefixIcon: Icons.tune,
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        final val = double.tryParse(v.trim());
+                        if (val == null || val <= 0) return 'Invalid';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AppTextField(
+                      controller: ptCtrl,
+                      label: 'PT Ratio',
+                      hint: '1 if none',
+                      prefixIcon: Icons.tune,
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        final val = double.tryParse(v.trim());
+                        if (val == null || val <= 0) return 'Invalid';
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              AppTextField(
+                controller: siteCtrl,
+                label: 'Site (factory/plant)',
+                hint: 'e.g. Unit 1, Pune',
+                prefixIcon: Icons.factory_outlined,
+              ),
+              const SizedBox(height: 8),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Multiplying Factor (MF) = CT × PT — meter readings isse multiply honge',
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                ),
+              ),
             ],
           ),
         ),
@@ -89,6 +147,11 @@ class MeterManagementPage extends StatelessWidget {
                           : locationCtrl.text.trim(),
                       contractDemandKw: double.parse(demandCtrl.text.trim()),
                       isActive: existing.isActive,
+                      ctRatio: double.parse(ctCtrl.text.trim()),
+                      ptRatio: double.parse(ptCtrl.text.trim()),
+                      site: siteCtrl.text.trim().isEmpty
+                          ? 'Main Site'
+                          : siteCtrl.text.trim(),
                     )
                   : MeterModel.create(
                       name: nameCtrl.text.trim(),
@@ -96,6 +159,11 @@ class MeterManagementPage extends StatelessWidget {
                           ? null
                           : locationCtrl.text.trim(),
                       contractDemandKw: double.parse(demandCtrl.text.trim()),
+                      ctRatio: double.parse(ctCtrl.text.trim()),
+                      ptRatio: double.parse(ptCtrl.text.trim()),
+                      site: siteCtrl.text.trim().isEmpty
+                          ? 'Main Site'
+                          : siteCtrl.text.trim(),
                     );
               if (existing != null) {
                 repo.updateMeter(meter);
@@ -268,7 +336,7 @@ class _MeterListState extends State<_MeterList> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Contract: ${meter.contractDemandKw.toStringAsFixed(0)} kVA${meter.location != null ? ' — ${meter.location}' : ''}',
+                                    '${meter.site} — Contract: ${meter.contractDemandKw.toStringAsFixed(0)} kVA — MF: ${meter.multiplyingFactor.toStringAsFixed(2)}${meter.location != null ? ' — ${meter.location}' : ''}',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: AppColors.textSecondary,

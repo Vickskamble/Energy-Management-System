@@ -1,8 +1,15 @@
 import 'dart:math';
+import '../../domain/entities/energy_log_entity.dart';
+import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import 'bill_breakdown.dart';
 
-enum SavingType { demandReduction, powerFactorImprovement, loadSmoothing }
+enum SavingType {
+  demandReduction,
+  powerFactorImprovement,
+  loadSmoothing,
+  contractDemandOptimization,
+}
 
 class SavingOpportunity {
   final SavingType type;
@@ -34,7 +41,7 @@ class SavingOpportunityGenerator {
       if (reducedBilling < breakdown.billingDemand - 1) {
         final savings =
             (breakdown.billingDemand - reducedBilling) *
-            AppConstants.demandChargePerKva;
+            AppConfig.demandChargePerKva;
         ops.add(
           SavingOpportunity(
             type: SavingType.demandReduction,
@@ -79,7 +86,7 @@ class SavingOpportunityGenerator {
       if (newBilling < breakdown.billingDemand - 1) {
         final savings =
             (breakdown.billingDemand - newBilling) *
-            AppConstants.demandChargePerKva;
+            AppConfig.demandChargePerKva;
         ops.add(
           SavingOpportunity(
             type: SavingType.loadSmoothing,
@@ -96,5 +103,54 @@ class SavingOpportunityGenerator {
 
     ops.sort((a, b) => b.monthlySavings.compareTo(a.monthlySavings));
     return ops.take(3).toList();
+  }
+
+  /// Issue 7C — Contract Demand Optimizer.
+  ///
+  /// Jab last 6 months ka peak MD contract demand ke 80% se bhi kam ho to
+  /// contract kam karne ki suggestion — direct ₹ bachat.
+  static SavingOpportunity? generateContractDemandOptimizer({
+    required List<EnergyLogEntity> logs,
+    required double contractDemand,
+  }) {
+    if (logs.isEmpty || contractDemand <= 0) return null;
+
+    final now = DateTime.now();
+    final monthlyPeaks = <double>[];
+    for (var i = 5; i >= 0; i--) {
+      final month = DateTime(now.year, now.month - i, 1);
+      var peak = 0.0;
+      for (final e in logs) {
+        if (e.loggedAt.year == month.year && e.loggedAt.month == month.month) {
+          if (e.mdRecorded > peak) peak = e.mdRecorded;
+        }
+      }
+      monthlyPeaks.add(peak);
+    }
+
+    // Sirf tab suggest karo jab kaafi history ho (>= 6 months data).
+    final monthsWithData = monthlyPeaks.where((p) => p > 0).length;
+    if (monthsWithData < 6) return null;
+
+    final maxPeak = monthlyPeaks.reduce(max);
+    if (maxPeak >= contractDemand * 0.8) return null;
+
+    // Suggest next standard 50 kVA step above the actual peak.
+    final suggested = (maxPeak / 50).ceil() * 50.0;
+    if (suggested >= contractDemand) return null;
+
+    final savings =
+        (contractDemand - suggested) * AppConfig.demandChargePerKva;
+    return SavingOpportunity(
+      type: SavingType.contractDemandOptimization,
+      title:
+          'Contract ${contractDemand.toStringAsFixed(0)} → ${suggested.toStringAsFixed(0)} kVA',
+      description:
+          'Last 6 months ka peak MD sirf ${maxPeak.toStringAsFixed(0)} kVA hai — '
+          'contract demand ${((maxPeak / contractDemand) * 100).toStringAsFixed(0)}% use ho raha hai.',
+      action:
+          'Utility se contract demand reduce karne ke liye apply karo (rate revision ke saath compare karke)',
+      monthlySavings: savings,
+    );
   }
 }
