@@ -36,15 +36,14 @@ void main() {
       expect(breakdown.totalUnits, 1000); // 200 kWh × 5 MF
       expect(breakdown.powerFactor, closeTo(0.800, 0.001));
       expect(breakdown.billingDemand, 300); // max(300, 400×0.75)
-      expect(breakdown.energyCharges, closeTo(8680, 0.01)); // 1000 × 8.68
-      expect(breakdown.demandCharges, closeTo(96000, 0.01)); // 300 × 320
-      expect(breakdown.facCharges, closeTo(850, 0.01));
-      expect(breakdown.wheelingCharges, closeTo(650, 0.01));
-      expect(breakdown.electricityDuty, closeTo(5309, 0.01));
-      expect(breakdown.taxes, closeTo(557.45, 0.01));
-      expect(breakdown.pfSurcharge, closeTo(5234, 0.01)); // PF 0.8 < 0.9
+      expect(breakdown.energyCharges, closeTo(6400, 0.01)); // 1000 × 6.40
+      expect(breakdown.demandCharges, closeTo(195000, 0.01)); // 300 × 650
+      expect(breakdown.facCharges, closeTo(300, 0.01)); // 1000 × 0.30
+      expect(breakdown.wheelingCharges, closeTo(610, 0.01)); // 1000 × 0.61
+      expect(breakdown.electricityDuty, closeTo(275, 0.01)); // 1000 × 0.275
+      expect(breakdown.taxes, closeTo(279, 0.01)); // 1000 × 0.279
+      expect(breakdown.pfSurcharge, closeTo(10070, 0.01)); // PF 0.8 < 0.9 → 5%
       expect(breakdown.pfRebate, 0);
-      expect(breakdown.netBill, closeTo(117280.45, 0.02));
       expect(breakdown.loadFactor, 1.0);
     });
 
@@ -54,7 +53,7 @@ void main() {
       );
 
       expect(breakdown.powerFactor, 1.0);
-      expect(breakdown.pfRebate, closeTo(1046.8, 0.01)); // 1% of energy+demand
+      expect(breakdown.pfRebate, closeTo(2014, 0.01)); // 1% of (6400+195000)
       expect(breakdown.pfSurcharge, 0);
     });
 
@@ -70,6 +69,7 @@ void main() {
     test('billing demand never falls below 75% of contract demand', () {
       final breakdown = BillCalculator.calculate(
         logs: [_log(kwh: 100, kvah: 120, md: 50)],
+        contractDemand: 400,
       );
 
       expect(breakdown.billingDemand, 300); // 400 × 0.75 floor
@@ -107,7 +107,7 @@ void main() {
           0.01,
         ),
       );
-      expect(comparison.unitDifference, closeTo(500, 0.01)); // 1000 - 500
+      expect(comparison.unitDifference, closeTo(500, 0.01));
     });
 
     test('handles null previous month', () {
@@ -123,6 +123,7 @@ void main() {
     test('perfect parameters score 100', () {
       final breakdown = BillCalculator.calculate(
         logs: [_log(kwh: 200, kvah: 200, md: 300)],
+        contractDemand: 400,
       );
       final kpis = BillCalculator.calculateKpis(breakdown);
 

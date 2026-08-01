@@ -1,5 +1,4 @@
 import 'dart:math';
-import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 
 class EnergyCalculator {
@@ -39,12 +38,26 @@ class EnergyCalculator {
     return totalUnits * ratePerUnit;
   }
 
-  static double calculateElectricityDuty(double subtotal, double percent) {
-    return subtotal * percent / 100;
+  /// Electricity duty = flat per-unit charge × total units (NOT percentage).
+  static double calculateElectricityDuty(double totalUnits, double perUnit) {
+    return totalUnits * perUnit;
   }
 
-  static double calculateTaxes(double subtotal, double percent) {
-    return subtotal * percent / 100;
+  /// Tax = flat per-unit charge × total units (NOT percentage).
+  static double calculateTaxes(double totalUnits, double perUnit) {
+    return totalUnits * perUnit;
+  }
+
+  /// TOD charges: energy charges × (weighted average multiplier − 1).
+  /// When all multipliers are 1.0, TOD charges = 0.
+  static double calculateTodCharges(
+    double energyCharges,
+    List<double> multipliers,
+  ) {
+    if (multipliers.length != 4) return 0;
+    final avg = multipliers.reduce((a, b) => a + b) / 4.0;
+    if ((avg - 1.0).abs() < 0.0001) return 0;
+    return energyCharges * (avg - 1.0);
   }
 
   static double calculatePfRebate(
@@ -93,15 +106,17 @@ class EnergyCalculator {
     double pfRebate = 0,
     double pfSurcharge = 0,
     double subsidy = 0,
+    double todCharges = 0,
+    double regionSubsidy = 0,
+    double rebateSection106 = 0,
   }) {
     final subtotal =
-        energyCharges + demandCharges + facCharges + wheelingCharges;
-    final duty = calculateElectricityDuty(
-      subtotal,
-      AppConfig.electricityDutyPercent,
-    );
-    final tax = calculateTaxes(subtotal + duty, AppConfig.taxPercent);
-    return (subtotal + duty + tax + pfSurcharge) - pfRebate - subsidy;
+        energyCharges + demandCharges + facCharges + wheelingCharges + todCharges;
+    return (subtotal + electricityDuty + taxes + pfSurcharge) -
+        pfRebate -
+        subsidy -
+        regionSubsidy -
+        rebateSection106;
   }
 
   static double calculateBillHealthScore({

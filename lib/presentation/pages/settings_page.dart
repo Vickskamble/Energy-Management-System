@@ -45,8 +45,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     _demandCtrl.text = AppConfig.demandChargePerKva.toStringAsFixed(2);
     _facCtrl.text = AppConfig.facRatePerUnit.toStringAsFixed(2);
     _wheelingCtrl.text = AppConfig.wheelingChargePerUnit.toStringAsFixed(2);
-    _dutyCtrl.text = AppConfig.electricityDutyPercent.toStringAsFixed(2);
-    _taxCtrl.text = AppConfig.taxPercent.toStringAsFixed(2);
+    _dutyCtrl.text = AppConfig.electricityDutyPerUnit.toStringAsFixed(2);
+    _taxCtrl.text = AppConfig.taxPerUnit.toStringAsFixed(2);
     _subsidyCtrl.text = AppConfig.subsidyPercent.toStringAsFixed(2);
   }
 
@@ -241,8 +241,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         demandChargePerKva: double.parse(_demandCtrl.text.trim()),
         facRatePerUnit: double.parse(_facCtrl.text.trim()),
         wheelingChargePerUnit: double.parse(_wheelingCtrl.text.trim()),
-        electricityDutyPercent: double.parse(_dutyCtrl.text.trim()),
-        taxPercent: double.parse(_taxCtrl.text.trim()),
+        electricityDutyPerUnit: double.parse(_dutyCtrl.text.trim()),
+        taxPerUnit: double.parse(_taxCtrl.text.trim()),
         subsidyPercent: double.parse(_subsidyCtrl.text.trim()),
       );
       if (mounted) {
@@ -271,16 +271,16 @@ class _SettingsScreenState extends State<SettingsScreen>
     _demandCtrl.text = AppConfig.demandChargePerKva.toStringAsFixed(2);
     _facCtrl.text = AppConfig.facRatePerUnit.toStringAsFixed(2);
     _wheelingCtrl.text = AppConfig.wheelingChargePerUnit.toStringAsFixed(2);
-    _dutyCtrl.text = AppConfig.electricityDutyPercent.toStringAsFixed(2);
-    _taxCtrl.text = AppConfig.taxPercent.toStringAsFixed(2);
+    _dutyCtrl.text = AppConfig.electricityDutyPerUnit.toStringAsFixed(2);
+    _taxCtrl.text = AppConfig.taxPerUnit.toStringAsFixed(2);
     _subsidyCtrl.text = AppConfig.subsidyPercent.toStringAsFixed(2);
     await TariffStore.saveAll(
       tariffPerUnit: AppConfig.tariffPerUnit,
       demandChargePerKva: AppConfig.demandChargePerKva,
       facRatePerUnit: AppConfig.facRatePerUnit,
       wheelingChargePerUnit: AppConfig.wheelingChargePerUnit,
-      electricityDutyPercent: AppConfig.electricityDutyPercent,
-      taxPercent: AppConfig.taxPercent,
+      electricityDutyPerUnit: AppConfig.electricityDutyPerUnit,
+      taxPerUnit: AppConfig.taxPerUnit,
       subsidyPercent: AppConfig.subsidyPercent,
     );
   }
@@ -311,7 +311,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 _rateField(
                   _tariffCtrl,
                   'Energy Tariff (₹ per kWh)',
-                  'e.g. 8.68',
+                  'e.g. 6.40',
                   mustBePositive: true,
                 ),
                 const SizedBox(height: 16),
@@ -330,7 +330,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       child: _rateField(
                         _demandCtrl,
                         'Demand (₹ per kVA)',
-                        'e.g. 320',
+                        'e.g. 650',
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -338,7 +338,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       child: _rateField(
                         _facCtrl,
                         'FAC (₹ per unit)',
-                        'e.g. 0.85',
+                        'e.g. 0.30',
                       ),
                     ),
                   ],
@@ -350,15 +350,15 @@ class _SettingsScreenState extends State<SettingsScreen>
                       child: _rateField(
                         _wheelingCtrl,
                         'Wheeling (₹ per unit)',
-                        'e.g. 0.65',
+                        'e.g. 0.61',
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _rateField(
                         _dutyCtrl,
-                        'Electricity Duty (%)',
-                        'e.g. 5.0',
+                        'Elec. Duty (₹ per unit)',
+                        'e.g. 0.275',
                       ),
                     ),
                   ],
@@ -369,8 +369,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     Expanded(
                       child: _rateField(
                         _taxCtrl,
-                        'Tax (%)',
-                        'e.g. 0.5',
+                        'Tax (₹ per unit)',
+                        'e.g. 0.279',
                       ),
                     ),
                     const SizedBox(width: 12),

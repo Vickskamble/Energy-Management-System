@@ -12,57 +12,74 @@ class AppConfig {
   static double _demandChargePerKva = AppConstants.demandChargePerKva;
   static double _facRatePerUnit = AppConstants.facRatePerUnit;
   static double _wheelingChargePerUnit = AppConstants.wheelingChargePerUnit;
-  static double _electricityDutyPercent = AppConstants.electricityDutyPercent;
-  static double _taxPercent = AppConstants.taxPercent;
+  static double _electricityDutyPerUnit = AppConstants.electricityDutyPerUnit;
+  static double _taxPerUnit = AppConstants.taxPerUnit;
   static double _subsidyPercent = AppConstants.subsidyPercent;
+  static double _regionSubsidyAmount = 0.0;
+  static double _rebateSection106 = 0.0;
+
+  /// TOD multipliers: index 0 = Zone A (00-06), 1 = Zone B (06-18),
+  /// 2 = Zone C (09-18), 3 = Zone D (17-24).  Multiplier 1.0 = no change.
+  static List<double> _todMultipliers = [1.0, 1.0, 1.0, 1.0];
 
   /// Effective energy tariff per unit (₹/kWh) — editable via Settings.
   static double get tariffPerUnit => _tariffPerUnit;
-
   static set tariffPerUnit(double value) {
     if (value > 0) _tariffPerUnit = value;
   }
 
   /// Demand charge per kVA (₹).
   static double get demandChargePerKva => _demandChargePerKva;
-
   static set demandChargePerKva(double value) {
     if (value >= 0) _demandChargePerKva = value;
   }
 
   /// Fuel Adjustment Charge per unit (₹).
   static double get facRatePerUnit => _facRatePerUnit;
-
   static set facRatePerUnit(double value) {
     if (value >= 0) _facRatePerUnit = value;
   }
 
   /// Wheeling charge per unit (₹).
   static double get wheelingChargePerUnit => _wheelingChargePerUnit;
-
   static set wheelingChargePerUnit(double value) {
     if (value >= 0) _wheelingChargePerUnit = value;
   }
 
-  /// Electricity duty percentage on subtotal.
-  static double get electricityDutyPercent => _electricityDutyPercent;
-
-  static set electricityDutyPercent(double value) {
-    if (value >= 0) _electricityDutyPercent = value;
+  /// Electricity duty per unit (₹) — flat per-unit charge, NOT percentage.
+  static double get electricityDutyPerUnit => _electricityDutyPerUnit;
+  static set electricityDutyPerUnit(double value) {
+    if (value >= 0) _electricityDutyPerUnit = value;
   }
 
-  /// Additional tax percentage.
-  static double get taxPercent => _taxPercent;
-
-  static set taxPercent(double value) {
-    if (value >= 0) _taxPercent = value;
+  /// Tax per unit (₹) — flat per-unit charge, NOT percentage.
+  static double get taxPerUnit => _taxPerUnit;
+  static set taxPerUnit(double value) {
+    if (value >= 0) _taxPerUnit = value;
   }
 
   /// Subsidy percentage (0 when none).
   static double get subsidyPercent => _subsidyPercent;
-
   static set subsidyPercent(double value) {
     if (value >= 0) _subsidyPercent = value;
+  }
+
+  /// Region subsidy flat amount deduction (₹).
+  static double get regionSubsidyAmount => _regionSubsidyAmount;
+  static set regionSubsidyAmount(double value) {
+    if (value >= 0) _regionSubsidyAmount = value;
+  }
+
+  /// Rebate U/s 106 flat amount deduction (₹).
+  static double get rebateSection106 => _rebateSection106;
+  static set rebateSection106(double value) {
+    if (value >= 0) _rebateSection106 = value;
+  }
+
+  /// TOD multipliers [ZoneA, ZoneB, ZoneC, ZoneD].
+  static List<double> get todMultipliers => List.unmodifiable(_todMultipliers);
+  static set todMultipliers(List<double> value) {
+    if (value.length == 4) _todMultipliers = value;
   }
 
   static void reset() {
@@ -70,9 +87,12 @@ class AppConfig {
     _demandChargePerKva = AppConstants.demandChargePerKva;
     _facRatePerUnit = AppConstants.facRatePerUnit;
     _wheelingChargePerUnit = AppConstants.wheelingChargePerUnit;
-    _electricityDutyPercent = AppConstants.electricityDutyPercent;
-    _taxPercent = AppConstants.taxPercent;
+    _electricityDutyPerUnit = AppConstants.electricityDutyPerUnit;
+    _taxPerUnit = AppConstants.taxPerUnit;
     _subsidyPercent = AppConstants.subsidyPercent;
+    _regionSubsidyAmount = 0.0;
+    _rebateSection106 = 0.0;
+    _todMultipliers = [1.0, 1.0, 1.0, 1.0];
   }
 }
 
@@ -113,16 +133,28 @@ class TariffStore {
     setDouble('tariff_per_unit', (v) => AppConfig.tariffPerUnit = v);
     setDouble('demand_charge_per_kva', (v) => AppConfig.demandChargePerKva = v);
     setDouble('fac_rate_per_unit', (v) => AppConfig.facRatePerUnit = v);
-    setDouble(
-      'wheeling_charge_per_unit',
-      (v) => AppConfig.wheelingChargePerUnit = v,
-    );
-    setDouble(
-      'electricity_duty_percent',
-      (v) => AppConfig.electricityDutyPercent = v,
-    );
-    setDouble('tax_percent', (v) => AppConfig.taxPercent = v);
+    setDouble('wheeling_charge_per_unit', (v) => AppConfig.wheelingChargePerUnit = v);
+
+    // Support legacy percentage keys → convert to per-unit fallback
+    if (map.containsKey('electricity_duty_per_unit')) {
+      setDouble('electricity_duty_per_unit', (v) => AppConfig.electricityDutyPerUnit = v);
+    } else if (map.containsKey('electricity_duty_percent')) {
+      // Legacy: ignore old percentage, keep default per-unit
+    }
+    if (map.containsKey('tax_per_unit')) {
+      setDouble('tax_per_unit', (v) => AppConfig.taxPerUnit = v);
+    } else if (map.containsKey('tax_percent')) {
+      // Legacy: ignore old percentage, keep default per-unit
+    }
+
     setDouble('subsidy_percent', (v) => AppConfig.subsidyPercent = v);
+    setDouble('region_subsidy_amount', (v) => AppConfig.regionSubsidyAmount = v);
+    setDouble('rebate_section_106', (v) => AppConfig.rebateSection106 = v);
+
+    final todRaw = map['tod_multipliers'];
+    if (todRaw is List && todRaw.length == 4) {
+      AppConfig.todMultipliers = todRaw.map((e) => (e as num).toDouble()).toList();
+    }
   }
 
   static Future<void> saveAll({
@@ -130,9 +162,12 @@ class TariffStore {
     required double demandChargePerKva,
     required double facRatePerUnit,
     required double wheelingChargePerUnit,
-    required double electricityDutyPercent,
-    required double taxPercent,
+    required double electricityDutyPerUnit,
+    required double taxPerUnit,
     required double subsidyPercent,
+    double regionSubsidyAmount = 0.0,
+    double rebateSection106 = 0.0,
+    List<double>? todMultipliers,
   }) async {
     try {
       final db = await getDatabaseFactory().openDatabase('ems_meta.db');
@@ -142,18 +177,24 @@ class TariffStore {
         'demand_charge_per_kva': demandChargePerKva,
         'fac_rate_per_unit': facRatePerUnit,
         'wheeling_charge_per_unit': wheelingChargePerUnit,
-        'electricity_duty_percent': electricityDutyPercent,
-        'tax_percent': taxPercent,
+        'electricity_duty_per_unit': electricityDutyPerUnit,
+        'tax_per_unit': taxPerUnit,
         'subsidy_percent': subsidyPercent,
+        'region_subsidy_amount': regionSubsidyAmount,
+        'rebate_section_106': rebateSection106,
+        'tod_multipliers': todMultipliers ?? AppConfig.todMultipliers,
       });
 
       AppConfig.tariffPerUnit = tariffPerUnit;
       AppConfig.demandChargePerKva = demandChargePerKva;
       AppConfig.facRatePerUnit = facRatePerUnit;
       AppConfig.wheelingChargePerUnit = wheelingChargePerUnit;
-      AppConfig.electricityDutyPercent = electricityDutyPercent;
-      AppConfig.taxPercent = taxPercent;
+      AppConfig.electricityDutyPerUnit = electricityDutyPerUnit;
+      AppConfig.taxPerUnit = taxPerUnit;
       AppConfig.subsidyPercent = subsidyPercent;
+      AppConfig.regionSubsidyAmount = regionSubsidyAmount;
+      AppConfig.rebateSection106 = rebateSection106;
+      if (todMultipliers != null) AppConfig.todMultipliers = todMultipliers;
     } catch (e) {
       AppLogger.e('Failed to save tariff settings', e);
       rethrow;

@@ -50,6 +50,14 @@ class EnergyLogRemoteDatasource {
     try {
       var query = _client.from(AppConstants.energyLogsTable).select('*');
 
+      // Defense-in-depth: filter by the logged-in user even though RLS
+      // already scopes rows — so data stays isolated if RLS is ever
+      // misconfigured or disabled.
+      final uid = _client.auth.currentUser?.id;
+      if (uid != null) {
+        query = query.eq('user_id', uid);
+      }
+
       if (from != null) {
         query = query.gte('logged_at', from.toUtc().toIso8601String());
       }

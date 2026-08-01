@@ -9,6 +9,9 @@ class BillBreakdown {
   final double pfRebate;
   final double pfSurcharge;
   final double subsidy;
+  final double todCharges;
+  final double regionSubsidy;
+  final double rebateSection106;
   final double netBill;
   final double billingDemand;
   final double contractDemand;
@@ -27,6 +30,9 @@ class BillBreakdown {
     required this.pfRebate,
     required this.pfSurcharge,
     required this.subsidy,
+    this.todCharges = 0,
+    this.regionSubsidy = 0,
+    this.rebateSection106 = 0,
     required this.netBill,
     required this.billingDemand,
     required this.contractDemand,
@@ -44,6 +50,7 @@ class BillBreakdown {
       netBill > 0 ? (wheelingCharges / netBill * 100) : 0;
   double get taxesPercent => netBill > 0 ? (taxes / netBill * 100) : 0;
   double get dutyPercent => netBill > 0 ? (electricityDuty / netBill * 100) : 0;
+  double get todPercent => netBill > 0 ? (todCharges / netBill * 100) : 0;
 
   Map<String, double> toCategoryMap() => {
     'Energy Charges': energyCharges,
@@ -52,6 +59,7 @@ class BillBreakdown {
     'Wheeling': wheelingCharges,
     'Electricity Duty': electricityDuty,
     'Taxes': taxes,
+    if (todCharges != 0) 'TOD Charges': todCharges,
   };
 
   Map<String, double> toPercentMap() => {
@@ -61,6 +69,7 @@ class BillBreakdown {
     'Wheeling': wheelingPercent,
     'Duty': dutyPercent,
     'Taxes': taxesPercent,
+    if (todCharges != 0) 'TOD': todPercent,
   };
 }
 

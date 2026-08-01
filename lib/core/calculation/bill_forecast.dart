@@ -41,16 +41,18 @@ class BillForecastCalculator {
         projectedUnits * AppConfig.wheelingChargePerUnit;
     final demandCharges =
         monthBreakdown.billingDemand * AppConfig.demandChargePerKva;
-    final subtotal =
-        energyCharges + demandCharges + facCharges + wheelingCharges;
+
+    // Electricity duty = per-unit × projected units (NOT percentage)
     final duty = EnergyCalculator.calculateElectricityDuty(
-      subtotal,
-      AppConfig.electricityDutyPercent,
+      projectedUnits,
+      AppConfig.electricityDutyPerUnit,
     );
+    // Taxes = per-unit × projected units (NOT percentage)
     final taxes = EnergyCalculator.calculateTaxes(
-      subtotal + duty,
-      AppConfig.taxPercent,
+      projectedUnits,
+      AppConfig.taxPerUnit,
     );
+
     final rebate = EnergyCalculator.calculatePfRebate(
       energyCharges,
       demandCharges,
@@ -62,10 +64,20 @@ class BillForecastCalculator {
       monthBreakdown.powerFactor,
     );
     final subsidy = AppConfig.subsidyPercent > 0
-        ? subtotal * AppConfig.subsidyPercent / 100
+        ? (energyCharges + demandCharges + facCharges + wheelingCharges) *
+            AppConfig.subsidyPercent /
+            100
         : 0.0;
     final projectedBill =
-        subtotal + duty + taxes + surcharge - rebate - subsidy;
+        energyCharges +
+        demandCharges +
+        facCharges +
+        wheelingCharges +
+        duty +
+        taxes +
+        surcharge -
+        rebate -
+        subsidy;
 
     return BillForecast(
       projectedBill: projectedBill,

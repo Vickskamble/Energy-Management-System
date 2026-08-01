@@ -135,6 +135,16 @@ CREATE TABLE IF NOT EXISTS analysis_results (
 CREATE INDEX IF NOT EXISTS idx_analysis_site ON analysis_results(site_id);
 CREATE INDEX IF NOT EXISTS idx_analysis_severity ON analysis_results(severity);
 
+-- 8. user_sessions — Single-device login enforcement
+CREATE TABLE IF NOT EXISTS user_sessions (
+  user_id      UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  device_token TEXT NOT NULL,
+  device_name  TEXT,
+  last_seen_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Enable Row Level Security
 ALTER TABLE energy_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sites ENABLE ROW LEVEL SECURITY;
@@ -143,6 +153,7 @@ ALTER TABLE meters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE readings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contract_demands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analysis_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_sessions ENABLE ROW LEVEL SECURITY;
 
 -- Default user_id to the authenticated user for all rows
 ALTER TABLE energy_logs ALTER COLUMN user_id SET DEFAULT auth.uid();
@@ -264,4 +275,20 @@ CREATE POLICY "Users can update own analysis_results"
 
 CREATE POLICY "Users can delete own analysis_results"
   ON analysis_results FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own session"
+  ON user_sessions FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own session"
+  ON user_sessions FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own session"
+  ON user_sessions FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own session"
+  ON user_sessions FOR DELETE
   USING (auth.uid() = user_id);

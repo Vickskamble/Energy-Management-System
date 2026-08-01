@@ -14,11 +14,19 @@ class BillCalculator {
     double? demandRate,
     double? facRate,
     double? wheelingRate,
+    double? electricityDutyPerUnit,
+    double? taxPerUnit,
+    List<double>? todMultipliers,
+    double regionSubsidy = 0,
+    double rebateSection106 = 0,
   }) {
     final effectiveEnergyRate = energyRate ?? AppConfig.tariffPerUnit;
     final effectiveDemandRate = demandRate ?? AppConfig.demandChargePerKva;
     final effectiveFacRate = facRate ?? AppConfig.facRatePerUnit;
     final effectiveWheelingRate = wheelingRate ?? AppConfig.wheelingChargePerUnit;
+    final effectiveEdRate = electricityDutyPerUnit ?? AppConfig.electricityDutyPerUnit;
+    final effectiveTaxRate = taxPerUnit ?? AppConfig.taxPerUnit;
+    final effectiveTod = todMultipliers ?? AppConfig.todMultipliers;
     if (logs.isEmpty) return _emptyBreakdown(contractDemand);
 
     double totalKwh = 0;
@@ -68,15 +76,22 @@ class BillCalculator {
       effectiveWheelingRate,
     );
 
-    final subtotal =
-        energyCharges + demandCharges + facCharges + wheelingCharges;
-    final electricityDuty = EnergyCalculator.calculateElectricityDuty(
-      subtotal,
-      AppConfig.electricityDutyPercent,
+    // TOD charges
+    final todCharges = EnergyCalculator.calculateTodCharges(
+      energyCharges,
+      effectiveTod,
     );
+
+    // Electricity duty = per-unit × total units (NOT percentage)
+    final electricityDuty = EnergyCalculator.calculateElectricityDuty(
+      totalUnits,
+      effectiveEdRate,
+    );
+
+    // Taxes = per-unit × total units (NOT percentage)
     final taxes = EnergyCalculator.calculateTaxes(
-      subtotal + electricityDuty,
-      AppConfig.taxPercent,
+      totalUnits,
+      effectiveTaxRate,
     );
 
     final pfRebate = EnergyCalculator.calculatePfRebate(
@@ -90,7 +105,9 @@ class BillCalculator {
       powerFactor,
     );
     final subsidy = AppConfig.subsidyPercent > 0
-        ? subtotal * AppConfig.subsidyPercent / 100
+        ? (energyCharges + demandCharges + facCharges + wheelingCharges + todCharges) *
+            AppConfig.subsidyPercent /
+            100
         : 0.0;
 
     final netBill = EnergyCalculator.calculateTotalBill(
@@ -103,6 +120,9 @@ class BillCalculator {
       pfRebate: pfRebate,
       pfSurcharge: pfSurcharge,
       subsidy: subsidy,
+      todCharges: todCharges,
+      regionSubsidy: regionSubsidy,
+      rebateSection106: rebateSection106,
     );
 
     final averageUnitCost = EnergyCalculator.calculateAverageUnitCost(
@@ -121,6 +141,9 @@ class BillCalculator {
       pfRebate: (pfRebate * 100).roundToDouble() / 100,
       pfSurcharge: (pfSurcharge * 100).roundToDouble() / 100,
       subsidy: (subsidy * 100).roundToDouble() / 100,
+      todCharges: (todCharges * 100).roundToDouble() / 100,
+      regionSubsidy: (regionSubsidy * 100).roundToDouble() / 100,
+      rebateSection106: (rebateSection106 * 100).roundToDouble() / 100,
       netBill: (netBill * 100).roundToDouble() / 100,
       billingDemand: (billingDemand * 100).roundToDouble() / 100,
       contractDemand: contractDemand,
@@ -245,6 +268,9 @@ class BillCalculator {
       pfRebate: 0,
       pfSurcharge: 0,
       subsidy: 0,
+      todCharges: 0,
+      regionSubsidy: 0,
+      rebateSection106: 0,
       netBill: 0,
       billingDemand: 0,
       contractDemand: contractDemand,

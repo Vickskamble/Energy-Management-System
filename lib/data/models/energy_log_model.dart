@@ -291,12 +291,12 @@ class EnergyLogModel {
     final subtotal =
         energyCharges + demandCharges + facCharges + wheelingCharges;
     final electricityDuty = CalculationEngine.calculateElectricityDuty(
-      subtotal,
-      AppConfig.electricityDutyPercent,
+      totalUnits,
+      AppConfig.electricityDutyPerUnit,
     );
     final taxes = CalculationEngine.calculateTaxes(
-      subtotal + electricityDuty,
-      AppConfig.taxPercent,
+      totalUnits,
+      AppConfig.taxPerUnit,
     );
 
     final pfRebate = CalculationEngine.calculatePfRebate(

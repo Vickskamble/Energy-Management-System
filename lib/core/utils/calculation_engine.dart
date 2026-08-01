@@ -55,12 +55,14 @@ class CalculationEngine {
     return totalUnits * ratePerUnit;
   }
 
-  static double calculateElectricityDuty(double subtotal, double percent) {
-    return subtotal * percent / 100;
+  /// Electricity duty = flat per-unit charge × total units (NOT percentage).
+  static double calculateElectricityDuty(double totalUnits, double perUnit) {
+    return totalUnits * perUnit;
   }
 
-  static double calculateTaxes(double subtotal, double percent) {
-    return subtotal * percent / 100;
+  /// Tax = flat per-unit charge × total units (NOT percentage).
+  static double calculateTaxes(double totalUnits, double perUnit) {
+    return totalUnits * perUnit;
   }
 
   static double calculatePfRebate(

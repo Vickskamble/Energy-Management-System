@@ -231,3 +231,26 @@ CREATE POLICY "Users can view own analysis_results" ON analysis_results FOR SELE
 CREATE POLICY "Users can insert own analysis_results" ON analysis_results FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own analysis_results" ON analysis_results FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own analysis_results" ON analysis_results FOR DELETE USING (auth.uid() = user_id);
+
+-- ============================================================
+-- 8. user_sessions — Single-device login (one account = one device)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_sessions (
+  user_id      UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  device_token TEXT NOT NULL,
+  device_name  TEXT,
+  last_seen_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE user_sessions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own session" ON user_sessions;
+DROP POLICY IF EXISTS "Users can insert own session" ON user_sessions;
+DROP POLICY IF EXISTS "Users can update own session" ON user_sessions;
+DROP POLICY IF EXISTS "Users can delete own session" ON user_sessions;
+
+CREATE POLICY "Users can view own session" ON user_sessions FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own session" ON user_sessions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own session" ON user_sessions FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own session" ON user_sessions FOR DELETE USING (auth.uid() = user_id);
