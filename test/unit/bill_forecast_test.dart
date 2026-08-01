@@ -47,7 +47,6 @@ void main() {
         referenceDate: DateTime(2026, 1, 10),
       )!;
 
-      // 400 kWh × 5 = 2000 units in 10 days of 31
       expect(forecast.daysElapsed, 10);
       expect(forecast.daysInMonth, 31);
       expect(forecast.projectedUnits, closeTo(6200, 0.01));
@@ -61,9 +60,9 @@ void main() {
 
       expect(forecast.projectedBill, greaterThan(0));
       expect(forecast.dailyAverageBill, greaterThan(0));
-      // 6200 units: energy 53816 + FAC 5270 + wheeling 4030
-      // + demand 96000 + duty 7955.8 + tax 835.36 + surcharge 7490.8
-      expect(forecast.projectedBill, closeTo(175397.96, 0.02));
+      // 6200 units: energy 39680 + demand 195000 + FAC 1860 + wheeling 3782
+      // + duty 1705 + tax 1729.80 + surcharge 11734 - rebate 0 - subsidy 0
+      expect(forecast.projectedBill, closeTo(255490.80, 0.01));
     });
 
     test('scales by the number of days in the reference month', () {
@@ -76,7 +75,6 @@ void main() {
 
       expect(forecast.daysElapsed, 15);
       expect(forecast.daysInMonth, 28);
-      // 100 kWh × 5 = 500 units → 500 × 28/15
       expect(forecast.projectedUnits, closeTo(933.33, 0.01));
     });
   });

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/network/session_guard.dart';
 import '../../core/network/supabase_client.dart';
 import '../../core/utils/app_logger.dart';
 import 'auth_event.dart';
@@ -41,25 +42,25 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
   ) {
     final data = event.authData;
     if (data == null) {
-      emit(const AppAuthUnauthenticated());
+      _handleUnauthenticated(emit);
       return;
     }
     try {
       final authState = data as AuthState;
       final session = authState.session;
       if (session != null) {
-        emit(
-          AppAuthAuthenticated(
-            userId: session.user.id,
-            email: session.user.email ?? '',
-          ),
+        // Enforce one-device-per-account BEFORE showing the app.
+        _enforceAndEmitAuthenticated(
+          userId: session.user.id,
+          email: session.user.email ?? '',
+          emit: emit,
         );
       } else {
-        emit(const AppAuthUnauthenticated());
+        _handleUnauthenticated(emit);
       }
     } catch (_) {
       // Cast failed — session not available
-      emit(const AppAuthUnauthenticated());
+      _handleUnauthenticated(emit);
     }
   }
 
@@ -71,17 +72,79 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
     try {
       final session = Supabase.instance.client.auth.currentSession;
       if (session != null) {
-        emit(
-          AppAuthAuthenticated(
-            userId: session.user.id,
-            email: session.user.email ?? '',
-          ),
+        _enforceAndEmitAuthenticated(
+          userId: session.user.id,
+          email: session.user.email ?? '',
+          emit: emit,
         );
       } else {
         emit(const AppAuthUnauthenticated());
       }
     } catch (_) {
       emit(const AppAuthUnauthenticated());
+    }
+  }
+
+  /// Single-device enforcement:
+  ///  - check() conflict  → sign out + show error
+  ///  - otherwise         → take over the session row, start heartbeat,
+  ///                        then emit authenticated.
+  Future<void> _enforceAndEmitAuthenticated({
+    required String userId,
+    required String email,
+    required Emitter<AppAuthState> emit,
+  }) async {
+    if (isClosed) return;
+    final status = await SessionGuard.instance.check(userId);
+    if (isClosed) return;
+    if (status == SessionStatus.conflict) {
+      await _signOutQuietly();
+      if (!isClosed) {
+        emit(
+          const AppAuthError(
+            'This account is already signed in on another device. '
+            'Sign out there first, then try again.',
+          ),
+        );
+      }
+      return;
+    }
+    await SessionGuard.instance.takeOver(userId);
+    SessionGuard.instance.startHeartbeat(
+      userId: userId,
+      onConflict: () => _onHeartbeatConflict(emit),
+    );
+    if (!isClosed) {
+      emit(AppAuthAuthenticated(userId: userId, email: email));
+    }
+  }
+
+  /// Called when the heartbeat detects another device took over the session.
+  Future<void> _onHeartbeatConflict(Emitter<AppAuthState> emit) async {
+    if (isClosed) return;
+    await SessionGuard.instance.stopHeartbeat();
+    await _signOutQuietly();
+    if (!isClosed) {
+      emit(
+        const AppAuthError(
+          'Signed out — this account is now logged in on another device.',
+        ),
+      );
+    }
+  }
+
+  void _handleUnauthenticated(Emitter<AppAuthState> emit) {
+    SessionGuard.instance.stopHeartbeat();
+    emit(const AppAuthUnauthenticated());
+  }
+
+  Future<void> _signOutQuietly() async {
+    try {
+      await Supabase.instance.client.auth.signOut().timeout(
+        const Duration(seconds: 10),
+      );
+    } catch (_) {
+      // Best-effort — RLS still protects the data.
     }
   }
 
@@ -101,6 +164,7 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
             password: event.password,
           )
           .timeout(const Duration(seconds: 15));
+      // The auth-state listener now drives _enforceAndEmitAuthenticated.
     } on TimeoutException {
       emit(const AppAuthError('Connection timed out. Check your network.'));
     } on AuthException catch (e) {
@@ -125,6 +189,11 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
           .signUp(email: event.email.trim(), password: event.password)
           .timeout(const Duration(seconds: 15));
       if (res.session != null) {
+        final uid = res.session!.user.id;
+        // Remove the auto-created session row so the fresh account isn't
+        // "active on a device" before the user signs in properly.
+        await SessionGuard.instance.stopHeartbeat(releaseSession: true);
+        await SessionGuard.instance.release(uid);
         await Supabase.instance.client.auth.signOut();
       }
       emit(const AppAuthRegisterSuccess());
@@ -144,6 +213,11 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
   ) async {
     emit(const AppAuthLoading());
     try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      await SessionGuard.instance.stopHeartbeat(releaseSession: true);
+      if (uid != null) {
+        await SessionGuard.instance.release(uid);
+      }
       await Supabase.instance.client.auth.signOut().timeout(
         const Duration(seconds: 15),
       );
@@ -184,6 +258,7 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
 
   @override
   Future<void> close() {
+    SessionGuard.instance.stopHeartbeat();
     _authSub?.cancel();
     return super.close();
   }

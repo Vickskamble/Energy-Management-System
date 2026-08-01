@@ -39,8 +39,9 @@ void main() {
 
       final demandOp = ops.where((o) => o.type == SavingType.demandReduction);
       expect(demandOp, isNotEmpty);
-      // 500 → max(300, 450) = 450 kVA saves 50 kVA × ₹320
-      expect(demandOp.first.monthlySavings, closeTo(16000, 0.01));
+      // billingDemand=500, floor=300, reducedBilling=max(300,450)=450
+      // savings = (500-450) × ₹650 = ₹32,500
+      expect(demandOp.first.monthlySavings, closeTo(32500, 0.01));
     });
 
     test('suggests PF improvement when power factor is below 0.95', () {
@@ -53,7 +54,10 @@ void main() {
         (o) => o.type == SavingType.powerFactorImprovement,
       );
       expect(pfOp, isNotEmpty);
-      expect(pfOp.first.monthlySavings, closeTo(6280.8, 0.01));
+      // PF 0.80 < 0.90 → penalty = 5.0 + 1.0 = 6.0%
+      // base = 6400 + 195000 = 201400
+      // savings = 201400 × 6.0 / 100 = 12084
+      expect(pfOp.first.monthlySavings, closeTo(12084, 0.01));
     });
 
     test('suggests load smoothing when load factor is low', () {
@@ -62,12 +66,16 @@ void main() {
           _log(kwh: 200, kvah: 250, md: 100),
           _log(kwh: 200, kvah: 250, md: 400),
         ],
+        contractDemand: 400,
       );
       final ops = SavingOpportunityGenerator.generate(breakdown);
 
       final smoothingOp = ops.where((o) => o.type == SavingType.loadSmoothing);
       expect(smoothingOp, isNotEmpty);
-      expect(smoothingOp.first.monthlySavings, closeTo(32000, 0.01));
+      // billingDemand=400, avgDemand=250, LF=0.625
+      // targetPeak=250/0.85=294.12, newBilling=max(300,294.12)=300
+      // savings = (400-300) × ₹650 = ₹65,000
+      expect(smoothingOp.first.monthlySavings, closeTo(65000, 0.01));
     });
 
     test('returns at most 3 opportunities sorted by savings', () {
@@ -94,18 +102,14 @@ void main() {
       final now = DateTime.now();
       return [
         for (var i = 0; i < 6; i++)
-          _log(
-            kwh: 200,
-            kvah: 250,
-            md: md,
-          ).copyWith(
+          _log(kwh: 200, kvah: 250, md: md).copyWith(
             loggedAt: DateTime(now.year, now.month - i, 10),
           ),
       ];
     }
 
     test('suggests contract reduction when 6-month peak is well below 80%', () {
-      final logs = sixMonthsOfLogs(md: 150); // 400 × 0.8 = 320 threshold
+      final logs = sixMonthsOfLogs(md: 150);
 
       final op = SavingOpportunityGenerator.generateContractDemandOptimizer(
         logs: logs,
@@ -114,8 +118,9 @@ void main() {
 
       expect(op, isNotNull);
       expect(op!.type, SavingType.contractDemandOptimization);
-      // 150 kVA peak → 150 kVA step → 250 kVA saved × ₹320
-      expect(op.monthlySavings, closeTo(80000, 0.01));
+      // 150 kVA peak → suggested = 150
+      // savings = (400-150) × ₹650 = ₹162,500
+      expect(op.monthlySavings, closeTo(162500, 0.01));
     });
 
     test('returns null when peak MD is above 80% of contract', () {

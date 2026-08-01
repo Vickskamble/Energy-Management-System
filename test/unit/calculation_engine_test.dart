@@ -38,14 +38,14 @@ void main() {
   group('calculateEstimatedBill', () {
     test('calculates bill using new tariff: units × MF × rate', () {
       final bill = CalculationEngine.calculateEstimatedBill(kwh: 1000);
-      // 1000 × 5 (MF) × 8.68 = 43,400
-      expect(bill, closeTo(43400, 1));
+      // 1000 × 5 (MF) × 6.40 = 32,000
+      expect(bill, closeTo(32000, 1));
     });
 
     test('bill is same regardless of PF (no penalty in per-reading calc)', () {
       final bill = CalculationEngine.calculateEstimatedBill(kwh: 500);
-      // 500 × 5 × 8.68 = 21,700
-      expect(bill, closeTo(21700, 1));
+      // 500 × 5 × 6.40 = 16,000
+      expect(bill, closeTo(16000, 1));
     });
   });
 
@@ -55,7 +55,7 @@ void main() {
     });
 
     test('returns false when md < threshold', () {
-      expect(CalculationEngine.isNearContractDemandBreach(300), false);
+      expect(CalculationEngine.isNearContractDemandBreach(100), false);
     });
   });
 
