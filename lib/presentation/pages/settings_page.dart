@@ -5,6 +5,7 @@ import '../../core/network/supabase_client.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/backup_service.dart';
+import '../../core/utils/data_reset_service.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_section.dart';
@@ -454,6 +455,19 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
           ),
         ),
+        const SizedBox(height: AppSpacing.lg),
+        AppSectionHeader(
+          title: 'Danger Zone',
+          subtitle: 'Permanently delete all readings, meters and settings',
+        ),
+        AppCard(
+          child: AppButtonOutline(
+            label: 'Reset All Data',
+            icon: Icons.delete_forever_outlined,
+            expanded: true,
+            onPressed: _confirmResetAll,
+          ),
+        ),
       ],
     );
   }
@@ -526,6 +540,57 @@ class _SettingsScreenState extends State<SettingsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Restore failed: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmResetAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset all data?'),
+        content: const Text(
+          'This permanently deletes ALL readings, meters and settings — '
+          'locally AND from Supabase (this account). '
+          'It cannot be undone. Export a backup first if you want to keep '
+          'anything.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Yes, Delete Everything',
+              style: TextStyle(color: AppColors.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await DataResetService.resetAllData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All data deleted — fresh start'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      context.read<EnergyBloc>().add(const LoadInitialDashboardData());
+      context.read<MeterRepository>().refresh();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Reset failed: $e'),
             backgroundColor: Colors.red.shade700,
           ),
         );

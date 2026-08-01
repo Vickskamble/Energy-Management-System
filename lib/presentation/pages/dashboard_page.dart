@@ -97,19 +97,11 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             EnergySuccess(
               :final logs,
-              :final estimatedBill,
-              :final totalConsumption,
               :final activeConsumptionToday,
-              :final currentPowerFactor,
-              :final maxDemandPeak,
             ) =>
               _DashboardContent(
                 logs: logs,
-                estimatedBill: estimatedBill,
-                totalConsumption: totalConsumption,
                 activeConsumptionToday: activeConsumptionToday,
-                currentPowerFactor: currentPowerFactor,
-                maxDemandPeak: maxDemandPeak,
               ),
             EnergyValidationError e => AppErrorState(
               message: e.message,
@@ -132,19 +124,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
 class _DashboardContent extends StatefulWidget {
   final List<dynamic> logs;
-  final double estimatedBill;
-  final double totalConsumption;
   final double activeConsumptionToday;
-  final double currentPowerFactor;
-  final double maxDemandPeak;
 
   const _DashboardContent({
     required this.logs,
-    required this.estimatedBill,
-    required this.totalConsumption,
     required this.activeConsumptionToday,
-    required this.currentPowerFactor,
-    required this.maxDemandPeak,
   });
 
   @override
@@ -201,25 +185,52 @@ class _DashboardContentState extends State<_DashboardContent> {
         .toList();
   }
 
+  /// Month used for the monthly KPI cards: the current month when it has
+  /// readings, otherwise the most recent month with data (so cards never show
+  /// ₹0 while all-time sections show values).
+  List<EnergyLogEntity> get _kpiMonthLogs {
+    if (_currentMonthLogs.isNotEmpty) return _currentMonthLogs;
+    if (_siteLogs.isEmpty) return const [];
+    final byMonth = <String, List<EnergyLogEntity>>{};
+    for (final l in _siteLogs) {
+      final key = '${l.loggedAt.year}-${l.loggedAt.month}';
+      byMonth.putIfAbsent(key, () => []).add(l);
+    }
+    final keys = byMonth.keys.toList()..sort();
+    return byMonth[keys.last]!;
+  }
+
+  /// "July 2026 — " prefix on KPI cards when they show the fallback month
+  /// instead of the current one (empty current month).
+  String get _kpiMonthLabel {
+    if (_currentMonthLogs.isNotEmpty) return '';
+    if (_kpiMonthLogs.isEmpty) return '';
+    final l = _kpiMonthLogs.first.loggedAt;
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${months[l.month - 1]} ${l.year} — ';
+  }
+
   /// Site-aware KPI values — full-data values when "All Sites".
   double get _siteEstimatedBill {
-    if (_site == null) return widget.estimatedBill;
-    return _currentMonthLogs.fold(0.0, (s, e) => s + e.estimatedBill);
+    if (_site == null) {
+      return _kpiMonthLogs.fold(0.0, (s, e) => s + e.estimatedBill);
+    }
+    return _kpiMonthLogs.fold(0.0, (s, e) => s + e.estimatedBill);
   }
 
   double get _siteTotalConsumption {
-    if (_site == null) return widget.totalConsumption;
-    return _currentMonthLogs.fold(0.0, (s, e) => s + e.kwh * e.multiplyingFactor);
+    return _kpiMonthLogs.fold(0.0, (s, e) => s + e.kwh * e.multiplyingFactor);
   }
 
   double get _siteMaxDemandPeak {
-    if (_site == null) return widget.maxDemandPeak;
-    return _siteLogs.fold(0.0, (s, e) => e.mdRecorded > s ? e.mdRecorded : s);
+    return _kpiMonthLogs.fold(0.0, (s, e) => e.mdRecorded > s ? e.mdRecorded : s);
   }
 
   double get _sitePowerFactor {
-    if (_site == null) return widget.currentPowerFactor;
-    return BillCalculator.calculate(logs: _siteLogs).powerFactor;
+    return BillCalculator.calculate(logs: _kpiMonthLogs).powerFactor;
   }
 
   Widget _buildSiteSelector() {
@@ -344,7 +355,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                 color: AppColors.kpiCost,
                 decimals: 0,
                 description:
-                    'Avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
+                    '${_kpiMonthLabel}Avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
               ),
               AppKpiCard(
                 title: 'Total Consumption',
@@ -354,7 +365,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                 color: AppColors.kpiEnergy,
                 decimals: 0,
                 description:
-                    '${breakdown.totalUnits.toStringAsFixed(0)} billed units',
+                    '$_kpiMonthLabel${breakdown.totalUnits.toStringAsFixed(0)} billed units',
               ),
               AppKpiCard(
                 title: 'Max Demand',
@@ -365,7 +376,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     ? AppColors.warning
                     : AppColors.kpiDemand,
                 description:
-                    'Billing demand: ${breakdown.billingDemand.toStringAsFixed(1)} kVA',
+                    '${_kpiMonthLabel}Billing demand: ${breakdown.billingDemand.toStringAsFixed(1)} kVA',
               ),
               AppKpiCard(
                 title: 'Power Factor',
@@ -517,20 +528,10 @@ class _DashboardContentState extends State<_DashboardContent> {
           ),
           const SizedBox(height: AppSpacing.xxl),
 
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (breakdown.netBill > 0)
-                Expanded(
-                  flex: 3,
-                  child: _buildBillBreakdown(context, breakdown),
-                ),
-              if (breakdown.netBill > 0 && insights.isNotEmpty)
-                const SizedBox(width: AppSpacing.lg),
-              if (insights.isNotEmpty)
-                Expanded(flex: 2, child: _buildInsightsSection(insights)),
-            ],
-          ),
+          if (insights.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.xl),
+            _buildInsightsSection(insights),
+          ],
           const SizedBox(height: AppSpacing.xl),
 
           if (recommendations.isNotEmpty) ...[
@@ -994,138 +995,6 @@ class _DashboardContentState extends State<_DashboardContent> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildBillBreakdown(BuildContext context, BillBreakdown breakdown) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AppSectionHeader(
-          title: 'Bill Breakdown',
-          subtitle:
-              '₹${breakdown.netBill.toStringAsFixed(0)} total estimated bill',
-        ),
-        AppCard(
-          child: Column(
-            children: [
-              _billRow(
-                'Energy Charges',
-                breakdown.energyCharges,
-                breakdown.energyChargesPercent,
-                AppColors.kpiEnergy,
-              ),
-              const Divider(height: 24),
-              _billRow(
-                'Demand Charges',
-                breakdown.demandCharges,
-                breakdown.demandChargesPercent,
-                AppColors.kpiDemand,
-              ),
-              const Divider(height: 24),
-              _billRow(
-                'FAC',
-                breakdown.facCharges,
-                breakdown.facPercent,
-                AppColors.warning,
-              ),
-              const Divider(height: 24),
-              _billRow(
-                'Wheeling Charges',
-                breakdown.wheelingCharges,
-                breakdown.wheelingPercent,
-                AppColors.textSecondary,
-              ),
-              const Divider(height: 24),
-              _billRow(
-                'Electricity Duty',
-                breakdown.electricityDuty,
-                breakdown.dutyPercent,
-                AppColors.kpiEfficiency,
-              ),
-              const Divider(height: 24),
-              _billRow(
-                'Taxes',
-                breakdown.taxes,
-                breakdown.taxesPercent,
-                AppColors.kpiCO2,
-              ),
-              if (breakdown.pfRebate > 0) ...[
-                const Divider(height: 24),
-                _billRow(
-                  'PF Rebate',
-                  -breakdown.pfRebate,
-                  0,
-                  AppColors.success,
-                ),
-              ],
-              if (breakdown.pfSurcharge > 0) ...[
-                const Divider(height: 24),
-                _billRow(
-                  'PF Surcharge',
-                  breakdown.pfSurcharge,
-                  0,
-                  AppColors.danger,
-                ),
-              ],
-              if (breakdown.subsidy > 0) ...[
-                const Divider(height: 24),
-                _billRow('Subsidy', -breakdown.subsidy, 0, AppColors.success),
-              ],
-              const Divider(height: 24),
-              _billRow(
-                'Net Bill',
-                breakdown.netBill,
-                100,
-                AppColors.primary,
-                bold: true,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _billRow(
-    String label,
-    double amount,
-    double percent,
-    Color color, {
-    bool bold = false,
-  }) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-            ),
-          ),
-        ),
-        if (percent > 0)
-          Text(
-            '${percent.toStringAsFixed(1)}%',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-        const SizedBox(width: 16),
-        Text(
-          '₹${amount.abs().toStringAsFixed(0)}',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
-            color: amount >= 0 ? null : AppColors.success,
-          ),
-        ),
-      ],
     );
   }
 
