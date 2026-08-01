@@ -52,7 +52,7 @@ class PdfImportService {
           await page.ensureLoaded();
           final rawText = await page.loadText();
           if (rawText == null || rawText.fullText.trim().isEmpty) continue;
-          final draft = _parsePage(rawText.fullText, pageIndex: i + 1);
+          final draft = parseBillText(rawText.fullText, pageIndex: i + 1);
           if (draft != null) readings.add(draft);
         } catch (e) {
           AppLogger.w('PDF page ${i + 1} parse failed: $e');
@@ -75,7 +75,11 @@ class PdfImportService {
   // Label-based parsing (Issue 11 — format flexibility)
   // ---------------------------------------------------------------------------
 
-  static PdfReadingDraft? _parsePage(String rawText, {required int pageIndex}) {
+  /// Label-based parsing of one page's raw text (Issue 11 — format
+  /// flexibility). Pure Dart — testable without a PDF engine; returns null
+  /// when the page is not an energy bill.
+  static PdfReadingDraft? parseBillText(String rawText,
+      {required int pageIndex}) {
     final lines = rawText
         .split(RegExp(r'[\r\n]+'))
         .map((l) => l.trim())
