@@ -49,6 +49,25 @@ MD: 110
     expect(r.mdRecorded, closeTo(110, 0.01));
   });
 
+  test('handles common Indian bill labels (MDI, P.F., Unit Consumed)', () {
+    const text = '''
+ELE Corporation Electricity Bill
+Account No: 123456789
+Bill Date: 21/07/2026
+Unit Consumed: 620
+MDI (kVA): 45.8
+P.F.: 0.93
+''';
+
+    final r = PdfImportService.parseBillText(text, pageIndex: 1);
+
+    expect(r, isNotNull);
+    expect(r!.kwh, closeTo(620, 0.01));
+    expect(r.mdRecorded, closeTo(45.8, 0.01));
+    expect(r.kvah, closeTo(620 / 0.93, 0.01));
+    expect(r.loggedAt.month, 7);
+  });
+
   test('returns null when the page has no readable readings', () {
     const text = 'Just a normal document with no meter values.';
 
