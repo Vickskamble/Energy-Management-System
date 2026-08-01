@@ -98,6 +98,14 @@ class _ReportsContent extends StatelessWidget {
                       );
                     } catch (e) {
                       AppLogger.e('PDF export failed', e);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('PDF export failed: $e'),
+                            backgroundColor: Colors.red.shade700,
+                          ),
+                        );
+                      }
                     }
                   }
                 },
@@ -261,7 +269,11 @@ class _ReportsContent extends StatelessWidget {
             Text(dateFmt.format(log.loggedAt)),
             Text(log.meterName),
             Text(log.kwh.toStringAsFixed(1)),
-            Text('₹${(log.estimatedBill / log.kwh).toStringAsFixed(2)}'),
+            Text(
+              log.kwh > 0
+                  ? '₹${(log.estimatedBill / log.kwh).toStringAsFixed(2)}'
+                  : '—',
+            ),
             Text(log.powerFactor.toStringAsFixed(3)),
             Text(log.mdRecorded.toStringAsFixed(1)),
             Text('₹ ${log.estimatedBill.toStringAsFixed(0)}'),

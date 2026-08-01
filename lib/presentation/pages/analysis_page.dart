@@ -533,10 +533,13 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     meterName: log.meterName,
                     kwh: double.parse(kwhCtrl.text.trim()),
                     kvah: double.parse(kvahCtrl.text.trim()),
+                    rkvarhLag: log.rkvarhLag,
+                    rkvarhLead: log.rkvarhLead,
                     mdRecorded: double.parse(mdCtrl.text.trim()),
                     loggedAt: date,
                     contractDemand: log.contractDemand,
                     userId: log.userId,
+                    isSynced: log.isSynced,
                   );
                   Navigator.pop(dialogCtx);
                   try {

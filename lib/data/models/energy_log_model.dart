@@ -252,6 +252,7 @@ class EnergyLogModel {
     double contractDemand = AppConstants.defaultContractDemandKva,
     DateTime? loggedAt,
     String? userId,
+    bool isSynced = false,
   }) {
     final pf = powerFactor ?? CalculationEngine.calculatePowerFactor(kwh, kvah);
     final totalUnits = kwh * AppConstants.multiplyingFactor;
@@ -334,7 +335,7 @@ class EnergyLogModel {
       contractDemand: (contractDemand * 100).round() / 100,
       estimatedBill: (bill * 100).round() / 100,
       loggedAt: loggedAt ?? DateTime.now(),
-      isSynced: false,
+      isSynced: isSynced,
       userId: uid,
       energyCharges: (energyCharges * 100).round() / 100,
       demandCharges: (demandCharges * 100).round() / 100,

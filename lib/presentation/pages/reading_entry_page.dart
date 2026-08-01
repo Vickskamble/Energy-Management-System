@@ -30,6 +30,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
   List<MeterModel> _meters = [];
   bool _metersLoading = true;
   bool _fetchingPrevious = false;
+  bool _lastSubmitWasManual = false;
 
   String _selectedMeter = '';
   final _currentKwhCtrl = TextEditingController();
@@ -111,8 +112,19 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     });
   }
 
+  String? _requiredNumberValidator(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Required';
+    return double.tryParse(v.trim()) == null ? 'Enter a valid number' : null;
+  }
+
+  String? _optionalNumberValidator(String? v) {
+    if (v == null || v.trim().isEmpty) return null;
+    return double.tryParse(v.trim()) == null ? 'Enter a valid number' : null;
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    _lastSubmitWasManual = true;
     context.read<EnergyBloc>().add(
       SubmitManualReadingForm(
         meterName: _selectedMeter,
@@ -134,6 +146,10 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
       listener: (context, state) {
         switch (state) {
           case EnergySuccess(:final currentPowerFactor, :final maxDemandPeak):
+            // Ignore states triggered by auto-refresh / other pages —
+            // success feedback belongs only to a manual form submit.
+            if (!_lastSubmitWasManual) break;
+            _lastSubmitWasManual = false;
             AppSnackbar.success(context, 'Reading saved successfully');
             _clearForm();
             if (currentPowerFactor < 0.95) {
@@ -147,8 +163,10 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
               );
             }
           case EnergyValidationError _:
+            _lastSubmitWasManual = false;
             AppSnackbar.warning(context, state.message);
           case EnergyOperationFailure _:
+            _lastSubmitWasManual = false;
             AppSnackbar.error(context, state.message);
           default:
             break;
@@ -170,7 +188,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                 const AppEmptyState(
                   icon: Icons.speed_rounded,
                   title: 'No meters configured',
-                  subtitle: 'Add one in Settings first',
+                  subtitle: 'Add one in Meter Management first',
                 )
               else
                 Form(
@@ -191,6 +209,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                             ),
                             const SizedBox(height: 12),
                             DropdownButtonFormField<String>(
+                              key: ValueKey(_selectedMeter),
                               initialValue: _selectedMeter,
                               decoration: const InputDecoration(
                                 labelText: 'Meter Name',
@@ -261,10 +280,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                         TextInputType.numberWithOptions(
                                           decimal: true,
                                         ),
-                                    validator: (v) =>
-                                        v == null || v.trim().isEmpty
-                                        ? 'Required'
-                                        : null,
+                                    validator: _requiredNumberValidator,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -278,10 +294,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                         TextInputType.numberWithOptions(
                                           decimal: true,
                                         ),
-                                    validator: (v) =>
-                                        v == null || v.trim().isEmpty
-                                        ? 'Required'
-                                        : null,
+                                    validator: _requiredNumberValidator,
                                   ),
                                 ),
                               ],
@@ -298,10 +311,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                         TextInputType.numberWithOptions(
                                           decimal: true,
                                         ),
-                                    validator: (v) =>
-                                        v == null || v.trim().isEmpty
-                                        ? 'Required'
-                                        : null,
+                                    validator: _requiredNumberValidator,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -315,10 +325,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                         TextInputType.numberWithOptions(
                                           decimal: true,
                                         ),
-                                    validator: (v) =>
-                                        v == null || v.trim().isEmpty
-                                        ? 'Required'
-                                        : null,
+                                    validator: _requiredNumberValidator,
                                   ),
                                 ),
                               ],
@@ -350,6 +357,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                         TextInputType.numberWithOptions(
                                           decimal: true,
                                         ),
+                                    validator: _optionalNumberValidator,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -362,6 +370,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                         TextInputType.numberWithOptions(
                                           decimal: true,
                                         ),
+                                    validator: _optionalNumberValidator,
                                   ),
                                 ),
                               ],

@@ -28,16 +28,27 @@ class EnergyRepository {
     return models.map((m) => m.toEntity()).toList();
   }
 
-  /// Save reading locally first (offline-first)
+  /// Save reading locally first (offline-first), then push to Supabase
+  /// immediately when online so data never waits for a connectivity change.
   Future<EnergyLogEntity> saveReading(EnergyLogModel model) async {
     await _local.insertLog(model);
+    if (SupabaseClientManager.isInitialized) {
+      try {
+        await _remote.pushLog(model);
+        await _local.markAsSynced(model.id);
+      } catch (e) {
+        AppLogger.w('Sync deferred (will sync later): $e');
+      }
+    }
     return model.toEntity();
   }
 
-  /// Update an existing reading (local + best-effort remote sync)
+  /// Update an existing reading (local always; remote upsert best-effort).
+  /// Remote is updated regardless of sync status so edited synced readings
+  /// never diverge from Supabase.
   Future<void> updateReading(EnergyLogModel model) async {
     await _local.updateLog(model);
-    if (model.isSynced && SupabaseClientManager.isInitialized) {
+    if (SupabaseClientManager.isInitialized) {
       try {
         await _remote.updateLog(model);
         await _local.markAsSynced(model.id);

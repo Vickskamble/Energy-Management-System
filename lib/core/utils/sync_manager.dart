@@ -17,6 +17,21 @@ class SyncManager {
         bloc.add(const SyncOfflineCachedLogs());
       }
     });
+    _syncPendingIfOnline(bloc);
+  }
+
+  /// Sync pending logs once on app start — connectivity-change events never
+  /// fire when the device is already continuously connected.
+  Future<void> _syncPendingIfOnline(EnergyBloc bloc) async {
+    try {
+      final results = await _connectivity.checkConnectivity();
+      final hasConnection = results.any((r) => r != ConnectivityResult.none);
+      if (hasConnection) {
+        bloc.add(const SyncOfflineCachedLogs());
+      }
+    } catch (_) {
+      // Connectivity check failed — the change listener will cover us later.
+    }
   }
 
   void stop() {
