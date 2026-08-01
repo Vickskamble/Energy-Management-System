@@ -23,4 +23,7 @@ class AppConstants {
   static const double pfRebateThreshold = 0.95;
   static const double pfSurchargeThreshold = 0.90;
   static const double loadFactorThresholdGood = 0.75;
+
+  /// Tolerance (%) for actual vs estimated bill reconciliation (Issue 7B).
+  static const double billAccuracyTolerancePercent = 10.0;
 }

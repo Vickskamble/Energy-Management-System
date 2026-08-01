@@ -1,4 +1,5 @@
 import '../constants/app_constants.dart';
+import '../config/app_config.dart';
 import '../calculation/bill_breakdown.dart';
 import '../../domain/entities/energy_log_entity.dart';
 
@@ -95,7 +96,7 @@ class RecommendationEngine {
     if (demandUtil > 85) {
       final potentialPenalty =
           (breakdown.billingDemand - breakdown.contractDemand) *
-          AppConstants.demandChargePerKva;
+          AppConfig.demandChargePerKva;
       items.add(
         RecommendationItem(
           title: 'Reduce Peak Demand',
@@ -111,9 +112,9 @@ class RecommendationEngine {
       );
     } else if (demandUtil < 50) {
       final currentCharge =
-          breakdown.billingDemand * AppConstants.demandChargePerKva;
+          breakdown.billingDemand * AppConfig.demandChargePerKva;
       final suggestedDemand = breakdown.billingDemand * 1.2;
-      final newCharge = suggestedDemand * AppConstants.demandChargePerKva;
+      final newCharge = suggestedDemand * AppConfig.demandChargePerKva;
       items.add(
         RecommendationItem(
           title: 'Reduce Contract Demand',

@@ -139,6 +139,48 @@ Both flows are offline-first — all writes go to local Sembast first, sync to S
 - Register a new account from the Login screen
 - No pre-seeded data required — add meters and readings via the app
 
+## Deployment (GitHub Pages)
+
+The repo has a CI workflow (`.github/workflows/deploy.yml`) that runs on every push to
+`main`:
+
+1. **Test** — `flutter test`
+2. **Build** — `flutter build web --release`
+3. **Deploy** — static site pushed to the `gh-pages` branch (GitHub Pages)
+
+### Secrets
+
+Configure these in **GitHub → Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+|--------|-------|
+| `SUPABASE_URL` | e.g. `https://your-project.supabase.co` |
+| `SUPABASE_ANON_KEY` | Anon (publishable) key from Supabase → Settings → API |
+
+The workflow writes them into `.env` at build time (`.env` is git-ignored, so no secrets
+are committed).
+
+### Base-href note
+
+The app is served from `/Energy-Management-System/` (org repo), so the workflow builds
+with `--base-href=/Energy-Management-System/`. If you fork or rename the repo, update the
+base-href in `.github/workflows/deploy.yml` and the `README` accordingly.
+
+### Manual deploy (any host)
+
+```bash
+cp .env.example .env   # fill in SUPABASE_URL / SUPABASE_ANON_KEY
+flutter build web --release
+# serve build/web/ from any static host (Nginx, Netlify, Firebase Hosting, etc.)
+# for non-root paths add: --base-href=/your-path/
+```
+
+### Data backup
+
+All local data (readings, meters, settings) can be exported/imported as a single JSON
+file from **Settings → System → Backup & Restore**. Supabase backups are managed in the
+Supabase dashboard (Platform → Backups).
+
 ## Project Structure
 
 ```

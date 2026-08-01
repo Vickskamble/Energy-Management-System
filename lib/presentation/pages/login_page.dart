@@ -18,7 +18,6 @@ class _LoginPageState extends State<LoginPage>
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _obscurePass = true;
-  bool _rememberMe = false;
   late AnimationController _animCtrl;
   late Animation<double> _fadeIn;
 
@@ -248,33 +247,8 @@ class _LoginPageState extends State<LoginPage>
                               const SizedBox(height: 12),
                               Row(
                                 mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                                    MainAxisAlignment.end,
                                 children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox(
-                                        height: 24,
-                                        width: 24,
-                                        child: Checkbox(
-                                          value: _rememberMe,
-                                          onChanged: (v) => setState(
-                                            () => _rememberMe = v ?? false,
-                                          ),
-                                          materialTapTargetSize:
-                                              MaterialTapTargetSize.shrinkWrap,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      const Text(
-                                        'Remember me',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
                                   TextButton(
                                     onPressed: () =>
                                         _showForgotPasswordDialog(context),

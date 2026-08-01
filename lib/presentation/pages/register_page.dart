@@ -123,7 +123,8 @@ class _RegisterPageState extends State<RegisterPage> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Account created! Please sign in to continue.',
+                              'Account created! Check your email to verify, '
+                              'then sign in to continue.',
                             ),
                             backgroundColor: Colors.green,
                           ),

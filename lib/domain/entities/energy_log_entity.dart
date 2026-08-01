@@ -26,6 +26,7 @@ class EnergyLogEntity {
   final double billingDemand;
   final double loadFactor;
   final double avgUnitCost;
+  final double multiplyingFactor;
 
   const EnergyLogEntity({
     required this.id,
@@ -54,6 +55,7 @@ class EnergyLogEntity {
     this.billingDemand = 0,
     this.loadFactor = 0,
     this.avgUnitCost = 0,
+    this.multiplyingFactor = 1.0,
   });
 
   EnergyLogEntity copyWith({
@@ -70,6 +72,7 @@ class EnergyLogEntity {
     DateTime? loggedAt,
     bool? isSynced,
     String? userId,
+    double? multiplyingFactor,
     double? energyCharges,
     double? demandCharges,
     double? facCharges,
@@ -111,6 +114,7 @@ class EnergyLogEntity {
       billingDemand: billingDemand ?? this.billingDemand,
       loadFactor: loadFactor ?? this.loadFactor,
       avgUnitCost: avgUnitCost ?? this.avgUnitCost,
+      multiplyingFactor: multiplyingFactor ?? this.multiplyingFactor,
     );
   }
 

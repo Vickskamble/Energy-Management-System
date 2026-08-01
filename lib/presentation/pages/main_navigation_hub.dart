@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../core/utils/reading_reminder.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../data/repositories/energy_repository.dart';
 import '../auth_bloc/auth_bloc.dart';
 import '../bloc/energy_bloc.dart';
 import '../bloc/energy_event.dart';
@@ -28,6 +30,25 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   void initState() {
     super.initState();
     context.read<EnergyBloc>().add(const LoadInitialDashboardData());
+    _checkReadingReminder();
+  }
+
+  /// Month-end reading reminder (Issue 7F) — fire once per month.
+  Future<void> _checkReadingReminder() async {
+    try {
+      final now = DateTime.now();
+      final logs = await context.read<EnergyRepository>().getAllLogs();
+      final thisMonth = logs
+          .where(
+            (e) => e.loggedAt.year == now.year && e.loggedAt.month == now.month,
+          )
+          .length;
+      await ReadingReminderService.maybeRemind(
+        readingCountThisMonth: thisMonth,
+      );
+    } catch (e) {
+      // Reminder is best-effort; never block startup on it.
+    }
   }
 
   void _onItemTapped(int index) {

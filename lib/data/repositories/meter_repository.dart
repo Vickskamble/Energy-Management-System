@@ -35,4 +35,7 @@ class MeterRepository extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  /// Notifies listeners to re-read data (e.g. after a backup restore).
+  void refresh() => notifyListeners();
 }

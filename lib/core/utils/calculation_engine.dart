@@ -17,9 +17,10 @@ class CalculationEngine {
     double energyRate = AppConstants.tariffPerUnit,
     double demandRate = 0,
     double pfThreshold = AppConstants.pfPenaltyThreshold,
+    double multiplyingFactor = AppConstants.multiplyingFactor,
   }) {
     final units = Decimal.fromInt(
-      (kwh * AppConstants.multiplyingFactor).round(),
+      (kwh * multiplyingFactor).round(),
     );
     final total = units * Decimal.parse(energyRate.toStringAsFixed(2));
     return total.toDouble();

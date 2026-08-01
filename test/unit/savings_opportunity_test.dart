@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ems/core/calculation/bill_breakdown.dart';
 import 'package:ems/core/calculation/bill_calculator.dart';
 import 'package:ems/core/calculation/savings_opportunity.dart';
 import 'package:ems/domain/entities/energy_log_entity.dart';
@@ -21,6 +20,7 @@ EnergyLogEntity _log({
     contractDemand: 400,
     estimatedBill: 0,
     loggedAt: DateTime(2026, 1, 10),
+    multiplyingFactor: 5,
   );
 }
 
@@ -86,6 +86,58 @@ void main() {
           lessThanOrEqualTo(ops[i - 1].monthlySavings),
         );
       }
+    });
+  });
+
+  group('SavingOpportunityGenerator.generateContractDemandOptimizer', () {
+    List<EnergyLogEntity> sixMonthsOfLogs({required double md}) {
+      final now = DateTime.now();
+      return [
+        for (var i = 0; i < 6; i++)
+          _log(
+            kwh: 200,
+            kvah: 250,
+            md: md,
+          ).copyWith(
+            loggedAt: DateTime(now.year, now.month - i, 10),
+          ),
+      ];
+    }
+
+    test('suggests contract reduction when 6-month peak is well below 80%', () {
+      final logs = sixMonthsOfLogs(md: 150); // 400 × 0.8 = 320 threshold
+
+      final op = SavingOpportunityGenerator.generateContractDemandOptimizer(
+        logs: logs,
+        contractDemand: 400,
+      );
+
+      expect(op, isNotNull);
+      expect(op!.type, SavingType.contractDemandOptimization);
+      // 150 kVA peak → 150 kVA step → 250 kVA saved × ₹320
+      expect(op.monthlySavings, closeTo(80000, 0.01));
+    });
+
+    test('returns null when peak MD is above 80% of contract', () {
+      final logs = sixMonthsOfLogs(md: 350);
+
+      final op = SavingOpportunityGenerator.generateContractDemandOptimizer(
+        logs: logs,
+        contractDemand: 400,
+      );
+
+      expect(op, isNull);
+    });
+
+    test('returns null with less than 6 months of data', () {
+      final logs = sixMonthsOfLogs(md: 150).sublist(0, 3);
+
+      final op = SavingOpportunityGenerator.generateContractDemandOptimizer(
+        logs: logs,
+        contractDemand: 400,
+      );
+
+      expect(op, isNull);
     });
   });
 }

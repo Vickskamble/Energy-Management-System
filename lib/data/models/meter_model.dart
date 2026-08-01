@@ -7,6 +7,9 @@ class MeterModel {
   final String? location;
   final double contractDemandKw;
   final bool isActive;
+  final double ctRatio;
+  final double ptRatio;
+  final String site;
 
   const MeterModel({
     required this.id,
@@ -14,7 +17,13 @@ class MeterModel {
     this.location,
     this.contractDemandKw = 400.0,
     this.isActive = true,
+    this.ctRatio = 1.0,
+    this.ptRatio = 1.0,
+    this.site = 'Main Site',
   });
+
+  /// Multiplying factor = CT ratio × PT ratio (defaults to 1 when unset).
+  double get multiplyingFactor => ctRatio * ptRatio;
 
   MeterEntity toEntity() => MeterEntity(
     id: id,
@@ -22,6 +31,9 @@ class MeterModel {
     location: location,
     contractDemandKw: contractDemandKw,
     isActive: isActive,
+    ctRatio: ctRatio,
+    ptRatio: ptRatio,
+    site: site,
   );
 
   factory MeterModel.fromEntity(MeterEntity entity) => MeterModel(
@@ -30,6 +42,9 @@ class MeterModel {
     location: entity.location,
     contractDemandKw: entity.contractDemandKw,
     isActive: entity.isActive,
+    ctRatio: entity.ctRatio,
+    ptRatio: entity.ptRatio,
+    site: entity.site,
   );
 
   Map<String, Object?> toMap() => {
@@ -38,6 +53,9 @@ class MeterModel {
     if (location != null) 'location': location,
     'contract_demand_kw': contractDemandKw,
     'is_active': isActive ? 1 : 0,
+    'ct_ratio': ctRatio,
+    'pt_ratio': ptRatio,
+    'site': site,
   };
 
   factory MeterModel.fromMap(Map<String, Object?> map) => MeterModel(
@@ -46,6 +64,9 @@ class MeterModel {
     location: map['location'] as String?,
     contractDemandKw: (map['contract_demand_kw'] as num?)?.toDouble() ?? 400.0,
     isActive: (map['is_active'] as int?) == 1,
+    ctRatio: (map['ct_ratio'] as num?)?.toDouble() ?? 1.0,
+    ptRatio: (map['pt_ratio'] as num?)?.toDouble() ?? 1.0,
+    site: map['site'] as String? ?? 'Main Site',
   );
 
   Map<String, dynamic> toJson() => {
@@ -54,6 +75,9 @@ class MeterModel {
     if (location != null) 'location': location,
     'contract_demand_kw': contractDemandKw,
     'is_active': isActive,
+    'ct_ratio': ctRatio,
+    'pt_ratio': ptRatio,
+    'site': site,
   };
 
   factory MeterModel.fromJson(Map<String, dynamic> json) => MeterModel(
@@ -62,17 +86,26 @@ class MeterModel {
     location: json['location'] as String?,
     contractDemandKw: (json['contract_demand_kw'] as num?)?.toDouble() ?? 400.0,
     isActive: (json['is_active'] as bool?) ?? true,
+    ctRatio: (json['ct_ratio'] as num?)?.toDouble() ?? 1.0,
+    ptRatio: (json['pt_ratio'] as num?)?.toDouble() ?? 1.0,
+    site: json['site'] as String? ?? 'Main Site',
   );
 
   factory MeterModel.create({
     required String name,
     String? location,
     double contractDemandKw = 400.0,
+    double ctRatio = 1.0,
+    double ptRatio = 1.0,
+    String site = 'Main Site',
   }) => MeterModel(
     id: const Uuid().v4(),
     name: name,
     location: location,
     contractDemandKw: contractDemandKw,
     isActive: true,
+    ctRatio: ctRatio,
+    ptRatio: ptRatio,
+    site: site,
   );
 }

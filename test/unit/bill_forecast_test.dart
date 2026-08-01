@@ -20,6 +20,7 @@ EnergyLogEntity _log({
     contractDemand: 400,
     estimatedBill: 0,
     loggedAt: at,
+    multiplyingFactor: 5,
   );
 }
 

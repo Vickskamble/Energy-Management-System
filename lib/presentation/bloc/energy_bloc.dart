@@ -5,15 +5,20 @@ import '../../core/error/exceptions.dart';
 import '../../core/utils/calculation_engine.dart';
 import '../../data/models/energy_log_model.dart';
 import '../../data/repositories/energy_repository.dart';
+import '../../data/repositories/meter_repository.dart';
 import 'energy_event.dart';
 import 'energy_state.dart';
 
 class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
   final EnergyRepository _repository;
+  final MeterRepository _meterRepository;
 
-  EnergyBloc({required EnergyRepository repository})
-    : _repository = repository,
-      super(const EnergyInitial()) {
+  EnergyBloc({
+    required EnergyRepository repository,
+    MeterRepository? meterRepository,
+  }) : _repository = repository,
+       _meterRepository = meterRepository ?? MeterRepository(),
+       super(const EnergyInitial()) {
     on<LoadInitialDashboardData>(_onLoadDashboard);
     on<SubmitManualReadingForm>(_onSubmitReading);
     on<SyncOfflineCachedLogs>(_onSyncCache);
@@ -98,6 +103,21 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
       );
 
       // ── Step 5: Build domain model ───────────────────────────────────────
+      // Multiplying factor comes from the meter's CT/PT ratio (default 5x
+      // legacy behaviour when the meter has no ratios configured).
+      double meterMf = AppConstants.multiplyingFactor;
+      try {
+        final meters = await _meterRepository.getAllMeters();
+        for (final meter in meters) {
+          if (meter.name == event.meterName.trim()) {
+            meterMf = meter.multiplyingFactor;
+            break;
+          }
+        }
+      } catch (_) {
+        // Meter lookup failed — fall back to the global default.
+      }
+
       final model = EnergyLogModel.create(
         meterName: event.meterName,
         kwh: consumedKwh,
@@ -108,6 +128,7 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
         mdRecorded: event.mdRecorded,
         contractDemand: AppConstants.defaultContractDemandKva,
         loggedAt: event.loggedAt,
+        multiplyingFactor: meterMf,
       );
 
       // ── Step 6: Persist locally (offline-first, is_synced = false) ──────
