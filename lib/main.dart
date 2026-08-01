@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'core/config/app_config.dart';
 import 'core/network/supabase_client.dart';
 import 'core/utils/notification_service.dart';
@@ -63,6 +64,13 @@ void main() async {
   } catch (_) {}
 
   await NotificationService.instance.initialize();
+
+  // PDF import (pdfrx) requires explicit initialization before first use.
+  try {
+    await pdfrxFlutterInitialize();
+  } catch (e) {
+    debugPrint('pdfrx init failed: $e');
+  }
 
   final repository = EnergyRepository();
 
