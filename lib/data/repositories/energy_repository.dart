@@ -1,130 +1,86 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../core/config/app_config.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/network/supabase_client.dart';
-import '../../core/utils/app_logger.dart';
 import '../../domain/entities/energy_log_entity.dart';
-import '../datasources/local/energy_log_local_datasource.dart';
 import '../datasources/remote/energy_log_remote_datasource.dart';
 import '../models/energy_log_model.dart';
 
+/// Cloud-only energy log store — every read/write goes straight to
+/// Supabase (RLS-scoped to the signed-in user). There is no local cache.
 class EnergyRepository {
-  final EnergyLogLocalDatasource _local;
   final EnergyLogRemoteDatasource _remote;
-  final Connectivity _connectivity;
 
-  EnergyRepository({
-    EnergyLogLocalDatasource? local,
-    EnergyLogRemoteDatasource? remote,
-    Connectivity? connectivity,
-  }) : _local = local ?? EnergyLogLocalDatasource(),
-       _remote = remote ?? EnergyLogRemoteDatasource(),
-       _connectivity = connectivity ?? Connectivity();
+  EnergyRepository({EnergyLogRemoteDatasource? remote})
+    : _remote = remote ?? EnergyLogRemoteDatasource();
 
-  /// Get all logs from local storage
+  static const int _defaultFetchLimit = 500;
+
+  /// Get all logs from the cloud (most recent first).
   Future<List<EnergyLogEntity>> getAllLogs({int? limit}) async {
-    final models = await _local.getAllLogs(limit: limit);
+    final models = await _remote.fetchLogs(limit: limit ?? _defaultFetchLimit);
     return models.map((m) => m.toEntity()).toList();
   }
 
-  /// Save reading locally first (offline-first), then push to Supabase
-  /// immediately when online so data never waits for a connectivity change.
+  /// Save a reading directly to Supabase.
   Future<EnergyLogEntity> saveReading(EnergyLogModel model) async {
-    await _local.insertLog(model);
-    if (SupabaseClientManager.isInitialized) {
-      try {
-        await _remote.pushLog(model);
-        await _local.markAsSynced(model.id);
-      } catch (e) {
-        AppLogger.w('Sync deferred (will sync later): $e');
-      }
-    }
+    _ensureOnline();
+    await _remote.pushLog(model);
     return model.toEntity();
   }
 
-  /// Update an existing reading (local always; remote upsert best-effort).
-  /// Remote is updated regardless of sync status so edited synced readings
-  /// never diverge from Supabase.
+  /// Update an existing reading (remote upsert).
   Future<void> updateReading(EnergyLogModel model) async {
-    await _local.updateLog(model);
-    if (SupabaseClientManager.isInitialized) {
-      try {
-        await _remote.updateLog(model);
-        await _local.markAsSynced(model.id);
-      } catch (e) {
-        AppLogger.w('Remote update deferred (will sync later): $e');
-      }
-    }
+    _ensureOnline();
+    await _remote.updateLog(model);
   }
 
-  /// Delete a reading (local always; remote best-effort)
+  /// Delete a reading from the cloud.
   Future<void> deleteReading(String id, {bool synced = false}) async {
-    await _local.deleteLog(id);
-    if (synced && SupabaseClientManager.isInitialized) {
-      try {
-        await _remote.deleteLog(id);
-      } catch (e) {
-        AppLogger.w('Remote delete deferred (will sync later): $e');
-      }
-    }
+    _ensureOnline();
+    await _remote.deleteLog(id);
   }
 
-  /// Check for a duplicate reading (same meter, near-identical time)
+  /// Check for a duplicate reading (same meter, near-identical time).
   Future<EnergyLogEntity?> findDuplicateReading(
     String meterName,
     DateTime loggedAt,
   ) async {
-    final model = await _local.findDuplicate(meterName, loggedAt);
-    return model?.toEntity();
+    final models = await _remote.fetchLogs(
+      from: loggedAt.subtract(const Duration(minutes: 2)),
+      to: loggedAt.add(const Duration(minutes: 2)),
+      meterName: meterName,
+      limit: 1,
+    );
+    if (models.isEmpty) return null;
+    return models.first.toEntity();
   }
 
-  /// Wipe all cached readings (used when the logged-in user changes)
-  Future<void> clearLocalCache() async {
-    try {
-      await _local.clearAll();
-    } catch (e) {
-      AppLogger.e('Failed to clear local readings cache', e);
-    }
-  }
-
-  /// Bulk-save imported readings (PDF import): local first (offline-first),
-  /// then best-effort remote push so imported history is never lost locally.
+  /// Bulk-save imported readings (PDF import) directly to the cloud.
   Future<int> bulkSaveReadings(List<EnergyLogModel> models) async {
     if (models.isEmpty) return 0;
-    await _local.insertLogs(models);
-    if (SupabaseClientManager.isInitialized) {
-      try {
-        await _remote.pushLogs(models);
-        for (final model in models) {
-          await _local.markAsSynced(model.id);
-        }
-      } catch (e) {
-        AppLogger.w('Bulk sync deferred (will sync later): $e');
-      }
-    }
+    _ensureOnline();
+    await _remote.pushLogs(models);
     return models.length;
   }
 
-  /// Get dashboard aggregate data from local storage
+  /// Get dashboard aggregate data from the cloud.
   Future<DashboardData> getDashboardData() async {
-    await _ensureLocalDataSynced();
-
     final todayStart = DateTime(
       DateTime.now().year,
       DateTime.now().month,
       DateTime.now().day,
     );
     final tomorrowStart = todayStart.add(const Duration(days: 1));
-    final monthStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
     final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
     final nextMonthStart = DateTime(now.year, now.month + 1, 1);
 
-    final allLogs = await _local.getAllLogs();
-    final todayLogs = await _local.getLogsInRange(
+    final allLogs = await _remote.fetchLogs(limit: _defaultFetchLimit);
+    final todayLogs = await _remote.fetchLogs(
       from: todayStart,
       to: tomorrowStart,
     );
-    final monthLogs = await _local.getLogsInRange(
+    final monthLogs = await _remote.fetchLogs(
       from: monthStart,
       to: nextMonthStart,
     );
@@ -169,49 +125,20 @@ class EnergyRepository {
     );
   }
 
-  /// Sync unsynced local logs to Supabase
-  Future<int> syncUnsyncedLogs() async {
-    final connectivityResult = await _connectivity.checkConnectivity();
-    final hasConnection = connectivityResult.any(
-      (r) => r != ConnectivityResult.none,
-    );
-
-    if (!hasConnection) {
-      throw const NetworkException('No internet connection available');
-    }
-
-    if (!SupabaseClientManager.isInitialized) {
-      throw const RemoteStorageException('Supabase not initialized');
-    }
-
-    final unsynced = await _local.getUnsyncedLogs();
-    if (unsynced.isEmpty) return 0;
-
-    await _remote.pushLogs(unsynced);
-
-    for (final log in unsynced) {
-      await _local.markAsSynced(log.id);
-    }
-
-    return unsynced.length;
-  }
-
-  /// Get the latest reading for a meter (for form auto-fill)
+  /// Get the latest reading for a meter (for form auto-fill).
   Future<EnergyLogEntity?> getLatestReading(String meterName) async {
-    final model = await _local.getLatestLog(meterName);
-    return model?.toEntity();
+    final models = await _remote.fetchLogs(meterName: meterName, limit: 1);
+    if (models.isEmpty) return null;
+    return models.first.toEntity();
   }
 
-  /// Get daily consumption for current month (for monthly chart)
+  /// Get daily consumption for current month (for monthly chart).
   Future<Map<String, double>> getDailyConsumption() async {
     final now = DateTime.now();
     final monthStart = DateTime(now.year, now.month, 1);
     final nextMonthStart = DateTime(now.year, now.month + 1, 1);
 
-    final logs = await _local.getLogsInRange(
-      from: monthStart,
-      to: nextMonthStart,
-    );
+    final logs = await _remote.fetchLogs(from: monthStart, to: nextMonthStart);
 
     final daily = <String, double>{};
     for (final log in logs) {
@@ -222,25 +149,15 @@ class EnergyRepository {
     return daily;
   }
 
-  /// If local DB is empty, pull data from Supabase and cache locally.
-  /// Never generates placeholder data — an empty dashboard is honest data.
-  Future<void> _ensureLocalDataSynced() async {
-    try {
-      final count = await _local.getLogCount();
-      if (count > 0) return;
-
-      if (!SupabaseClientManager.isInitialized) return;
-
-      try {
-        final remoteLogs = await _remote.fetchLogs(limit: 200);
-        if (remoteLogs.isNotEmpty) {
-          await _local.insertLogs(remoteLogs);
-        }
-      } catch (e) {
-        AppLogger.e('Failed to pull remote logs', e);
-      }
-    } catch (e) {
-      AppLogger.e('Failed to ensure local data', e);
+  /// Cloud-only mode: every operation requires a live Supabase session.
+  void _ensureOnline() {
+    if (!SupabaseClientManager.isInitialized) {
+      throw const RemoteStorageException('Supabase not initialized');
+    }
+    if (SupabaseClientManager.client.auth.currentUser == null) {
+      throw const RemoteStorageException(
+        'You must be signed in to save data.',
+      );
     }
   }
 

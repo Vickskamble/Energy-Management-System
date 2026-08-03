@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/config/app_config.dart';
 import '../../core/network/session_guard.dart';
 import '../../core/network/supabase_client.dart';
 import '../../core/utils/app_logger.dart';
@@ -114,6 +115,15 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
       userId: userId,
       onConflict: () => _onHeartbeatConflict(emit),
     );
+
+    // Tariff settings are per-user cloud data — load them before the UI
+    // builds so bill calculations use this account's rates.
+    try {
+      await TariffStore.load(userId: userId);
+    } catch (e) {
+      AppLogger.w('Tariff load failed, using defaults: $e');
+    }
+
     if (!isClosed) {
       emit(AppAuthAuthenticated(userId: userId, email: email));
     }

@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:pdfrx/pdfrx.dart';
-import 'core/config/app_config.dart';
 import 'core/network/supabase_client.dart';
 import 'core/utils/notification_service.dart';
-import 'core/utils/sync_manager.dart';
 import 'core/utils/user_cache_guard.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
@@ -13,7 +11,6 @@ import 'data/repositories/energy_repository.dart';
 import 'data/repositories/meter_repository.dart';
 import 'presentation/auth_bloc/auth_bloc.dart';
 import 'presentation/bloc/energy_bloc.dart';
-import 'presentation/bloc/energy_event.dart';
 import 'presentation/pages/login_page.dart';
 import 'presentation/pages/main_navigation_hub.dart';
 
@@ -57,7 +54,6 @@ void main() async {
   };
 
   await dotenv.load(fileName: '.env');
-  await TariffStore.load();
 
   try {
     await SupabaseClientManager.initialize();
@@ -131,24 +127,10 @@ class _AppEntry extends StatefulWidget {
 }
 
 class _AppEntryState extends State<_AppEntry> {
-  late final SyncManager _syncManager;
-
   @override
   void initState() {
     super.initState();
-
     context.read<AuthBloc>().add(const AppAuthCheckRequested());
-
-    final energyBloc = context.read<EnergyBloc>();
-    energyBloc.add(const LoadInitialDashboardData());
-    _syncManager = SyncManager();
-    _syncManager.start(energyBloc);
-  }
-
-  @override
-  void dispose() {
-    _syncManager.stop();
-    super.dispose();
   }
 
   @override

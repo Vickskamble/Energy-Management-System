@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sembast/sembast.dart';
-import '../../data/repositories/energy_repository.dart';
 import '../../data/repositories/meter_repository.dart';
 import '../../presentation/auth_bloc/auth_bloc.dart';
 import '../../presentation/bloc/energy_bloc.dart';
@@ -9,8 +8,9 @@ import '../../presentation/bloc/energy_event.dart';
 import '../database/database_factory.dart';
 import 'app_logger.dart';
 
-/// Wipes the local cache whenever the logged-in user changes,
-/// so one user's readings/meters never leak to another user on the same device.
+/// Tracks the last signed-in user on this device and reloads the dashboard
+/// whenever the user changes. All business data lives in Supabase, so no
+/// cache wiping is needed — the new user simply fetches their own rows.
 class UserCacheGuard extends StatefulWidget {
   final Widget child;
   const UserCacheGuard({super.key, required this.child});
@@ -21,7 +21,6 @@ class UserCacheGuard extends StatefulWidget {
 
 class _UserCacheGuardState extends State<UserCacheGuard> {
   String? _lastUserId;
-  Database? _metaDb;
 
   @override
   void initState() {
@@ -31,13 +30,13 @@ class _UserCacheGuardState extends State<UserCacheGuard> {
 
   Future<void> _initMeta() async {
     try {
-      _metaDb = await getDatabaseFactory().openDatabase('ems_meta.db');
+      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
       final store = stringMapStoreFactory.store('meta');
-      final rec = await store.record('last_user_id').get(_metaDb!);
+      final rec = await store.record('last_user_id').get(db);
       final value = rec?['value'];
       if (value is String) {
         _lastUserId = value;
-        AppLogger.i('Last cached user: ${value.substring(0, 8)}...');
+        AppLogger.i('Last signed-in user: ${value.substring(0, 8)}...');
       }
     } catch (e) {
       AppLogger.e('Failed to load meta', e);
@@ -46,23 +45,22 @@ class _UserCacheGuardState extends State<UserCacheGuard> {
 
   Future<void> _saveLastUserId(String userId) async {
     try {
-      _metaDb ??= await getDatabaseFactory().openDatabase('ems_meta.db');
+      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
       final store = stringMapStoreFactory.store('meta');
-      await store.record('last_user_id').put(_metaDb!, {'value': userId});
+      await store.record('last_user_id').put(db, {'value': userId});
     } catch (e) {
       AppLogger.e('Failed to persist user id', e);
     }
   }
 
-  Future<void> _wipeCaches() async {
+  Future<void> _reloadForUser() async {
     if (!mounted) return;
     try {
-      final energyRepo = context.read<EnergyRepository>();
       final meterRepo = context.read<MeterRepository>();
-      await energyRepo.clearLocalCache();
-      await meterRepo.clearLocalCache();
+      meterRepo.refresh();
+      context.read<EnergyBloc>().add(const LoadInitialDashboardData());
     } catch (e) {
-      AppLogger.e('Cache wipe failed', e);
+      AppLogger.e('Failed to reload data for user', e);
     }
   }
 
@@ -74,14 +72,10 @@ class _UserCacheGuardState extends State<UserCacheGuard> {
           final differentUser =
               _lastUserId != null && _lastUserId != state.userId;
           if (differentUser) {
-            await _wipeCaches();
-            if (!context.mounted) return;
-            context.read<EnergyBloc>().add(const LoadInitialDashboardData());
+            await _reloadForUser();
           }
           _lastUserId = state.userId;
           await _saveLastUserId(state.userId);
-        } else if (state is AppAuthUnauthenticated) {
-          await _wipeCaches();
         }
       },
       child: widget.child,

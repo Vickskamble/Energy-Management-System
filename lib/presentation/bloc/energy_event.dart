@@ -31,7 +31,4 @@ sealed class EnergyEvent with _$EnergyEvent {
     required double mdRecorded,
     required DateTime loggedAt,
   }) = SubmitManualReadingForm;
-
-  /// Trigger a background sync of all offline-cached (is_synced = false) logs to Supabase
-  const factory EnergyEvent.syncOfflineCachedLogs() = SyncOfflineCachedLogs;
 }
