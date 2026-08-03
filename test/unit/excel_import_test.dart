@@ -180,6 +180,95 @@ void main() {
       expect(drafts.first.loggedAt, DateTime(2026, 6, 7, 12, 30));
     });
 
+    test('converts cumulative meter readings to per-day consumption',
+        () async {
+      final bytes = _buildWorkbook('Readings', [
+        [
+          TextCellValue('Meter'),
+          TextCellValue('Reading Date'),
+          TextCellValue('kWh'),
+          TextCellValue('kVAh'),
+          TextCellValue('MD Recorded'),
+        ],
+        [
+          TextCellValue('Meter A'),
+          TextCellValue('01/07/2026'),
+          IntCellValue(57037),
+          IntCellValue(59109),
+          IntCellValue(126),
+        ],
+        [
+          TextCellValue('Meter A'),
+          TextCellValue('02/07/2026'),
+          IntCellValue(57123),
+          IntCellValue(59201),
+          IntCellValue(0),
+        ],
+        [
+          TextCellValue('Meter A'),
+          TextCellValue('03/07/2026'),
+          IntCellValue(57268),
+          IntCellValue(59350),
+          IntCellValue(0),
+        ],
+        [
+          TextCellValue('Meter A'),
+          TextCellValue('30/07/2026'),
+          IntCellValue(60641),
+          IntCellValue(62702),
+          IntCellValue(0),
+        ],
+      ]);
+
+      final drafts = await ExcelImportService.extractReadings(bytes);
+
+      expect(drafts, hasLength(4));
+      // First row = opening baseline → 0 consumption, its MD is kept.
+      expect(drafts[0].kwh, 0);
+      expect(drafts[0].kvah, 0);
+      expect(drafts[0].mdRecorded, 126);
+      expect(drafts[0].sourceLabel, contains('opening'));
+      // Subsequent rows = current − previous cumulative value.
+      expect(drafts[1].kwh, 86); // 57123 − 57037
+      expect(drafts[1].kvah, 92); // 59201 − 59109
+      expect(drafts[2].kwh, 145); // 57268 − 57123
+      expect(drafts[2].kvah, 149); // 59350 − 59201
+      // Total consumption = last − first opening value.
+      final totalKwh = drafts.fold<double>(0, (sum, d) => sum + d.kwh);
+      final totalKvah = drafts.fold<double>(0, (sum, d) => sum + d.kvah);
+      expect(totalKwh, 60641 - 57037); // 3604
+      expect(totalKvah, 62702 - 59109); // 3593
+    });
+
+    test('does not treat small per-day consumption as cumulative', () async {
+      final bytes = _buildWorkbook('Readings', [
+        [
+          TextCellValue('Meter'),
+          TextCellValue('Reading Date'),
+          TextCellValue('kWh'),
+          TextCellValue('MD Recorded'),
+        ],
+        [
+          TextCellValue('Meter A'),
+          TextCellValue('01/07/2026'),
+          IntCellValue(120),
+          IntCellValue(40),
+        ],
+        [
+          TextCellValue('Meter A'),
+          TextCellValue('02/07/2026'),
+          IntCellValue(95),
+          IntCellValue(30),
+        ],
+      ]);
+
+      final drafts = await ExcelImportService.extractReadings(bytes);
+
+      expect(drafts, hasLength(2));
+      expect(drafts[0].kwh, 120);
+      expect(drafts[1].kwh, 95);
+    });
+
     test('throws FormatException when no readable data is present', () async {
       final excel = Excel.createExcel();
       final bytes = Uint8List.fromList(excel.encode()!);
