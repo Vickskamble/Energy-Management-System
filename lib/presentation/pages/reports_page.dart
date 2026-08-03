@@ -910,7 +910,9 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
     setState(() {
       _meters = meters;
       for (final e in _editors) {
-        if (e.meterName.isEmpty && meters.isNotEmpty) {
+        if (meters.isEmpty) break;
+        final known = meters.any((m) => m.name == e.meterName);
+        if (e.meterName.isEmpty || !known) {
           e.meterName = meters.first.name;
         }
       }
@@ -1075,8 +1077,11 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              key: ValueKey(e.meterName),
-              initialValue: e.meterName,
+              key: ValueKey('meter-$index-${e.meterName}'),
+              initialValue: _meters.any((m) => m.name == e.meterName)
+                  ? e.meterName
+                  : null,
+              hint: const Text('Select Meter'),
               decoration: const InputDecoration(
                 labelText: 'Meter',
                 isDense: true,

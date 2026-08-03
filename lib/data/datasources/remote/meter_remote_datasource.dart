@@ -30,11 +30,12 @@ class MeterRemoteDatasource {
 
   Future<MeterModel?> getMeterById(String id) async {
     try {
-      final data = await _client
-          .from(_table)
-          .select('*')
-          .eq('id', id)
-          .maybeSingle();
+      final uid = _client.auth.currentUser?.id;
+      var query = _client.from(_table).select('*').eq('id', id);
+      if (uid != null) {
+        query = query.eq('user_id', uid);
+      }
+      final data = await query.maybeSingle();
       if (data == null) return null;
       return MeterModel.fromJson(data);
     } catch (e) {
@@ -56,7 +57,12 @@ class MeterRemoteDatasource {
 
   Future<void> deleteMeter(String id) async {
     try {
-      await _client.from(_table).delete().eq('id', id);
+      final uid = _client.auth.currentUser?.id;
+      var query = _client.from(_table).delete().eq('id', id);
+      if (uid != null) {
+        query = query.eq('user_id', uid);
+      }
+      await query;
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
       throw const RemoteStorageException('Unable to delete meter.');

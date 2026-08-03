@@ -86,14 +86,18 @@ class EnergyLogRemoteDatasource {
     }
   }
 
-  /// Fetch a single log by id
+  /// Fetch a single log by id (scoped to the logged-in user)
   Future<EnergyLogModel?> fetchLogById(String id) async {
     try {
-      final data = await _client
+      final uid = _client.auth.currentUser?.id;
+      var query = _client
           .from(AppConstants.energyLogsTable)
           .select('*')
-          .eq('id', id)
-          .maybeSingle();
+          .eq('id', id);
+      if (uid != null) {
+        query = query.eq('user_id', uid);
+      }
+      final data = await query.maybeSingle();
 
       if (data == null) return null;
       return EnergyLogModel.fromJson(data);
@@ -103,10 +107,18 @@ class EnergyLogRemoteDatasource {
     }
   }
 
-  /// Delete a log on remote
+  /// Delete a log on remote (scoped to the logged-in user)
   Future<void> deleteLog(String id) async {
     try {
-      await _client.from(AppConstants.energyLogsTable).delete().eq('id', id);
+      final uid = _client.auth.currentUser?.id;
+      var query = _client
+          .from(AppConstants.energyLogsTable)
+          .delete()
+          .eq('id', id);
+      if (uid != null) {
+        query = query.eq('user_id', uid);
+      }
+      await query;
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
       throw const RemoteStorageException('Unable to delete log from server.');
