@@ -45,8 +45,9 @@ class ExcelImportService {
   ExcelImportService._();
 
   static Future<List<ExcelReadingDraft>> extractReadings(
-    Uint8List bytes,
-  ) async {
+    Uint8List bytes, {
+    ExcelColumnMap? columnMap,
+  }) async {
     final Excel excel;
     try {
       excel = Excel.decodeBytes(bytes);
@@ -59,7 +60,7 @@ class ExcelImportService {
 
     final drafts = <ExcelReadingDraft>[];
     for (final sheet in excel.tables.values) {
-      drafts.addAll(_parseSheet(sheet));
+      drafts.addAll(_parseSheet(sheet, columnMap));
     }
     if (drafts.isEmpty) {
       throw const FormatException(
@@ -75,13 +76,49 @@ class ExcelImportService {
   // Sheet parsing
   // ---------------------------------------------------------------------------
 
-  static List<ExcelReadingDraft> _parseSheet(Sheet sheet) {
+  /// Reads the header (column names) of the first data sheet. Used by the
+  /// manual column-mapping UI so the user can assign each field.
+  static Future<List<String>> readHeaders(Uint8List bytes) async {
+    final Excel excel;
+    try {
+      excel = Excel.decodeBytes(bytes);
+    } catch (e) {
+      AppLogger.e('Excel decode failed', e);
+      return const [];
+    }
+    for (final sheet in excel.tables.values) {
+      final rows = sheet.rows;
+      if (rows.isEmpty) continue;
+      final headerRow = _findHeaderRow(rows);
+      if (headerRow < 0) continue;
+      return rows[headerRow].map(_cellText).toList();
+    }
+    return const [];
+  }
+
+  /// Best-effort automatic column detection. Returns a map the UI can present
+  /// as default values before the user confirms.
+  static ExcelColumnMap detectMapping(List<String> headers) {
+    return _mapColumns(headers);
+  }
+
+  /// Whether an [ExcelColumnMap] has enough info to import rows.
+  static bool hasValidMapping(ExcelColumnMap? map) {
+    if (map == null) return false;
+    return map.kwh != null || (map.currentKwh != null && map.prevKwh != null);
+  }
+
+  static List<ExcelReadingDraft> _parseSheet(
+    Sheet sheet, [
+    ExcelColumnMap? columnMap,
+  ]) {
     final rows = sheet.rows;
     if (rows.isEmpty) return [];
 
     final headerRow = _findHeaderRow(rows);
     if (headerRow < 0) return [];
-    final cols = _mapColumns(rows[headerRow]);
+    final cols = columnMap ??
+        _mapColumns(rows[headerRow].map(_cellText).toList());
     if (cols.kwh == null && (cols.currentKwh == null || cols.prevKwh == null)) {
       return [];
     }
@@ -94,11 +131,21 @@ class ExcelImportService {
         cols.kwh != null && _isCumulative(rows, headerRow, cols.kwh!);
     final kvahCumulative =
         cols.kvah != null && _isCumulative(rows, headerRow, cols.kvah!);
+    final lagCumulative = cols.lag != null &&
+        _isCumulative(rows, headerRow, cols.lag!, minValue: 1000);
+    final leadCumulative = cols.lead != null &&
+        _isCumulative(rows, headerRow, cols.lead!, minValue: 1000);
     final kwhSeries = kwhCumulative
         ? _cumulativeSeries(rows, headerRow, cols.kwh!)
         : null;
     final kvahSeries = kvahCumulative
         ? _cumulativeSeries(rows, headerRow, cols.kvah!)
+        : null;
+    final lagSeries = lagCumulative
+        ? _cumulativeSeries(rows, headerRow, cols.lag!)
+        : null;
+    final leadSeries = leadCumulative
+        ? _cumulativeSeries(rows, headerRow, cols.lead!)
         : null;
 
     final drafts = <ExcelReadingDraft>[];
@@ -134,10 +181,20 @@ class ExcelImportService {
           cols.prevKvah,
         );
       }
-      final lag = cols.lag != null ? _cellNumber(row[cols.lag!]) ?? 0 : 0.0;
-      final lead = cols.lead != null
-          ? _cellNumber(row[cols.lead!]) ?? 0
-          : 0.0;
+      final double lag;
+      if (lagSeries != null) {
+        lag = lagSeries[i - (headerRow + 1)];
+      } else {
+        lag = cols.lag != null ? _cellNumber(row[cols.lag!]) ?? 0 : 0.0;
+      }
+      final double lead;
+      if (leadSeries != null) {
+        lead = leadSeries[i - (headerRow + 1)];
+      } else {
+        lead = cols.lead != null
+            ? _cellNumber(row[cols.lead!]) ?? 0
+            : 0.0;
+      }
       final md = cols.md != null ? _cellNumber(row[cols.md!]) ?? 0 : 0.0;
 
       final baseline = kwhSeries != null && i == headerRow + 1;
@@ -165,8 +222,9 @@ class ExcelImportService {
   static bool _isCumulative(
     List<List<Data?>> rows,
     int headerRow,
-    int col,
-  ) {
+    int col, {
+    double minValue = 10000,
+  }) {
     var minVal = double.infinity;
     var prev = double.nan;
     var nonDecreasing = 0;
@@ -182,7 +240,7 @@ class ExcelImportService {
       prev = v;
     }
     if (valid < 2) return false;
-    return nonDecreasing >= valid - 1 && minVal >= 10000;
+    return nonDecreasing >= valid - 1 && minVal >= minValue;
   }
 
   /// Cumulative readings → per-row consumed (current − previous). The first
@@ -230,26 +288,29 @@ class ExcelImportService {
     return -1;
   }
 
-  static _ColumnMap _mapColumns(List<Data?> header) {
+  static ExcelColumnMap _mapColumns(List<String> header) {
     bool has(String text, List<String> needles) {
       final t = text.toLowerCase();
       return needles.any(t.contains);
     }
 
-    final map = _ColumnMap();
+    final map = ExcelColumnMap();
     for (var i = 0; i < header.length; i++) {
-      final h = _cellText(header[i]).toLowerCase();
+      final h = header[i].toLowerCase();
       if (h.isEmpty) continue;
       final isCurrent =
           has(h, ['current', 'present', 'this']) ||
           (h.contains('reading') && !has(h, ['previous', 'last']));
       final isPrev = has(h, ['previous', 'prev', 'last']);
       final isKvah = h.contains('kvah');
-      final isReactive = h.contains('rkvarh') || h.contains('reactive');
+      final isReactive = h.contains('kvarh') ||
+          h.contains('rkvarh') ||
+          h.contains('reactive');
       final isLag = h.contains('lag');
       final isLead = h.contains('lead');
+      final isConst = has(h, ['const', 'multiplier', 'ct&pt', 'ct/pt']);
 
-      if (map.meter == null && has(h, ['meter'])) {
+      if (map.meter == null && has(h, ['meter']) && !isConst) {
         map.meter = i;
       } else if (map.date == null && has(h, ['date'])) {
         map.date = i;
@@ -259,8 +320,9 @@ class ExcelImportService {
       } else if (!isKvah &&
           !isLag &&
           !isLead &&
+          !isConst &&
           has(h, ['md', 'demand', 'mdi'])) {
-        map.md ??= i;
+        if (map.md == null || h.contains('kva')) map.md = i;
       } else if (!isKvah &&
           (h.contains('kwh') ||
               h.contains('reading') ||
@@ -395,7 +457,7 @@ class ExcelImportService {
   }
 }
 
-class _ColumnMap {
+class ExcelColumnMap {
   int? meter;
   int? date;
   int? kwh;

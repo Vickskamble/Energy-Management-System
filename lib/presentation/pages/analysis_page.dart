@@ -1101,6 +1101,12 @@ class _AnalysisContentState extends State<_AnalysisContent> {
   Future<void> _showEditDialog(EnergyLogEntity log) async {
     final kwhCtrl = TextEditingController(text: log.kwh.toStringAsFixed(2));
     final kvahCtrl = TextEditingController(text: log.kvah.toStringAsFixed(2));
+    final rkvarhLagCtrl = TextEditingController(
+      text: log.rkvarhLag.toStringAsFixed(2),
+    );
+    final rkvarhLeadCtrl = TextEditingController(
+      text: log.rkvarhLead.toStringAsFixed(2),
+    );
     final mdCtrl = TextEditingController(
       text: log.mdRecorded.toStringAsFixed(2),
     );
@@ -1167,6 +1173,44 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                       },
                     ),
                     const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: rkvarhLagCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'rkVARh (Lag)',
+                              prefixIcon: Icon(Icons.warning_outlined),
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return null;
+                              return double.tryParse(v.trim()) == null
+                                  ? 'Enter a valid number'
+                                  : null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: rkvarhLeadCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'rkVARh (Lead)',
+                              prefixIcon: Icon(Icons.check_circle_outline),
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return null;
+                              return double.tryParse(v.trim()) == null
+                                  ? 'Enter a valid number'
+                                  : null;
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.event_outlined, size: 20),
@@ -1220,8 +1264,9 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     meterName: log.meterName,
                     kwh: double.parse(kwhCtrl.text.trim()),
                     kvah: double.parse(kvahCtrl.text.trim()),
-                    rkvarhLag: log.rkvarhLag,
-                    rkvarhLead: log.rkvarhLead,
+                    rkvarhLag: double.tryParse(rkvarhLagCtrl.text.trim()) ?? 0,
+                    rkvarhLead: double.tryParse(rkvarhLeadCtrl.text.trim()) ??
+                        0,
                     mdRecorded: double.parse(mdCtrl.text.trim()),
                     loggedAt: date,
                     contractDemand: log.contractDemand,
