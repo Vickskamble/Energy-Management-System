@@ -102,9 +102,10 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
       );
 
       // ── Step 5: Build domain model ───────────────────────────────────────
-      // Multiplying factor comes from the meter's CT/PT ratio (default 5x
-      // legacy behaviour when the meter has no ratios configured).
-      double meterMf = AppConstants.multiplyingFactor;
+      // Multiplying factor comes from the meter's CT/PT ratio (default 1x —
+      // the entered kWh is treated as actual consumed units when no meter
+      // with a configured ratio matches).
+      double meterMf = 1.0;
       try {
         final meters = await _meterRepository.getAllMeters();
         for (final meter in meters) {
