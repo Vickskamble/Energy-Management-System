@@ -288,7 +288,13 @@ class _DashboardContentState extends State<_DashboardContent> {
           (l) => l.loggedAt.year == now.year && l.loggedAt.month == now.month,
         )
         .toList();
-    final previousMonth = DateTime(now.year, now.month - 1, 1);
+    // Use the most recent month with data when the current month is empty,
+    // so forecast & comparison never render blank.
+    final referenceLogs = currentMonthLogs.isEmpty ? _kpiMonthLogs : currentMonthLogs;
+    final refMonth = referenceLogs.isEmpty ? null : referenceLogs.first.loggedAt;
+    final previousMonth = refMonth == null
+        ? DateTime(now.year, now.month - 1, 1)
+        : DateTime(refMonth.year, refMonth.month - 1, 1);
     final previousMonthLogs = entityLogs
         .where(
           (l) =>
@@ -296,17 +302,23 @@ class _DashboardContentState extends State<_DashboardContent> {
               l.loggedAt.month == previousMonth.month,
         )
         .toList();
-    final currentMonthBreakdown = currentMonthLogs.isEmpty
+    final currentMonthBreakdown = referenceLogs.isEmpty
         ? null
-        : BillCalculator.calculate(logs: currentMonthLogs);
+        : BillCalculator.calculate(logs: referenceLogs);
     final previousBreakdown = previousMonthLogs.isEmpty
         ? null
         : BillCalculator.calculate(logs: previousMonthLogs);
     final comparison = currentMonthBreakdown == null
         ? null
         : BillCalculator.compare(currentMonthBreakdown, previousBreakdown);
+    final forecastRef = refMonth == null
+        ? now
+        : (refMonth.year == now.year && refMonth.month == now.month)
+            ? now
+            : DateTime(refMonth.year, refMonth.month + 1, 0);
     final forecast = BillForecastCalculator.calculate(
-      monthLogs: currentMonthLogs,
+      monthLogs: referenceLogs,
+      referenceDate: forecastRef,
     );
     final opportunities = SavingOpportunityGenerator.generate(breakdown);
     final contractOptimizer = SavingOpportunityGenerator
