@@ -576,7 +576,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: spacing,
           mainAxisSpacing: spacing,
-          childAspectRatio: cardWidth / 165,
+          childAspectRatio: cardWidth / 180,
           children: cards,
         );
       },
