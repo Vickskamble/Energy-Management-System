@@ -9,7 +9,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_logger.dart';
 import '../../core/utils/export_service.dart';
-import '../../core/utils/pdf_import_service.dart';
+import '../../core/utils/excel_import_service.dart';
 import '../../core/utils/pdf_report_service.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
@@ -168,30 +168,30 @@ class _ReportsContentState extends State<_ReportsContent> {
     }
   }
 
-  Future<void> _pickAndImportPdf(BuildContext context) async {
+  Future<void> _pickAndImportExcel(BuildContext context) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf'],
+      allowedExtensions: ['xlsx', 'xls'],
       allowMultiple: true,
       withData: true,
     );
     if (result == null || result.files.isEmpty) return;
 
     var sourceFile = '';
-    final drafts = <PdfReadingDraft>[];
+    final drafts = <ExcelReadingDraft>[];
     try {
       for (final file in result.files) {
         final bytes = file.bytes;
         if (bytes == null) continue;
         sourceFile = file.name;
-        drafts.addAll(await PdfImportService.extractReadings(bytes));
+        drafts.addAll(await ExcelImportService.extractReadings(bytes));
       }
     } catch (e) {
-      AppLogger.e('PDF import failed', e);
+      AppLogger.e('Excel import failed', e);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('PDF import failed: $e'),
+            content: Text('Import failed: $e'),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -203,7 +203,7 @@ class _ReportsContentState extends State<_ReportsContent> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No readings found in the selected PDF file(s)'),
+            content: Text('No readings found in the selected Excel file(s)'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -214,7 +214,7 @@ class _ReportsContentState extends State<_ReportsContent> {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
-      builder: (_) => _PdfImportPreviewDialog(
+      builder: (_) => _ImportPreviewDialog(
         drafts: drafts,
         sourceFile: sourceFile,
       ),
@@ -238,9 +238,9 @@ class _ReportsContentState extends State<_ReportsContent> {
             mainAxisSize: MainAxisSize.min,
             children: [
               AppButtonOutline(
-                label: 'Import PDF',
+                label: 'Import Data',
                 icon: Icons.file_upload_outlined,
-                onPressed: () => _pickAndImportPdf(context),
+                onPressed: () => _pickAndImportExcel(context),
               ),
               const SizedBox(width: 8),
               AppButtonOutline(
@@ -871,19 +871,19 @@ class _ReportsContentState extends State<_ReportsContent> {
   }
 }
 
-/// Preview + edit screen for readings parsed from PDF bill(s).
+/// Preview + edit screen for readings parsed from an Excel file.
 /// Nothing is saved until the user confirms (Issue 11 — manual edit mandatory).
-class _PdfImportPreviewDialog extends StatefulWidget {
-  const _PdfImportPreviewDialog({required this.drafts, required this.sourceFile});
+class _ImportPreviewDialog extends StatefulWidget {
+  const _ImportPreviewDialog({required this.drafts, required this.sourceFile});
 
-  final List<PdfReadingDraft> drafts;
+  final List<ExcelReadingDraft> drafts;
   final String sourceFile;
 
   @override
-  State<_PdfImportPreviewDialog> createState() => _PdfImportPreviewDialogState();
+  State<_ImportPreviewDialog> createState() => _ImportPreviewDialogState();
 }
 
-class _PdfImportPreviewDialogState extends State<_PdfImportPreviewDialog> {
+class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
   List<MeterModel> _meters = [];
   bool _saving = false;
 
@@ -1054,7 +1054,7 @@ class _PdfImportPreviewDialogState extends State<_PdfImportPreviewDialog> {
             Row(
               children: [
                 Text(
-                  'Bill ${index + 1} (PDF page ${e.draft.sourcePage})',
+                  e.draft.sourceLabel,
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1171,7 +1171,8 @@ class _PdfImportPreviewDialogState extends State<_PdfImportPreviewDialog> {
 
 class _DraftEditor {
   _DraftEditor(this.draft)
-    : dateCtrl = TextEditingController(
+    : meterName = draft.meterName,
+      dateCtrl = TextEditingController(
         text: '${draft.loggedAt.day.toString().padLeft(2, '0')}'
             '/${draft.loggedAt.month.toString().padLeft(2, '0')}'
             '/${draft.loggedAt.year}',
@@ -1182,7 +1183,7 @@ class _DraftEditor {
       leadCtrl = TextEditingController(text: _fmt(draft.rkvarhLead)),
       mdCtrl = TextEditingController(text: _fmt(draft.mdRecorded));
 
-  final PdfReadingDraft draft;
+  final ExcelReadingDraft draft;
   String meterName = '';
   final TextEditingController dateCtrl;
   final TextEditingController kwhCtrl;
