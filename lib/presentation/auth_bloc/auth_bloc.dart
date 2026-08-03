@@ -174,7 +174,17 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
             password: event.password,
           )
           .timeout(const Duration(seconds: 15));
-      // The auth-state listener now drives _enforceAndEmitAuthenticated.
+      // Drive the authenticated flow directly from the sign-in result so we
+      // never depend on the (possibly delayed) auth-state listener.
+      if (isClosed) return;
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        await _enforceAndEmitAuthenticated(
+          userId: user.id,
+          email: user.email ?? '',
+          emit: emit,
+        );
+      }
     } on TimeoutException {
       emit(const AppAuthError('Connection timed out. Check your network.'));
     } on AuthException catch (e) {
