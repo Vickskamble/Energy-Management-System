@@ -33,8 +33,9 @@ class EnergyLogRemoteDatasource {
           .select();
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
-      throw const RemoteStorageException(
-        'Unable to sync data. Check your connection and try again.',
+      throw RemoteStorageException(
+        'Unable to sync data. Check your connection and try again.\n'
+        'Detail: $e',
       );
     }
   }
