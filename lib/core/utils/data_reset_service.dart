@@ -1,45 +1,66 @@
-import '../../data/datasources/local/energy_log_local_datasource.dart';
-import '../../data/datasources/local/meter_local_datasource.dart';
 import '../config/app_config.dart';
-import '../constants/app_constants.dart';
-import '../database/database_factory.dart';
 import '../network/supabase_client.dart';
 import '../utils/app_logger.dart';
 
-/// Wipes ALL app data for the current user: local sembast databases (logs,
-/// meters, meta settings) plus the user's rows in Supabase (RLS allows
-/// deleting own rows). Used by Settings > Danger Zone > Reset All Data.
+/// Wipes ALL business data for the current user from Supabase (RLS allows
+/// deleting own rows): energy logs, meters, tariff settings and bill
+/// reconciliation. Used by Settings > Danger Zone > Reset All Data.
 class DataResetService {
   DataResetService._();
 
   static Future<void> resetAllData() async {
-    // 1. Local: energy logs + meters.
-    await EnergyLogLocalDatasource().clearAll();
-    await MeterLocalDatasource().clearAll();
+    if (!SupabaseClientManager.isInitialized) {
+      AppConfig.reset();
+      return;
+    }
+    final user = SupabaseClientManager.client.auth.currentUser;
+    if (user == null) {
+      AppConfig.reset();
+      return;
+    }
+    final uid = user.id;
+    final client = SupabaseClientManager.client;
 
-    // 2. Local: meta database (tariff, bill reconciliation, reminder flags).
+    // 1. Cloud: energy logs.
     try {
-      final factory = getDatabaseFactory();
-      await factory.deleteDatabase('ems_meta.db');
+      await client
+          .from('energy_logs')
+          .delete()
+          .eq('user_id', uid);
     } catch (e) {
-      AppLogger.w('Meta db reset failed (best-effort): $e');
+      AppLogger.w('Cloud reset of energy logs failed (best-effort): $e');
     }
-    AppConfig.reset();
-    await TariffStore.load();
 
-    // 3. Cloud: delete the current user's energy logs (own-row RLS policy).
-    if (SupabaseClientManager.isInitialized) {
-      final user = SupabaseClientManager.client.auth.currentUser;
-      if (user != null) {
-        try {
-          await SupabaseClientManager.client
-              .from(AppConstants.energyLogsTable)
-              .delete()
-              .eq('user_id', user.id);
-        } catch (e) {
-          AppLogger.w('Cloud reset failed (best-effort): $e');
-        }
-      }
+    // 2. Cloud: meters.
+    try {
+      await client
+          .from('user_meters')
+          .delete()
+          .eq('user_id', uid);
+    } catch (e) {
+      AppLogger.w('Cloud reset of meters failed (best-effort): $e');
     }
+
+    // 3. Cloud: tariff settings.
+    try {
+      await client
+          .from('user_settings')
+          .delete()
+          .eq('user_id', uid);
+    } catch (e) {
+      AppLogger.w('Cloud reset of settings failed (best-effort): $e');
+    }
+
+    // 4. Cloud: bill reconciliation.
+    try {
+      await client
+          .from('bill_reconcile')
+          .delete()
+          .eq('user_id', uid);
+    } catch (e) {
+      AppLogger.w('Cloud reset of bills failed (best-effort): $e');
+    }
+
+    AppConfig.reset();
   }
 }

@@ -55,13 +55,12 @@ extension EnergyEventPatterns on EnergyEvent {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( LoadInitialDashboardData value)?  loadInitialDashboardData,TResult Function( SubmitManualReadingForm value)?  submitManualReadingForm,TResult Function( SyncOfflineCachedLogs value)?  syncOfflineCachedLogs,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( LoadInitialDashboardData value)?  loadInitialDashboardData,TResult Function( SubmitManualReadingForm value)?  submitManualReadingForm,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case LoadInitialDashboardData() when loadInitialDashboardData != null:
 return loadInitialDashboardData(_that);case SubmitManualReadingForm() when submitManualReadingForm != null:
-return submitManualReadingForm(_that);case SyncOfflineCachedLogs() when syncOfflineCachedLogs != null:
-return syncOfflineCachedLogs(_that);case _:
+return submitManualReadingForm(_that);case _:
   return orElse();
 
 }
@@ -79,13 +78,12 @@ return syncOfflineCachedLogs(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( LoadInitialDashboardData value)  loadInitialDashboardData,required TResult Function( SubmitManualReadingForm value)  submitManualReadingForm,required TResult Function( SyncOfflineCachedLogs value)  syncOfflineCachedLogs,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( LoadInitialDashboardData value)  loadInitialDashboardData,required TResult Function( SubmitManualReadingForm value)  submitManualReadingForm,}){
 final _that = this;
 switch (_that) {
 case LoadInitialDashboardData():
 return loadInitialDashboardData(_that);case SubmitManualReadingForm():
-return submitManualReadingForm(_that);case SyncOfflineCachedLogs():
-return syncOfflineCachedLogs(_that);}
+return submitManualReadingForm(_that);}
 }
 /// A variant of `map` that fallback to returning `null`.
 ///
@@ -99,13 +97,12 @@ return syncOfflineCachedLogs(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( LoadInitialDashboardData value)?  loadInitialDashboardData,TResult? Function( SubmitManualReadingForm value)?  submitManualReadingForm,TResult? Function( SyncOfflineCachedLogs value)?  syncOfflineCachedLogs,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( LoadInitialDashboardData value)?  loadInitialDashboardData,TResult? Function( SubmitManualReadingForm value)?  submitManualReadingForm,}){
 final _that = this;
 switch (_that) {
 case LoadInitialDashboardData() when loadInitialDashboardData != null:
 return loadInitialDashboardData(_that);case SubmitManualReadingForm() when submitManualReadingForm != null:
-return submitManualReadingForm(_that);case SyncOfflineCachedLogs() when syncOfflineCachedLogs != null:
-return syncOfflineCachedLogs(_that);case _:
+return submitManualReadingForm(_that);case _:
   return null;
 
 }
@@ -122,12 +119,11 @@ return syncOfflineCachedLogs(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  loadInitialDashboardData,TResult Function( String meterName,  double currentKwh,  double previousKwh,  double currentKvah,  double previousKvah,  double rkvarhLag,  double rkvarhLead,  double mdRecorded,  DateTime loggedAt)?  submitManualReadingForm,TResult Function()?  syncOfflineCachedLogs,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  loadInitialDashboardData,TResult Function( String meterName,  double currentKwh,  double previousKwh,  double currentKvah,  double previousKvah,  double rkvarhLag,  double rkvarhLead,  double mdRecorded,  DateTime loggedAt)?  submitManualReadingForm,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case LoadInitialDashboardData() when loadInitialDashboardData != null:
 return loadInitialDashboardData();case SubmitManualReadingForm() when submitManualReadingForm != null:
-return submitManualReadingForm(_that.meterName,_that.currentKwh,_that.previousKwh,_that.currentKvah,_that.previousKvah,_that.rkvarhLag,_that.rkvarhLead,_that.mdRecorded,_that.loggedAt);case SyncOfflineCachedLogs() when syncOfflineCachedLogs != null:
-return syncOfflineCachedLogs();case _:
+return submitManualReadingForm(_that.meterName,_that.currentKwh,_that.previousKwh,_that.currentKvah,_that.previousKvah,_that.rkvarhLag,_that.rkvarhLead,_that.mdRecorded,_that.loggedAt);case _:
   return orElse();
 
 }
@@ -145,12 +141,11 @@ return syncOfflineCachedLogs();case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  loadInitialDashboardData,required TResult Function( String meterName,  double currentKwh,  double previousKwh,  double currentKvah,  double previousKvah,  double rkvarhLag,  double rkvarhLead,  double mdRecorded,  DateTime loggedAt)  submitManualReadingForm,required TResult Function()  syncOfflineCachedLogs,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  loadInitialDashboardData,required TResult Function( String meterName,  double currentKwh,  double previousKwh,  double currentKvah,  double previousKvah,  double rkvarhLag,  double rkvarhLead,  double mdRecorded,  DateTime loggedAt)  submitManualReadingForm,}) {final _that = this;
 switch (_that) {
 case LoadInitialDashboardData():
 return loadInitialDashboardData();case SubmitManualReadingForm():
-return submitManualReadingForm(_that.meterName,_that.currentKwh,_that.previousKwh,_that.currentKvah,_that.previousKvah,_that.rkvarhLag,_that.rkvarhLead,_that.mdRecorded,_that.loggedAt);case SyncOfflineCachedLogs():
-return syncOfflineCachedLogs();}
+return submitManualReadingForm(_that.meterName,_that.currentKwh,_that.previousKwh,_that.currentKvah,_that.previousKvah,_that.rkvarhLag,_that.rkvarhLead,_that.mdRecorded,_that.loggedAt);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -164,12 +159,11 @@ return syncOfflineCachedLogs();}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  loadInitialDashboardData,TResult? Function( String meterName,  double currentKwh,  double previousKwh,  double currentKvah,  double previousKvah,  double rkvarhLag,  double rkvarhLead,  double mdRecorded,  DateTime loggedAt)?  submitManualReadingForm,TResult? Function()?  syncOfflineCachedLogs,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  loadInitialDashboardData,TResult? Function( String meterName,  double currentKwh,  double previousKwh,  double currentKvah,  double previousKvah,  double rkvarhLag,  double rkvarhLead,  double mdRecorded,  DateTime loggedAt)?  submitManualReadingForm,}) {final _that = this;
 switch (_that) {
 case LoadInitialDashboardData() when loadInitialDashboardData != null:
 return loadInitialDashboardData();case SubmitManualReadingForm() when submitManualReadingForm != null:
-return submitManualReadingForm(_that.meterName,_that.currentKwh,_that.previousKwh,_that.currentKvah,_that.previousKvah,_that.rkvarhLag,_that.rkvarhLead,_that.mdRecorded,_that.loggedAt);case SyncOfflineCachedLogs() when syncOfflineCachedLogs != null:
-return syncOfflineCachedLogs();case _:
+return submitManualReadingForm(_that.meterName,_that.currentKwh,_that.previousKwh,_that.currentKvah,_that.previousKvah,_that.rkvarhLag,_that.rkvarhLead,_that.mdRecorded,_that.loggedAt);case _:
   return null;
 
 }
@@ -290,37 +284,5 @@ as DateTime,
 
 
 }
-
-/// @nodoc
-
-
-class SyncOfflineCachedLogs implements EnergyEvent {
-  const SyncOfflineCachedLogs();
-  
-
-
-
-
-
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SyncOfflineCachedLogs);
-}
-
-
-@override
-int get hashCode => runtimeType.hashCode;
-
-@override
-String toString() {
-  return 'EnergyEvent.syncOfflineCachedLogs()';
-}
-
-
-}
-
-
-
 
 // dart format on

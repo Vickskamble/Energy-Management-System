@@ -21,7 +21,6 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
        super(const EnergyInitial()) {
     on<LoadInitialDashboardData>(_onLoadDashboard);
     on<SubmitManualReadingForm>(_onSubmitReading);
-    on<SyncOfflineCachedLogs>(_onSyncCache);
   }
 
   // ---------------------------------------------------------------------------
@@ -158,67 +157,6 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
       emit(
         const EnergyOperationFailure(
           'Failed to save reading. Please verify the values and try again.',
-        ),
-      );
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Event: SyncOfflineCachedLogs
-  // ---------------------------------------------------------------------------
-  Future<void> _onSyncCache(
-    SyncOfflineCachedLogs event,
-    Emitter<EnergyState> emit,
-  ) async {
-    emit(const EnergyLoading());
-    try {
-      await _repository.syncUnsyncedLogs();
-
-      // Reload dashboard after sync
-      final dashboard = await _repository.getDashboardData();
-
-      emit(
-        EnergySuccess(
-          logs: dashboard.logs,
-          estimatedBill: dashboard.estimatedBill,
-          totalConsumption:
-              (dashboard.totalConsumption * 100).roundToDouble() / 100,
-          activeConsumptionToday:
-              (dashboard.activeConsumptionToday * 100).roundToDouble() / 100,
-          currentPowerFactor:
-              (dashboard.currentPowerFactor * 1000).roundToDouble() / 1000,
-          maxDemandPeak: (dashboard.maxDemandPeak * 100).roundToDouble() / 100,
-        ),
-      );
-    } on AppException catch (_) {
-      // On sync failure, still emit success with current local data
-      try {
-        final dashboard = await _repository.getDashboardData();
-        emit(
-          EnergySuccess(
-            logs: dashboard.logs,
-            estimatedBill: dashboard.estimatedBill,
-            totalConsumption:
-                (dashboard.totalConsumption * 100).roundToDouble() / 100,
-            activeConsumptionToday:
-                (dashboard.activeConsumptionToday * 100).roundToDouble() / 100,
-            currentPowerFactor:
-                (dashboard.currentPowerFactor * 1000).roundToDouble() / 1000,
-            maxDemandPeak:
-                (dashboard.maxDemandPeak * 100).roundToDouble() / 100,
-          ),
-        );
-      } catch (_) {
-        emit(
-          const EnergyOperationFailure(
-            'Sync failed. Data will sync automatically when connection is available.',
-          ),
-        );
-      }
-    } catch (_) {
-      emit(
-        const EnergyOperationFailure(
-          'Sync failed. Data will sync automatically when connection is available.',
         ),
       );
     }

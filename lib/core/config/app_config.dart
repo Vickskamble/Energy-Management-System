@@ -1,6 +1,6 @@
-import 'package:sembast/sembast.dart';
-import '../database/database_factory.dart';
 import '../constants/app_constants.dart';
+import '../error/exceptions.dart';
+import '../network/supabase_client.dart';
 import '../utils/app_logger.dart';
 
 /// Runtime-configurable tariff settings (persisted locally).
@@ -96,28 +96,35 @@ class AppConfig {
   }
 }
 
-/// Persists [AppConfig] values in a local sembast meta database.
+/// Persists [AppConfig] values per user in the Supabase `user_settings` table.
+/// Loaded after login so bills always use the signed-in user's tariff.
 class TariffStore {
   TariffStore._();
 
-  static const _recordKey = 'tariff';
+  static const _table = 'user_settings';
 
-  static Future<void> load() async {
+  static String? _currentUserId() {
+    if (!SupabaseClientManager.isInitialized) return null;
+    return SupabaseClientManager.client.auth.currentUser?.id;
+  }
+
+  /// Load tariff settings for the given user (or the signed-in user when
+  /// [userId] is null). Falls back to [AppConstants] defaults when nothing
+  /// is stored.
+  static Future<void> load({String? userId}) async {
+    final uid = userId ?? _currentUserId();
+    if (uid == null) return;
     try {
-      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
-      final store = stringMapStoreFactory.store('settings');
-
-      final rec = await store.record(_recordKey).get(db);
-      if (rec != null) {
-        _applyFromMap(rec);
-        return;
-      }
-
-      // Legacy single-value record ('tariff_per_unit') written by older builds.
-      final legacy = await store.record('tariff_per_unit').get(db);
-      final legacyValue = legacy?['value'];
-      if (legacyValue is num && legacyValue > 0) {
-        AppConfig.tariffPerUnit = legacyValue.toDouble();
+      final data = await SupabaseClientManager.client
+          .from(_table)
+          .select('data')
+          .eq('user_id', uid)
+          .maybeSingle();
+      final raw = data?['data'];
+      if (raw is Map) {
+        _applyFromMap(
+          raw.cast<String, Object?>(),
+        );
       }
     } catch (e) {
       AppLogger.e('Failed to load tariff settings', e);
@@ -169,10 +176,12 @@ class TariffStore {
     double rebateSection106 = 0.0,
     List<double>? todMultipliers,
   }) async {
+    final uid = _currentUserId();
+    if (uid == null) {
+      throw const RemoteStorageException('You must be signed in to save settings.');
+    }
     try {
-      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
-      final store = stringMapStoreFactory.store('settings');
-      await store.record(_recordKey).put(db, {
+      final data = {
         'tariff_per_unit': tariffPerUnit,
         'demand_charge_per_kva': demandChargePerKva,
         'fac_rate_per_unit': facRatePerUnit,
@@ -183,6 +192,11 @@ class TariffStore {
         'region_subsidy_amount': regionSubsidyAmount,
         'rebate_section_106': rebateSection106,
         'tod_multipliers': todMultipliers ?? AppConfig.todMultipliers,
+      };
+      await SupabaseClientManager.client.from(_table).upsert({
+        'user_id': uid,
+        'data': data,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
 
       AppConfig.tariffPerUnit = tariffPerUnit;
@@ -202,22 +216,31 @@ class TariffStore {
   }
 }
 
-/// Stores actual bill amounts per month (Issue 7B) so reports can reconcile
-/// them against the app's estimated bill.
+/// Stores actual bill amounts per month (Issue 7B) in the Supabase
+/// `bill_reconcile` table so reports can reconcile them against the app's
+/// estimated bill.
 class BillReconcileStore {
   BillReconcileStore._();
 
-  static const _recordKey = 'bill_reconcile';
+  static const _table = 'bill_reconcile';
+
+  static String? _currentUserId() {
+    if (!SupabaseClientManager.isInitialized) return null;
+    return SupabaseClientManager.client.auth.currentUser?.id;
+  }
 
   static Future<Map<String, double>> load() async {
+    final uid = _currentUserId();
+    if (uid == null) return {};
     try {
-      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
-      final store = stringMapStoreFactory.store('settings');
-      final rec = await store.record(_recordKey).get(db);
-      if (rec == null) return {};
-      return rec.map(
-        (k, v) => MapEntry(k, (v as num).toDouble()),
-      );
+      final data = await SupabaseClientManager.client
+          .from(_table)
+          .select('month_key,amount')
+          .eq('user_id', uid);
+      return {
+        for (final row in (data as List<dynamic>))
+          row['month_key'] as String: (row['amount'] as num).toDouble(),
+      };
     } catch (e) {
       AppLogger.e('Failed to load actual bills', e);
       return {};
@@ -225,13 +248,17 @@ class BillReconcileStore {
   }
 
   static Future<void> saveActualBill(String monthKey, double amount) async {
+    final uid = _currentUserId();
+    if (uid == null) {
+      throw const RemoteStorageException('You must be signed in to save bills.');
+    }
     try {
-      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
-      final store = stringMapStoreFactory.store('settings');
-      final rec = await store.record(_recordKey).get(db);
-      final map = Map<String, Object?>.from(rec ?? const {});
-      map[monthKey] = amount;
-      await store.record(_recordKey).put(db, map);
+      await SupabaseClientManager.client.from(_table).upsert({
+        'user_id': uid,
+        'month_key': monthKey,
+        'amount': amount,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
     } catch (e) {
       AppLogger.e('Failed to save actual bill', e);
       rethrow;
@@ -239,10 +266,13 @@ class BillReconcileStore {
   }
 
   static Future<void> clear() async {
+    final uid = _currentUserId();
+    if (uid == null) return;
     try {
-      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
-      final store = stringMapStoreFactory.store('settings');
-      await store.record(_recordKey).delete(db);
+      await SupabaseClientManager.client
+          .from(_table)
+          .delete()
+          .eq('user_id', uid);
     } catch (e) {
       AppLogger.e('Failed to clear actual bills', e);
     }
