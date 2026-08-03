@@ -86,6 +86,21 @@ class ExcelImportService {
       return [];
     }
 
+    // When the kWh / kVAh columns carry CUMULATIVE meter readings (each row
+    // is the meter's current total), convert to per-day consumption by taking
+    // the difference from the previous row. The first row is the opening
+    // baseline → consumption 0.
+    final kwhCumulative =
+        cols.kwh != null && _isCumulative(rows, headerRow, cols.kwh!);
+    final kvahCumulative =
+        cols.kvah != null && _isCumulative(rows, headerRow, cols.kvah!);
+    final kwhSeries = kwhCumulative
+        ? _cumulativeSeries(rows, headerRow, cols.kwh!)
+        : null;
+    final kvahSeries = kvahCumulative
+        ? _cumulativeSeries(rows, headerRow, cols.kvah!)
+        : null;
+
     final drafts = <ExcelReadingDraft>[];
     for (var i = headerRow + 1; i < rows.length; i++) {
       final row = rows[i];
@@ -97,24 +112,35 @@ class ExcelImportService {
           : DateTime.now();
       if (loggedAt.isAfter(DateTime.now())) continue;
 
-      final kwh = _resolveConsumed(
-        row,
-        cols.kwh,
-        cols.currentKwh,
-        cols.prevKwh,
-      );
-      final kvah = _resolveConsumed(
-        row,
-        cols.kvah,
-        cols.currentKvah,
-        cols.prevKvah,
-      );
+      final double kwh;
+      if (kwhSeries != null) {
+        kwh = kwhSeries[i - (headerRow + 1)];
+      } else {
+        kwh = _resolveConsumed(
+          row,
+          cols.kwh,
+          cols.currentKwh,
+          cols.prevKwh,
+        );
+      }
+      final double kvah;
+      if (kvahSeries != null) {
+        kvah = kvahSeries[i - (headerRow + 1)];
+      } else {
+        kvah = _resolveConsumed(
+          row,
+          cols.kvah,
+          cols.currentKvah,
+          cols.prevKvah,
+        );
+      }
       final lag = cols.lag != null ? _cellNumber(row[cols.lag!]) ?? 0 : 0.0;
       final lead = cols.lead != null
           ? _cellNumber(row[cols.lead!]) ?? 0
           : 0.0;
       final md = cols.md != null ? _cellNumber(row[cols.md!]) ?? 0 : 0.0;
 
+      final baseline = kwhSeries != null && i == headerRow + 1;
       if (kwh <= 0 && kvah <= 0 && md <= 0) continue;
 
       drafts.add(
@@ -126,11 +152,62 @@ class ExcelImportService {
           rkvarhLag: lag,
           rkvarhLead: lead,
           mdRecorded: md,
-          sourceLabel: 'Row ${i + 1}',
+          sourceLabel: baseline ? 'Row ${i + 1} (opening)' : 'Row ${i + 1}',
         ),
       );
     }
     return drafts;
+  }
+
+  /// Heuristic: treat a column as cumulative meter readings when it holds a
+  /// mostly-monotonically-increasing series of large values (meters display
+  /// running totals like 57,037 — not small per-day consumption figures).
+  static bool _isCumulative(
+    List<List<Data?>> rows,
+    int headerRow,
+    int col,
+  ) {
+    var minVal = double.infinity;
+    var prev = double.nan;
+    var nonDecreasing = 0;
+    var valid = 0;
+    for (var i = headerRow + 1; i < rows.length; i++) {
+      final v = _cellNumber(rows[i][col]);
+      if (v == null) continue;
+      valid++;
+      if (v < minVal) minVal = v;
+      if (!prev.isNaN) {
+        if (v >= prev) nonDecreasing++;
+      }
+      prev = v;
+    }
+    if (valid < 2) return false;
+    return nonDecreasing >= valid - 1 && minVal >= 10000;
+  }
+
+  /// Cumulative readings → per-row consumed (current − previous). The first
+  /// data row has no predecessor → 0. Out-of-order (meter reset) → 0.
+  static List<double> _cumulativeSeries(
+    List<List<Data?>> rows,
+    int headerRow,
+    int col,
+  ) {
+    final series = <double>[];
+    var prev = double.nan;
+    for (var i = headerRow + 1; i < rows.length; i++) {
+      final v = _cellNumber(rows[i][col]);
+      if (v == null) {
+        series.add(0.0);
+        continue;
+      }
+      if (prev.isNaN) {
+        series.add(0.0);
+      } else {
+        series.add(v >= prev ? v - prev : 0.0);
+      }
+      prev = v;
+    }
+    return series;
   }
 
   /// Returns the index of the row containing column headers, or -1.
