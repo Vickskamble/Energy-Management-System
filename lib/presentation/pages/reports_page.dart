@@ -958,8 +958,7 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
           contractDemand:
               meter?.contractDemandKw ?? AppConstants.defaultContractDemandKva,
           loggedAt: e.loggedAt,
-          multiplyingFactor:
-              meter?.multiplyingFactor ?? AppConstants.multiplyingFactor,
+          multiplyingFactor: meter?.multiplyingFactor ?? 1.0,
         ),
       );
     }
