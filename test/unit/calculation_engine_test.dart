@@ -38,14 +38,14 @@ void main() {
   group('calculateEstimatedBill', () {
     test('calculates bill using new tariff: units × MF × rate', () {
       final bill = CalculationEngine.calculateEstimatedBill(kwh: 1000);
-      // 1000 × 5 (MF) × 6.40 = 32,000
-      expect(bill, closeTo(32000, 1));
+      // 1000 × 5 (MF) × 8.44 = 42,200
+      expect(bill, closeTo(42200, 1));
     });
 
     test('bill is same regardless of PF (no penalty in per-reading calc)', () {
       final bill = CalculationEngine.calculateEstimatedBill(kwh: 500);
-      // 500 × 5 × 6.40 = 16,000
-      expect(bill, closeTo(16000, 1));
+      // 500 × 5 × 8.44 = 21,100
+      expect(bill, closeTo(21100, 1));
     });
   });
 

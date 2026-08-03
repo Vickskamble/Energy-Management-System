@@ -55,9 +55,9 @@ void main() {
       );
       expect(pfOp, isNotEmpty);
       // PF 0.80 < 0.90 → penalty = 5.0 + 1.0 = 6.0%
-      // base = 6400 + 195000 = 201400
-      // savings = 201400 × 6.0 / 100 = 12084
-      expect(pfOp.first.monthlySavings, closeTo(12084, 0.01));
+      // base = 8440 + 195000 = 203440
+      // savings = 203440 × 6.0 / 100 = 12206.4
+      expect(pfOp.first.monthlySavings, closeTo(12206.4, 0.01));
     });
 
     test('suggests load smoothing when load factor is low', () {

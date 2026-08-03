@@ -60,9 +60,9 @@ void main() {
 
       expect(forecast.projectedBill, greaterThan(0));
       expect(forecast.dailyAverageBill, greaterThan(0));
-      // 6200 units: energy 39680 + demand 195000 + FAC 1860 + wheeling 3782
-      // + duty 1705 + tax 1729.80 + surcharge 11734 - rebate 0 - subsidy 0
-      expect(forecast.projectedBill, closeTo(255490.80, 0.01));
+      // 6200 units: energy 52328 + demand 195000 + FAC 1860 + wheeling 5022
+      // + duty 1705 + tax 1729.80 + surcharge 12366.40 - rebate 0 - subsidy 0
+      expect(forecast.projectedBill, closeTo(270011.20, 0.01));
     });
 
     test('scales by the number of days in the reference month', () {
