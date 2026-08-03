@@ -36,13 +36,13 @@ void main() {
       expect(breakdown.totalUnits, 1000); // 200 kWh × 5 MF
       expect(breakdown.powerFactor, closeTo(0.800, 0.001));
       expect(breakdown.billingDemand, 300); // max(300, 400×0.75)
-      expect(breakdown.energyCharges, closeTo(6400, 0.01)); // 1000 × 6.40
+      expect(breakdown.energyCharges, closeTo(8440, 0.01)); // 1000 × 8.44
       expect(breakdown.demandCharges, closeTo(195000, 0.01)); // 300 × 650
       expect(breakdown.facCharges, closeTo(300, 0.01)); // 1000 × 0.30
-      expect(breakdown.wheelingCharges, closeTo(610, 0.01)); // 1000 × 0.61
+      expect(breakdown.wheelingCharges, closeTo(810, 0.01)); // 1000 × 0.81
       expect(breakdown.electricityDuty, closeTo(275, 0.01)); // 1000 × 0.275
       expect(breakdown.taxes, closeTo(279, 0.01)); // 1000 × 0.279
-      expect(breakdown.pfSurcharge, closeTo(10070, 0.01)); // PF 0.8 < 0.9 → 5%
+      expect(breakdown.pfSurcharge, closeTo(10172, 0.01)); // PF 0.8 < 0.9 → 5%
       expect(breakdown.pfRebate, 0);
       expect(breakdown.loadFactor, 1.0);
     });
@@ -53,7 +53,7 @@ void main() {
       );
 
       expect(breakdown.powerFactor, 1.0);
-      expect(breakdown.pfRebate, closeTo(2014, 0.01)); // 1% of (6400+195000)
+      expect(breakdown.pfRebate, closeTo(2034.4, 0.01)); // 1% of (8440+195000)
       expect(breakdown.pfSurcharge, 0);
     });
 
