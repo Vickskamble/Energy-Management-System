@@ -65,7 +65,7 @@ class DashboardChart extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 260,
+          height: 240,
           child: LineChart(
             LineChartData(
               minX: 0,

@@ -104,15 +104,15 @@ class _AppKpiCardState extends State<AppKpiCard>
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(AppSpacing.xl),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Container(
-                      width: 42,
-                      height: 42,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
@@ -171,7 +171,7 @@ class _AppKpiCardState extends State<AppKpiCard>
                       ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   widget.title,
                   style: TextStyle(
@@ -189,7 +189,7 @@ class _AppKpiCardState extends State<AppKpiCard>
                     Text(
                       _displayValue.toStringAsFixed(widget.decimals),
                       style: AppTypography.mono(
-                        size: 26,
+                        size: 24,
                         weight: FontWeight.w700,
                         color: widget.color,
                       ),
