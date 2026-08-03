@@ -174,6 +174,8 @@ class _AppKpiCardState extends State<AppKpiCard>
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textSecondary,
@@ -219,6 +221,8 @@ class _AppKpiCardState extends State<AppKpiCard>
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     widget.description!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
