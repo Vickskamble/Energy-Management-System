@@ -119,7 +119,8 @@ class TariffStore {
           .from(_table)
           .select('data')
           .eq('user_id', uid)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 10));
       final raw = data?['data'];
       if (raw is Map) {
         _applyFromMap(

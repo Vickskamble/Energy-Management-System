@@ -71,8 +71,8 @@ class SessionGuard {
 
   /// Whether this device may log in for [userId].
   ///
-  /// Fail-open on errors (table missing / network down) so the app keeps
-  /// working until the migration has been applied.
+  /// Fail-open on errors (table missing / network down / timeout) so the app
+  /// keeps working until the migration has been applied.
   Future<SessionStatus> check(String userId) async {
     final token = await getDeviceToken();
     try {
@@ -80,7 +80,8 @@ class SessionGuard {
           .from(_table)
           .select('device_token,last_seen_at')
           .eq('user_id', userId)
-          .limit(1);
+          .limit(1)
+          .timeout(const Duration(seconds: 10));
       if (rows.isEmpty) return SessionStatus.ok;
       final row = rows.first;
       final otherToken = row['device_token'];
@@ -106,7 +107,7 @@ class SessionGuard {
         'device_token': token,
         'device_name': _deviceName(),
         'last_seen_at': DateTime.now().toUtc().toIso8601String(),
-      });
+      }).timeout(const Duration(seconds: 10));
     } catch (e) {
       AppLogger.e('SessionGuard.takeOver failed', e);
     }
