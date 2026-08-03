@@ -95,14 +95,7 @@ class _DashboardPageState extends State<DashboardPage> {
             EnergyInitial() || EnergyLoading() => const AppLoadingIndicator(
               message: 'Loading dashboard...',
             ),
-            EnergySuccess(
-              :final logs,
-              :final activeConsumptionToday,
-            ) =>
-              _DashboardContent(
-                logs: logs,
-                activeConsumptionToday: activeConsumptionToday,
-              ),
+            EnergySuccess(:final logs) => _DashboardContent(logs: logs),
             EnergyValidationError e => AppErrorState(
               message: e.message,
               onRetry: () => context.read<EnergyBloc>().add(
@@ -124,11 +117,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
 class _DashboardContent extends StatefulWidget {
   final List<dynamic> logs;
-  final double activeConsumptionToday;
 
   const _DashboardContent({
     required this.logs,
-    required this.activeConsumptionToday,
   });
 
   @override
@@ -215,10 +206,9 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   /// Site-aware KPI values — full-data values when "All Sites".
   double get _siteEstimatedBill {
-    if (_site == null) {
-      return _kpiMonthLogs.fold(0.0, (s, e) => s + e.estimatedBill);
-    }
-    return _kpiMonthLogs.fold(0.0, (s, e) => s + e.estimatedBill);
+    // Full estimated bill (energy + demand + charges + taxes), not just the
+    // energy-charge figure stored per reading.
+    return BillCalculator.calculate(logs: _kpiMonthLogs).netBill;
   }
 
   double get _siteTotalConsumption {
@@ -231,6 +221,26 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   double get _sitePowerFactor {
     return BillCalculator.calculate(logs: _kpiMonthLogs).powerFactor;
+  }
+
+  /// Today's usage shown in meter units (kWh × MF). If no reading exists for
+  /// today, falls back to the latest reading so the card never shows ₹0.
+  double get _todayUnits {
+    final now = DateTime.now();
+    final todays = _siteLogs
+        .where(
+          (l) =>
+              l.loggedAt.year == now.year &&
+              l.loggedAt.month == now.month &&
+              l.loggedAt.day == now.day,
+        )
+        .toList();
+    if (todays.isNotEmpty) {
+      return todays.fold(0.0, (s, l) => s + l.kwh * l.multiplyingFactor);
+    }
+    if (_siteLogs.isEmpty) return 0.0;
+    final last = _siteLogs.last;
+    return last.kwh * last.multiplyingFactor;
   }
 
   Widget _buildSiteSelector() {
@@ -333,17 +343,13 @@ class _DashboardContentState extends State<_DashboardContent> {
             _buildSiteSelector(),
             const SizedBox(height: AppSpacing.lg),
           ],
+          _buildAlertBanner(context),
+          const SizedBox(height: AppSpacing.lg),
           AppSectionHeader(
             title: 'Energy Overview',
             subtitle: 'Bill analysis and monitoring dashboard',
           ),
           const SizedBox(height: AppSpacing.lg),
-
-          _buildAlertsSection(context),
-          const SizedBox(height: AppSpacing.xl),
-
-          _buildMdBreachCard(entityLogs),
-          const SizedBox(height: AppSpacing.xl),
 
           _kpiGrid(
             cards: [
@@ -433,14 +439,20 @@ class _DashboardContentState extends State<_DashboardContent> {
               ),
               AppKpiCard(
                 title: "Today's Usage",
-                value: widget.activeConsumptionToday,
-                suffix: 'kWh',
+                value: _todayUnits,
+                suffix: 'units',
                 icon: Icons.today_rounded,
                 color: AppColors.kpiSavings,
-                description: 'Consumption so far today',
+                description: 'Last reading — consumption in units (kWh × MF)',
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.lg),
+
+          _buildMdBreachCard(entityLogs),
+          const SizedBox(height: AppSpacing.lg),
+
+          _buildAlertsSection(context),
           const SizedBox(height: AppSpacing.xxl),
 
           if (opportunities.isNotEmpty) ...[
@@ -564,7 +576,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: spacing,
           mainAxisSpacing: spacing,
-          childAspectRatio: cardWidth / 200,
+          childAspectRatio: cardWidth / 165,
           children: cards,
         );
       },
@@ -992,6 +1004,53 @@ class _DashboardContentState extends State<_DashboardContent> {
           Text(
             value,
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlertBanner(BuildContext context) {
+    final hasPfIssue = _sitePowerFactor < AppConstants.pfPenaltyThreshold;
+    final hasMdIssue = _siteMaxDemandPeak >= AppConstants.mdWarningThresholdKva;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = hasPfIssue || hasMdIssue
+        ? AppColors.warning
+        : AppColors.success;
+    final IconData icon = hasPfIssue || hasMdIssue
+        ? Icons.warning_amber_rounded
+        : Icons.check_circle_rounded;
+    final String text;
+    if (hasPfIssue && hasMdIssue) {
+      text = '2 alerts — PF penalty & Max Demand high';
+    } else if (hasPfIssue) {
+      text = '1 alert — Low PF (below ${AppConstants.pfPenaltyThreshold})';
+    } else if (hasMdIssue) {
+      text = '1 alert — Max Demand high';
+    } else {
+      text = 'All systems normal';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm + 2,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.10 : 0.08),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
           ),
         ],
       ),
