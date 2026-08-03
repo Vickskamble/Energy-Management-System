@@ -5,7 +5,7 @@ class AppConstants {
   static const String energyLogsStore = 'energy_logs';
 
   static const double multiplyingFactor = 5.0;
-  static const double tariffPerUnit = 6.40;
+  static const double tariffPerUnit = 8.44;
   static const double defaultContractDemandKva = 201.00;
   static const double pfPenaltyThreshold = 0.95;
   static const double mdWarningThresholdKva = 190.00;
@@ -14,7 +14,7 @@ class AppConstants {
 
   static const double demandChargePerKva = 650.00;
   static const double facRatePerUnit = 0.30;
-  static const double wheelingChargePerUnit = 0.61;
+  static const double wheelingChargePerUnit = 0.81;
   static const double electricityDutyPerUnit = 0.275;
   static const double taxPerUnit = 0.279;
   static const double pfRebatePercent = 1.0;
