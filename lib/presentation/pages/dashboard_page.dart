@@ -581,9 +581,12 @@ class _DashboardContentState extends State<_DashboardContent> {
     return LayoutBuilder(
       builder: (context, constraints) {
         const spacing = 12.0;
-        final cardWidth = (constraints.maxWidth - spacing * 3) / 4;
+        final width = MediaQuery.of(context).size.width;
+        final columns = width < 600 ? 2 : 4;
+        final cardWidth = (constraints.maxWidth - spacing * (columns - 1)) /
+            columns;
         return GridView.count(
-          crossAxisCount: 4,
+          crossAxisCount: columns,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: spacing,
