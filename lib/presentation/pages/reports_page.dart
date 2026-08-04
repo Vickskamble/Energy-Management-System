@@ -180,11 +180,39 @@ class _ReportsContentState extends State<_ReportsContent> {
     var sourceFile = '';
     final drafts = <ExcelReadingDraft>[];
     try {
+      // Read the first file's headers to let the user confirm the column
+      // mapping (auto-detection is prefilled). This fits every client file
+      // format, e.g. kVA demand recorded under "Contract KVA".
+      ExcelColumnMap? columnMap;
+      if (result.files.isNotEmpty) {
+        final bytes = result.files.first.bytes;
+        if (bytes != null) {
+          final headers = await ExcelImportService.readHeaders(bytes);
+          final detected = ExcelImportService.detectMapping(headers);
+          if (context.mounted) {
+            columnMap = await showDialog<ExcelColumnMap>(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) => _ColumnMappingDialog(
+                headers: headers,
+                initial: detected,
+              ),
+            );
+          }
+        }
+      }
+      if (columnMap == null) return;
+
       for (final file in result.files) {
         final bytes = file.bytes;
         if (bytes == null) continue;
         sourceFile = file.name;
-        drafts.addAll(await ExcelImportService.extractReadings(bytes));
+        drafts.addAll(
+          await ExcelImportService.extractReadings(
+            bytes,
+            columnMap: columnMap,
+          ),
+        );
       }
     } catch (e) {
       AppLogger.e('Excel import failed', e);
@@ -873,6 +901,139 @@ class _ReportsContentState extends State<_ReportsContent> {
 
 /// Preview + edit screen for readings parsed from an Excel file.
 /// Nothing is saved until the user confirms (Issue 11 — manual edit mandatory).
+class _ColumnMappingDialog extends StatefulWidget {
+  final List<String> headers;
+  final ExcelColumnMap initial;
+
+  const _ColumnMappingDialog({
+    required this.headers,
+    required this.initial,
+  });
+
+  @override
+  State<_ColumnMappingDialog> createState() => _ColumnMappingDialogState();
+}
+
+class _ColumnMappingDialogState extends State<_ColumnMappingDialog> {
+  late final ExcelColumnMap _map = widget.initial;
+
+  String _colName(int index) {
+    var n = index;
+    var label = '';
+    while (n >= 0) {
+      label = String.fromCharCode(65 + (n % 26)) + label;
+      n = n ~/ 26 - 1;
+    }
+    return label;
+  }
+
+  Widget _fieldDropdown({
+    required String label,
+    required int? value,
+    required void Function(int?) onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DropdownButtonFormField<int>(
+        initialValue: value,
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
+        ),
+        items: [
+          const DropdownMenuItem<int>(value: -1, child: Text('— Auto —')),
+          for (var i = 0; i < widget.headers.length; i++)
+            if (widget.headers[i].trim().isNotEmpty)
+              DropdownMenuItem<int>(
+                value: i,
+                child: Text(
+                  '${_colName(i)}: ${widget.headers[i].trim()}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+        ],
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Confirm Column Mapping'),
+      content: SizedBox(
+        width: 480,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Auto-detection is prefilled. Adjust if your client file '
+                'uses different column names (e.g. kVA demand under '
+                '"Contract KVA").',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              _fieldDropdown(
+                label: 'Reading Date',
+                value: _map.date,
+                onChanged: (v) => setState(() => _map.date = v == -1 ? null : v),
+              ),
+              _fieldDropdown(
+                label: 'kWh (consumed or cumulative)',
+                value: _map.kwh,
+                onChanged: (v) => setState(() => _map.kwh = v == -1 ? null : v),
+              ),
+              _fieldDropdown(
+                label: 'kVAh',
+                value: _map.kvah,
+                onChanged: (v) => setState(() => _map.kvah = v == -1 ? null : v),
+              ),
+              _fieldDropdown(
+                label: 'Max Demand kVA',
+                value: _map.md,
+                onChanged: (v) => setState(() => _map.md = v == -1 ? null : v),
+              ),
+              _fieldDropdown(
+                label: 'rkVARh Lag',
+                value: _map.lag,
+                onChanged: (v) => setState(() => _map.lag = v == -1 ? null : v),
+              ),
+              _fieldDropdown(
+                label: 'rkVARh Lead',
+                value: _map.lead,
+                onChanged: (v) => setState(() => _map.lead = v == -1 ? null : v),
+              ),
+              _fieldDropdown(
+                label: 'Meter Name',
+                value: _map.meter,
+                onChanged: (v) =>
+                    setState(() => _map.meter = v == -1 ? null : v),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_map),
+          child: const Text('Continue'),
+        ),
+      ],
+    );
+  }
+}
+
 class _ImportPreviewDialog extends StatefulWidget {
   const _ImportPreviewDialog({required this.drafts, required this.sourceFile});
 
