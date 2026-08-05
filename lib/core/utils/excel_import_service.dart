@@ -17,6 +17,7 @@ class ExcelReadingDraft {
     this.rkvarhLag = 0,
     this.rkvarhLead = 0,
     this.mdRecorded = 0,
+    this.powerFactor,
     required this.sourceLabel,
   });
 
@@ -27,6 +28,10 @@ class ExcelReadingDraft {
   double rkvarhLag;
   double rkvarhLead;
   double mdRecorded;
+
+  /// PF as recorded in the client's file (column "PF"). Null when the file
+  /// has no PF column — the system calculates it from kWh/kVAh instead.
+  double? powerFactor;
 
   /// Human-readable source, e.g. "Row 5" (1-based Excel row number).
   final String sourceLabel;
@@ -197,11 +202,21 @@ class ExcelImportService {
       }
       final md = cols.md != null ? _cellNumber(row[cols.md!]) ?? 0 : 0.0;
 
+      // PF from the client's file is stored as-is (never recalculated).
+      // Excel often stores it as 0.85 or 0.853 — keep the raw value.
+      final pfRaw = cols.pf != null ? _cellNumber(row[cols.pf!]) : null;
+      final pf = (pfRaw != null && pfRaw > 0 && pfRaw <= 1)
+          ? pfRaw
+          : (pfRaw != null && pfRaw > 1 && pfRaw <= 100
+              ? pfRaw / 100
+              : null);
+
       final baseline = kwhSeries != null && i == headerRow + 1;
       if (kwh <= 0 && kvah <= 0 && md <= 0) continue;
 
       drafts.add(
         ExcelReadingDraft(
+          powerFactor: pf,
           meterName: meter,
           loggedAt: loggedAt,
           kwh: kwh,
@@ -314,6 +329,10 @@ class ExcelImportService {
         map.meter = i;
       } else if (map.date == null && has(h, ['date'])) {
         map.date = i;
+      } else if (map.pf == null &&
+          (h == 'pf' || h.startsWith('pf') && h.length <= 4) &&
+          !isKvah) {
+        map.pf = i;
       } else if (isReactive && (isLag || isLead)) {
         if (isLag && map.lag == null) map.lag = i;
         if (isLead && map.lead == null) map.lead = i;
@@ -469,4 +488,5 @@ class ExcelColumnMap {
   int? lag;
   int? lead;
   int? md;
+  int? pf;
 }

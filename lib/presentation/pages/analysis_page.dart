@@ -420,11 +420,10 @@ class _AnalysisContentState extends State<_AnalysisContent> {
           subtitle: 'Last ${recent.length} readings',
         ),
         const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: AppCard(
+        if (MediaQuery.of(context).size.width < 600)
+          Column(
+            children: [
+              AppCard(
                 child: _miniLineChartMulti(
                   title: 'Power Factor',
                   series: [
@@ -437,10 +436,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   unit: '',
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: AppCard(
+              const SizedBox(height: 12),
+              AppCard(
                 child: _miniLineChartMulti(
                   title: 'Load Factor',
                   series: [
@@ -453,9 +450,45 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   unit: '',
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          )
+        else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: AppCard(
+                  child: _miniLineChartMulti(
+                    title: 'Power Factor',
+                    series: [
+                      _ChartSeries(
+                        label: 'PF',
+                        color: AppColors.kpiEfficiency,
+                        values: recent.map((e) => e.powerFactor).toList(),
+                      ),
+                    ],
+                    unit: '',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: AppCard(
+                  child: _miniLineChartMulti(
+                    title: 'Load Factor',
+                    series: [
+                      _ChartSeries(
+                        label: 'LF',
+                        color: AppColors.kpiPower,
+                        values: recent.map((e) => e.loadFactor).toList(),
+                      ),
+                    ],
+                    unit: '',
+                  ),
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }
@@ -621,30 +654,51 @@ class _AnalysisContentState extends State<_AnalysisContent> {
               'Last ${kwhSeries.first.values.length} readings — ${target ?? 'all meters'}',
         ),
         const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: AppCard(
+        if (MediaQuery.of(context).size.width < 600)
+          Column(
+            children: [
+              AppCard(
                 child: _miniLineChartMulti(
                   title: 'kWh Consumption',
                   series: kwhSeries,
                   unit: 'kWh',
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: AppCard(
+              const SizedBox(height: 12),
+              AppCard(
                 child: _miniLineChartMulti(
                   title: 'Max Demand (kVA)',
                   series: mdSeries,
                   unit: 'kVA',
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          )
+        else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: AppCard(
+                  child: _miniLineChartMulti(
+                    title: 'kWh Consumption',
+                    series: kwhSeries,
+                    unit: 'kWh',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: AppCard(
+                  child: _miniLineChartMulti(
+                    title: 'Max Demand (kVA)',
+                    series: mdSeries,
+                    unit: 'kVA',
+                  ),
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }

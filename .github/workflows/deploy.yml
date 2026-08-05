@@ -1,26 +1,34 @@
-name: Deploy to GitHub Pages
+name: Release Build
 
 on:
   push:
     branches: [main]
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
   id-token: write
 
 concurrency:
-  group: pages
+  group: release
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
@@ -30,24 +38,79 @@ jobs:
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
 
-      - run: flutter pub get
+      - name: Install dependencies
+        run: flutter pub get
 
       - name: Run tests
         run: flutter test
 
-      - name: Build web
-        run: flutter build web --release --base-href=/Energy-Management-System/
+      # ----- Android APK -----
+      - name: Build Android APK
+        run: flutter build apk --release
+        if: success()
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v3
+        if: success()
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
+
+      # ----- Desktop Builds -----
+      - name: Build Windows
+        run: flutter build windows --release
+        if: success()
+
+      - name: Build macOS
+        run: flutter build macos --release
+        if: success()
+
+      - name: Build Linux
+        run: flutter build linux --release
+        if: success()
+
+      - name: Upload Desktop Artifacts
+        uses: actions/upload-artifact@v3
+        if: success()
+        with:
+          name: desktop
+          path: |
+            build/windows/runner/Release/
+            build/macos/Build/Products/Release/
+            build/linux/bundle/
+          retention-days: 7
+
+      # ----- Web -----
+      - name: Build Web
+        run: flutter build web --release --base-href=/Energy-Management-System/
+        if: success()
+
+      - name: Upload Web Artifact
+        uses: actions/upload-pages-artifact@v3
+        if: success()
         with:
           path: build/web
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
+      # ----- Deploy to GitHub Pages -----
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
+        if: success()
+
+  # ----- Notify on success/failure -----
+  notify:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    if: always() && needs.build-and-deploy.result == 'success'
+    steps:
+      - name: Release Success
+        run: echo "✅ All builds completed successfully!"
+
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    if: always() && needs.build-and-deploy.result == 'failure'
+    steps:
+      - name: Release Failed
+        run: echo "❌ Build failed! Please check the workflow logs."
+        shell: bash

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PowerEMS — Energy Management System</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0f172a;
+    display: flex;
+    justify-content: center;
+    padding: 24px;
+  }
+  .poster {
+    width: 1000px;
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+    color: #e2e8f0;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+  }
+  .header {
+    padding: 40px 48px 28px;
+    background: linear-gradient(135deg, #10b981 0%, #0d9488 60%, #0284c7 100%);
+  }
+  .logo { font-size: 15px; letter-spacing: 4px; color: #ffffff; font-weight: 600; opacity: .9; }
+  h1 { font-size: 52px; color: #fff; font-weight: 800; margin-top: 6px; }
+  .tagline { font-size: 19px; color: #ecfeff; margin-top: 8px; font-weight: 500; }
+  .badges { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .badge {
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .body { padding: 32px 48px 40px; }
+  .section { margin-bottom: 26px; }
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #34d399;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: rgba(148,163,184,0.3); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .card {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(148,163,184,0.2);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .card h3 { font-size: 15px; color: #f8fafc; margin-bottom: 6px; font-weight: 700; }
+  .card p { font-size: 13px; color: #94a3b8; line-height: 1.5; }
+  .icon { font-size: 20px; margin-right: 8px; }
+  .highlight-card { background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(2,132,199,0.15)); border-color: rgba(52,211,153,0.4); }
+  .pricing { display: flex; gap: 14px; margin-top: 6px; }
+  .feature-list { list-style: none; }
+  .feature-list li { font-size: 13.5px; color: #cbd5e1; padding: 5px 0; padding-left: 24px; position: relative; }
+  .feature-list li::before { content: '✔'; position: absolute; left: 0; color: #34d399; font-weight: 700; }
+  .platform-row { display: flex; gap: 14px; margin-top: 6px; }
+  .platform {
+    flex: 1; background: rgba(30,41,59,0.8); border: 1px solid rgba(148,163,184,0.2);
+    border-radius: 12px; padding: 14px 16px; text-align: center;
+  }
+  .platform .p-icon { font-size: 26px; }
+  .platform .p-name { font-size: 14px; font-weight: 700; color: #f8fafc; margin-top: 4px; }
+  .platform .p-status { font-size: 12px; margin-top: 2px; }
+  .ready { color: #34d399; font-weight: 700; }
+  .progress { color: #fbbf24; font-weight: 700; }
+  .demo-box {
+    background: linear-gradient(135deg, #052e16, #064e3b);
+    border: 1px solid rgba(52,211,153,0.4);
+    border-radius: 14px; padding: 16px 20px; display: flex; align-items: center; gap: 18px;
+  }
+  .demo-box .code { font-family: 'Consolas', monospace; font-size: 14px; color: #a7f3d0; }
+  .footer {
+    padding: 20px 48px;
+    background: rgba(2,6,23,0.6);
+    font-size: 12.5px;
+    color: #64748b;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(148,163,184,0.15);
+  }
+  .footer strong { color: #94a3b8; }
+</style>
+</head>
+<body>
+<div class="poster">
+  <div class="header">
+    <div class="logo">⚡ POWEREMS</div>
+    <h1>Energy Management System</h1>
+    <div class="tagline">Track. Analyze. Save. — Complete electricity billing &amp; monitoring platform</div>
+    <div class="badges">
+      <span class="badge">📱 Android Ready</span>
+      <span class="badge">🌐 Web Live</span>
+      <span class="badge">🖥️ Windows Coming</span>
+      <span class="badge">☁️ Cloud Sync</span>
+      <span class="badge">🔐 Secure Login</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="section">
+      <div class="section-title">Core Features</div>
+      <div class="grid">
+        <div class="card highlight-card">
+          <h3><span class="icon">📊</span>Smart Dashboard</h3>
+          <p>Est. monthly bill, consumption, max demand, power factor, bill health score &amp; load factor in one view</p>
+        </div>
+        <div class="card highlight-card">
+          <h3><span class="icon">📈</span>Bill Forecast</h3>
+          <p>Projected month-end bill from current usage pace + month-over-month comparison with % change</p>
+        </div>
+        <div class="card">
+          <h3><span class="icon">📥</span>Excel Import (Any Format)</h3>
+          <p>Import complete history from any client file — smart column detection, manual mapping, cumulative meter conversion</p>
+        </div>
+        <div class="card">
+          <h3><span class="icon">🧮</span>Utility-Accurate Billing</h3>
+          <p>Energy, demand, PF rebate (≥0.95) &amp; penalty (&lt;0.90), FAC, wheeling, duty, taxes, TOD charges</p>
+        </div>
+        <div class="card">
+          <h3><span class="icon">⚡</span>Power Quality Analysis</h3>
+          <p>PF &amp; load factor trends, kWh &amp; demand charts, anomaly detection, Lag/Lead reactive tracking</p>
+        </div>
+        <div class="card">
+          <h3><span class="icon">💰</span>Savings Insights</h3>
+          <p>Prioritized opportunities: demand reduction, PF improvement, load smoothing, contract optimization</p>
+        </div>
+        <div class="card">
+          <h3><span class="icon">🚨</span>Smart Alerts</h3>
+          <p>Instant warning when PF drops below 0.95 or demand crosses contract threshold</p>
+        </div>
+        <div class="card">
+          <h3><span class="icon">📄</span>Reports &amp; PDF</h3>
+          <p>Executive summary, professional PDF export &amp; CSV export for client sharing</p>
+        </div>
+        <div class="card">
+          <h3><span class="icon">🏭</span>Multi-Site &amp; Multi-Meter</h3>
+          <p>Manage multiple sites &amp; meters with individual contract demand and CT/PT ratios</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Platforms</div>
+      <div class="platform-row">
+        <div class="platform">
+          <div class="p-icon">📱</div>
+          <div class="p-name">Android</div>
+          <div class="p-status ready">✔ Ready — APK</div>
+        </div>
+        <div class="platform">
+          <div class="p-icon">🌐</div>
+          <div class="p-name">Web</div>
+          <div class="p-status ready">✔ Live Now</div>
+        </div>
+        <div class="platform">
+          <div class="p-icon">🖥️</div>
+          <div class="p-name">Windows</div>
+          <div class="p-status progress">◐ In Progress</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">What It Solves For Clients</div>
+      <div class="grid2">
+        <ul class="feature-list">
+          <li>No more manual register books &amp; spreadsheet tracking</li>
+          <li>Full history upload from existing Excel records in minutes</li>
+          <li>Every month's bill estimated before the bill arrives</li>
+          <li>PF penalty avoided — live tracking &amp; capacitor guidance</li>
+        </ul>
+        <ul class="feature-list">
+          <li>Contract demand optimized to reduce fixed charges</li>
+          <li>Offline-first — works even without internet</li>
+          <li>Backup &amp; restore — data never lost</li>
+          <li>Secure — each client sees only their own data</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Try It Live</div>
+      <div class="demo-box">
+        <div style="flex:1">
+          <div style="font-size:15px; font-weight:700; color:#a7f3d0;">🌐 Live Demo</div>
+          <div style="font-size:13px; color:#86efac; margin-top:4px;">vickskamble.github.io/Energy-Management-System</div>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:12px; color:#6ee7b7;">LOGIN</div>
+          <div class="code">gkh@ems.com / gkh1234</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div><strong>PowerEMS</strong> — Energy Management System v1.0.0</div>
+    <div>Flutter • Supabase • Secure Cloud Sync • August 2026</div>
+  </div>
+</div>
+</body>
+</html>
