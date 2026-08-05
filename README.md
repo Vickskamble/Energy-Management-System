@@ -4,82 +4,103 @@ A professional Flutter-based Energy Management System for MSME industries. Helps
 
 ## Features
 
-### Bill Analysis
-- Full bill breakdown: Energy Charges, Demand Charges, FAC, Wheeling, Duty, Taxes
-- Power Factor analysis with rebate/surcharge calculation
-- Billing Demand vs Contract Demand tracking
-- Average unit cost per kWh
-- Load Factor analysis
-
 ### Dashboard
-- Bill Health Score and Energy Score
-- Smart Insights with business context for every metric
-- Data-driven Recommendations (no AI/hardware assumptions)
-- Bill breakdown visualization
-- Consumption & demand trends
-- Data validation engine
+- Live KPI grid: Estimated Monthly Bill, Total Consumption, Max Demand, Power Factor, Bill Health Score, Load Factor, Today's Usage
+- Auto-refresh (30 s) + pull-to-refresh; site filter chips
+- Alert banner & System Alerts (Low PF penalty, Near MD breach)
+- Bill Saving Opportunities incl. Contract Demand Optimizer
+- Bill Forecast (projected month-end bill / units)
+- Charts: Demand Trend (kVA) + Monthly Consumption
+- Month-over-month comparison with savings badge
 
-### Smart Insights
+### Bill Analysis
+- Full bill breakdown: Energy Charges, Demand Charges, FAC, Wheeling, Duty, Taxes, PF Rebate/Surcharge, Subsidy
+- Power Factor analysis with rebate/surcharge calculation
+- Billing Demand vs Contract Demand tracking (75% demand floor)
+- Average unit cost per kWh, Load Factor analysis
+- MD breach prediction (least-squares growth-rate extrapolation)
+- Anomaly detection (month-level SPIKE/DIP ≥ 30%)
+
+### Smart Insights (rule-based)
 Every metric includes business meaning:
 - "Power Factor 0.94 — close to rebate threshold, improving can save ₹X/month"
 - "Demand at 92% of contract — risk of excess demand penalty"
 - "Energy charges are 68% of bill — focus on efficiency measures"
 
+### Reading Entry
+- Meter dropdown with live meter list
+- Auto-fetch of previous kWh / kVAh readings
+- Validation: current ≥ previous, no future dates, duplicate-reading guard (±2 min)
+- PF (< 0.95) and MD (≥ 95% of contract) alerts on save
+
 ### Reports
-- Executive Summary
-- Bill Breakdown
-- Reading History with export
-- Validation status
+- Executive Summary (8 KPIs)
+- Bill Accuracy reconciliation (estimated vs actual, ±10% tolerance)
+- Monthly Bill History (12-month chart)
+- Reading History with pagination + edit/delete
+- PDF export, CSV export, Excel import
+
+### Excel Import (Reports → Import Data)
+- Multi-file picker (.xlsx / .xls)
+- Auto header-row discovery + column auto-detection
+- Manual column-mapping dialog (incl. "kVA demand under Contract KVA" case)
+- Per-row editable preview before save
+- Cumulative-reading detection (running totals → per-day consumption)
 
 ### Data Management
-- Offline-first with local Sembast storage
-- Supabase cloud sync
-- CSV export
-- Manual meter reading entry
-- Validation engine for data quality
+- Supabase cloud backend with Row Level Security (user-scoped)
+- Backup & Restore as single JSON (device-to-device migration)
+- Data Reset (Danger Zone) — clears local + Supabase
+- Data validation engine
+
+### Platform & Session
+- Email/password auth with email verification + password reset
+- Single-device login enforcement (`user_sessions` + session heartbeat)
+- Notifications: Low PF, MD breach, month-end reading reminder (Android/iOS)
+- Dark mode, responsive shell (sidebar on desktop, drawer on mobile)
 
 ## Screens
 
 | Screen | Purpose |
 |--------|---------|
-| Dashboard | KPI cards, bill breakdown, insights, recommendations, charts |
+| Dashboard | KPI cards, alerts, forecast, insights, recommendations, charts |
 | Reading Entry | Manual meter reading form with auto-fetch of previous readings |
-| Analysis | Bill KPIs, insights, recommendations, data validation, reading log |
-| Reports | Executive summary, bill breakdown, insights, recommendations, export |
-| Meter Management | Add/edit meters with contract demand configuration |
-| Settings | Theme toggle, sync status, user preferences |
+| Analysis | Bill breakdown, trends, MD breach prediction, anomalies, reading log edit/delete |
+| Reports | Executive summary, bill accuracy, history, PDF/CSV export, Excel import |
+| Meter Management | Add/edit/delete meters with contract demand, CT/PT, site config |
+| Settings | Account, appearance (dark mode), tariff editor, backup & restore, reset data |
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Framework | Flutter (Dart ^3.11.4) |
-| State Management | flutter_bloc (9.x) + Provider (6.x) |
-| Local Database | Sembast (offline-first) |
-| Cloud Backend | Supabase (Auth + Database) |
-| Charts | fl_chart |
-| Fonts | Google Fonts (Inter, JetBrains Mono) |
-| Code Gen | freezed, build_runner |
+| State Management | flutter_bloc (9.x) |
+| Cloud Backend | Supabase (Auth + Database + RLS) |
+| Charts | fl_chart (0.70.x) |
+| Local meta storage | sembast (device token, session, reminder flags) |
+| PDF | pdf, share_plus |
+| Excel | excel, file_picker |
+| Notifications | flutter_local_notifications |
+| Other | intl, uuid, connectivity_plus, flutter_dotenv, decimal, google_fonts |
 
 ## Architecture
 
+**Cloud-first, single Bloc flow:**
+
 ```
-User Input → Bloc/Provider → Repository → Local Datasource (Sembast)
-                                         → Remote Datasource (Supabase)
+UI → Bloc (AuthBloc / EnergyBloc) → Repository → Remote Datasource (Supabase)
                             ↓
-                     Calculation Engine
-                     Validation Engine
-                     Insight Generator
-                     Recommendation Engine
+                      Calculation Engine
+                      Validation Engine
+                      Insight Generator
+                      Recommendation Engine
                             ↓
                          UI Layer
 ```
 
-### Dual Data Flow
-- **Bloc flow** (`EnergyBloc`): Dashboard, Reading Entry, Analysis, Reports — uses `energy_logs` table
-- **Provider flow** (`EmsProvider`): Sites, Panels, Meters, Readings, Analysis Results — uses `ems_engine`
-
-Both flows are offline-first — all writes go to local Sembast first, sync to Supabase happens in background.
+- All reads/writes go directly to Supabase, scoped by `auth.uid()` RLS policies.
+- Sembast is used only for small app meta state (device token, last user, reminder flag) — there is no user-data cache.
 
 ## Calculation Modules
 
@@ -88,9 +109,11 @@ Both flows are offline-first — all writes go to local Sembast first, sync to S
 | `CalculationEngine` | `lib/core/utils/calculation_engine.dart` | Core calculations (PF, billing demand, charges) |
 | `EnergyCalculator` | `lib/core/calculation/energy_calculator.dart` | Modular pure functions (16 calculations) |
 | `BillCalculator` | `lib/core/calculation/bill_calculator.dart` | Logs → full BillBreakdown + MonthComparison + KPIs |
+| `BillForecastCalculator` | `lib/core/calculation/bill_forecast.dart` | Projects month-end bill & units |
+| `SavingsOpportunity` | `lib/core/calculation/savings_opportunity.dart` | Demand/PF/load-smoothing/contract-demand savings |
 | `DataValidator` | `lib/core/validation/data_validator.dart` | Reading validation, bill consistency, comparison checks |
 | `InsightGenerator` | `lib/core/insights/insight_generator.dart` | Business meaning for every metric |
-| `RecommendationEngine` | `lib/core/recommendations/recommendation_engine.dart` | Data-driven recommendations (no AI) |
+| `RecommendationEngine` | `lib/core/recommendations/recommendation_engine.dart` | Data-driven recommendations (rule-based, no AI) |
 
 ## Design System
 
@@ -100,6 +123,20 @@ Both flows are offline-first — all writes go to local Sembast first, sync to S
 - **Typography**: Inter (UI), JetBrains Mono (numbers)
 - **Spacing**: 4/8/12/16/20/24/32/40px grid
 - **KPI Colors**: Energy (blue), Power (purple), Demand (amber), Cost (green)
+
+## Supabase Schema
+
+Active tables (all RLS-scoped to the signed-in user):
+
+| Table | Purpose |
+|-------|---------|
+| `energy_logs` | Meter readings + full bill breakdown columns |
+| `user_meters` | Meters (name, site, contract demand, CT/PT, active) |
+| `user_settings` | Per-user tariff configuration |
+| `bill_reconcile` | Actual bill amounts for Bill Accuracy report |
+| `user_sessions` | Single-device login enforcement |
+
+> Legacy tables (`sites`, `panels`, `meters`, `readings`, `contract_demands`, `analysis_results`) are still defined in `supabase_schema.sql` but are **not used** by the current app.
 
 ## Getting Started
 
@@ -118,17 +155,19 @@ Both flows are offline-first — all writes go to local Sembast first, sync to S
    ```bash
    cp .env.example .env
    ```
-   Edit `.env` with your Supabase and OpenAI credentials:
+   Edit `.env` with your Supabase credentials:
    ```
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_ANON_KEY=your_supabase_anon_key_here
-   OPENAI_API_KEY=your_openai_api_key_here
-   OPENAI_MODEL=gpt-4o-mini
    ```
 
 3. **Create Supabase tables**
    - Open your Supabase project → SQL Editor
-   - Copy-paste and run `supabase_schema.sql` (creates all 7 tables)
+   - Run the SQL scripts in this order:
+     1. `supabase_schema.sql` — base tables + RLS policies
+     2. `supabase_cloud_data_migration.sql` — `user_meters`, `user_settings`, `bill_reconcile`
+     3. `supabase_single_device_migration.sql` — `user_sessions` (single-device login)
+   - Enable Email auth provider in Supabase → Authentication → Providers
 
 4. **Run the app**
    ```bash
@@ -137,7 +176,7 @@ Both flows are offline-first — all writes go to local Sembast first, sync to S
 
 ### Initial Login
 - Register a new account from the Login screen
-- No pre-seeded data required — add meters and readings via the app
+- No pre-seeded data required — add meters via Meter Management, then enter readings
 
 ## Deployment (GitHub Pages)
 
@@ -146,7 +185,7 @@ The repo has a CI workflow (`.github/workflows/deploy.yml`) that runs on every p
 
 1. **Test** — `flutter test`
 2. **Build** — `flutter build web --release`
-3. **Deploy** — static site pushed to the `gh-pages` branch (GitHub Pages)
+3. **Deploy** — static site pushed to GitHub Pages (Actions `deploy-pages`)
 
 ### Secrets
 
@@ -185,58 +224,63 @@ Supabase dashboard (Platform → Backups).
 
 ```
 lib/
+├── main.dart                 # App bootstrap, theme, bloc wiring
 ├── core/
-│   ├── calculation/      # Bill breakdown, energy calculator, KPI calculator
-│   ├── constants/        # App constants (tariffs, thresholds)
-│   ├── database/         # Sembast database factory
-│   ├── error/            # Custom exceptions
-│   ├── insights/         # Smart insight generator
-│   ├── network/          # Supabase client manager
-│   ├── recommendations/  # Data-driven recommendations
-│   ├── theme/            # Colors, typography, spacing, shadows, animations
-│   ├── utils/            # Calculation engine, export, notifications, sync
-│   ├── validation/       # Data validation engine
-│   └── widgets/          # Reusable UI components (30+ widgets)
+│   ├── calculation/          # Bill breakdown, energy calculator, bill calculator, forecast, savings
+│   ├── config/               # AppConfig (tariffs, defaults)
+│   ├── constants/            # App constants (thresholds)
+│   ├── database/             # Sembast meta DB factory (web/io)
+│   ├── error/                # Custom exceptions
+│   ├── insights/             # Smart insight generator
+│   ├── network/              # Supabase client manager, session guard
+│   ├── recommendations/      # Rule-based recommendations
+│   ├── theme/                # Colors, typography, spacing, shadows, animations
+│   ├── utils/                # Calculation engine, export (CSV/PDF), Excel import, backup, notifications, reminders, logger
+│   ├── validation/           # Data validation engine
+│   └── widgets/              # Reusable UI components (AppShell, AppSidebar, KPI cards, tables…)
 ├── data/
-│   ├── datasources/      # Local (Sembast) + Remote (Supabase)
-│   ├── models/           # EnergyLogModel, MeterModel
-│   └── repositories/     # EnergyRepository, MeterRepository
+│   ├── datasources/remote/   # Supabase remote datasources (energy_logs, user_meters)
+│   ├── models/               # EnergyLogModel, MeterModel
+│   └── repositories/         # EnergyRepository, MeterRepository
 ├── domain/
-│   └── entities/         # EnergyLogEntity, MeterEntity
-├── models/               # Site, Panel, Meter, Reading, AnalysisResult
-├── presentation/
-│   ├── auth_bloc/        # Authentication bloc
-│   ├── bloc/             # Energy bloc + state/event
-│   ├── pages/            # All app pages
-│   └── widgets/          # Chart widgets
-├── providers/            # EmsProvider (ChangeNotifier)
-├── screens/              # Detail screens (site, panel, meter)
-├── services/             # EmsEngine, AiService, SyncService
-├── theme/                # Power theme (legacy)
-└── widgets/power/        # Power monitoring widgets
+│   └── entities/             # EnergyLogEntity, MeterEntity
+└── presentation/
+    ├── auth_bloc/            # Authentication bloc
+    ├── bloc/                 # Energy bloc + state/event
+    ├── pages/                # All app pages
+    └── widgets/              # Chart widgets
 ```
 
-## Supabase Schema
+## Testing
 
-7 tables:
-
-| Table | Purpose | Sync |
-|-------|---------|------|
-| `energy_logs` | Meter readings + bill breakdown | EnergyRepository |
-| `sites` | Factory/plant locations | SyncService |
-| `panels` | Electrical panels | SyncService |
-| `meters` | Energy meters | SyncService |
-| `readings` | Detailed meter readings | SyncService |
-| `contract_demands` | Contract demand history | SyncService |
-| `analysis_results` | AI + rule-based findings | SyncService |
-
-## Lint / Analyze
+Unit tests cover the calculation engine, bill breakdown, bill forecast, savings
+opportunities, and Excel import column mapping (`test/unit/`). Run them with:
 
 ```bash
-dart analyze lib/           # Quick check (lib only)
-flutter analyze --no-pub    # Full check (skip pub get)
-flutter analyze              # Full check
+flutter test
 ```
+
+## Roadmap — Phase 2 (Upcoming)
+
+Planned Phase 2 features (from `ISSUES_AND_SOLUTIONS.md`):
+
+| Area | Feature |
+|------|---------|
+| AI Insights | Gemini free-tier smart insights + AI anomaly explanations (currently rule-based) |
+| Reports | Report-type dropdown (Daily / Monthly / Annual / Energy Audit) |
+| Reports | PDF charts + company header/logo branding |
+| Reports | MD breach report + PF penalty/rebate summary |
+| Reports | Email/share report, auto-scheduled monthly report |
+| Import | OCR / JPG import of scanned bills (Gemini OCR) |
+| Tariffs | Per-state tariff presets (UPCL / MKVVNL / MSEDCL) |
+| Data migration | CSV/xlsx migration with meter mapping |
+| Roles | Role-based access (Owner / Operator) |
+| CA/Auditor export | Yearly summary + meter-wise report for GST/audit |
+| Sharing | WhatsApp share (wa.me link) |
+| Budgeting | Monthly budget/goal tracking |
+| Comparison | YoY comparison (seasonality) |
+| UX | Hindi i18n, onboarding/help guide |
+| Security | Supabase App Check / domain restriction, Edge Function (server-side keys) |
 
 ## Version
 

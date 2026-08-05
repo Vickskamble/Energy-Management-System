@@ -52,122 +52,21 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Scaffold(
       body: Row(
         children: [
-          Expanded(
-            flex: 5,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF1E3A5F), Color(0xFF0F172A)],
-                ),
-              ),
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(48),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  AppColors.primary,
-                                  AppColors.primaryLight,
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.bolt_rounded,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'PowerEMS',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      FadeTransition(
-                        opacity: _fadeIn,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Enterprise Energy\nManagement System',
-                              style: TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                height: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Monitor, analyze, and optimize your energy consumption\nwith real-time data and AI-powered insights.',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white.withValues(alpha: 0.7),
-                                height: 1.5,
-                              ),
-                            ),
-                            const SizedBox(height: 48),
-                            Wrap(
-                              spacing: 16,
-                              runSpacing: 8,
-                              children: [
-                                _featureBadge(
-                                  Icons.analytics_rounded,
-                                  'Real-time Monitoring',
-                                ),
-                                _featureBadge(
-                                  Icons.auto_awesome_rounded,
-                                  'AI Insights',
-                                ),
-                                _featureBadge(
-                                  Icons.savings_rounded,
-                                  'Cost Optimization',
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '© 2026 PowerEMS. All rights reserved.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withValues(alpha: 0.4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+          if (!isMobile)
+            Expanded(
+              flex: 5,
+              child: _buildBrandingPanel(),
             ),
-          ),
           Expanded(
-            flex: 4,
+            flex: isMobile ? 1 : 4,
             child: SafeArea(
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(48),
+                  padding: EdgeInsets.all(isMobile ? 24 : 48),
                   child: FadeTransition(
                     opacity: _fadeIn,
                     child: Column(
@@ -370,6 +269,113 @@ class _LoginPageState extends State<LoginPage>
             child: const Text('Send reset link'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBrandingPanel() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E3A5F), Color(0xFF0F172A)],
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(48),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          AppColors.primary,
+                          AppColors.primaryLight,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.bolt_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'PowerEMS',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              FadeTransition(
+                opacity: _fadeIn,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Enterprise Energy\nManagement System',
+                      style: TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Monitor, analyze, and optimize your energy consumption\nwith real-time data and AI-powered insights.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white.withValues(alpha: 0.7),
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 48),
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 8,
+                      children: [
+                        _featureBadge(
+                          Icons.analytics_rounded,
+                          'Real-time Monitoring',
+                        ),
+                        _featureBadge(
+                          Icons.auto_awesome_rounded,
+                          'AI Insights',
+                        ),
+                        _featureBadge(
+                          Icons.savings_rounded,
+                          'Cost Optimization',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '© 2026 PowerEMS. All rights reserved.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.4),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

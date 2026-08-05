@@ -967,9 +967,7 @@ class _ColumnMappingDialogState extends State<_ColumnMappingDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Confirm Column Mapping'),
-      content: SizedBox(
-        width: 480,
-        child: SingleChildScrollView(
+      content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1011,6 +1009,11 @@ class _ColumnMappingDialogState extends State<_ColumnMappingDialog> {
                 onChanged: (v) => setState(() => _map.lead = v == -1 ? null : v),
               ),
               _fieldDropdown(
+                label: 'Power Factor (as-is)',
+                value: _map.pf,
+                onChanged: (v) => setState(() => _map.pf = v == -1 ? null : v),
+              ),
+              _fieldDropdown(
                 label: 'Meter Name',
                 value: _map.meter,
                 onChanged: (v) =>
@@ -1019,7 +1022,6 @@ class _ColumnMappingDialogState extends State<_ColumnMappingDialog> {
             ],
           ),
         ),
-      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(null),
@@ -1115,6 +1117,7 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
           kvah: e.kvah,
           rkvarhLag: e.lag,
           rkvarhLead: e.lead,
+          powerFactor: e.powerFactor,
           mdRecorded: e.md,
           contractDemand:
               meter?.contractDemandKw ?? AppConstants.defaultContractDemandKva,
@@ -1168,7 +1171,9 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
     return AlertDialog(
       title: const Text('Import Readings'),
       content: SizedBox(
-        width: 620,
+        width: MediaQuery.of(context).size.width < 600
+            ? double.maxFinite
+            : 620,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1295,13 +1300,80 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
               ],
             ),
             const SizedBox(height: 12),
-            Row(
+            if (MediaQuery.of(context).size.width < 600)
+              Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          controller: e.mdCtrl,
+                          label: 'MD Recorded (kVA)',
+                          prefixIcon: Icons.trending_up,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AppTextField(
+                          controller: e.pfCtrl,
+                          label: 'Power Factor',
+                          prefixIcon: Icons.percent,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          controller: e.lagCtrl,
+                          label: 'rkVARh Lag',
+                          prefixIcon: Icons.warning_outlined,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AppTextField(
+                          controller: e.leadCtrl,
+                          label: 'rkVARh Lead',
+                          prefixIcon: Icons.check_circle_outline,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            else
+              Row(
               children: [
                 Expanded(
                   child: AppTextField(
                     controller: e.mdCtrl,
                     label: 'MD Recorded (kVA)',
                     prefixIcon: Icons.trending_up,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppTextField(
+                    controller: e.pfCtrl,
+                    label: 'Power Factor',
+                    prefixIcon: Icons.percent,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                   ),
@@ -1347,7 +1419,12 @@ class _DraftEditor {
       kvahCtrl = TextEditingController(text: _fmt(draft.kvah)),
       lagCtrl = TextEditingController(text: _fmt(draft.rkvarhLag)),
       leadCtrl = TextEditingController(text: _fmt(draft.rkvarhLead)),
-      mdCtrl = TextEditingController(text: _fmt(draft.mdRecorded));
+      mdCtrl = TextEditingController(text: _fmt(draft.mdRecorded)),
+      pfCtrl = TextEditingController(
+        text: draft.powerFactor != null
+            ? draft.powerFactor!.toStringAsFixed(3)
+            : '',
+      );
 
   final ExcelReadingDraft draft;
   String meterName = '';
@@ -1357,6 +1434,7 @@ class _DraftEditor {
   final TextEditingController lagCtrl;
   final TextEditingController leadCtrl;
   final TextEditingController mdCtrl;
+  final TextEditingController pfCtrl;
 
   static String _fmt(double v) => v > 0 ? v.toStringAsFixed(2) : '';
 
@@ -1365,6 +1443,14 @@ class _DraftEditor {
   double get md => double.tryParse(mdCtrl.text.trim()) ?? 0;
   double get lag => double.tryParse(lagCtrl.text.trim()) ?? 0;
   double get lead => double.tryParse(leadCtrl.text.trim()) ?? 0;
+
+  /// PF as imported from the file (or edited by the user). Null → let the
+  /// system calculate from kWh/kVAh.
+  double? get powerFactor {
+    final v = double.tryParse(pfCtrl.text.trim());
+    if (v == null || v <= 0) return null;
+    return v > 1 ? v / 100 : v;
+  }
 
   bool get valid => kwh > 0 && md > 0;
 
@@ -1391,5 +1477,6 @@ class _DraftEditor {
     lagCtrl.dispose();
     leadCtrl.dispose();
     mdCtrl.dispose();
+    pfCtrl.dispose();
   }
 }

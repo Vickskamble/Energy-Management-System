@@ -472,7 +472,19 @@ class _DashboardContentState extends State<_DashboardContent> {
               title: 'Bill Saving Opportunities',
               subtitle: 'Direct monthly savings — priority order me',
             ),
-            Row(
+            if (MediaQuery.of(context).size.width < 600)
+              Column(
+                children: [
+                  for (var i = 0; i < opportunities.length; i++) ...[
+                    if (i > 0) const SizedBox(height: AppSpacing.lg),
+                    _SavingOpportunityCard(
+                      opportunity: opportunities[i],
+                    ),
+                  ],
+                ],
+              )
+            else
+              Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (var i = 0; i < opportunities.length; i++) ...[
@@ -488,7 +500,54 @@ class _DashboardContentState extends State<_DashboardContent> {
             const SizedBox(height: AppSpacing.xxl),
           ],
 
-          Row(
+          if (MediaQuery.of(context).size.width < 600)
+            Column(
+              children: [
+                AppCard(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Demand Trend (kVA)',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 240,
+                        child: DashboardChart(logs: entityLogs),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                AppCard(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Monthly Consumption',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 240,
+                        child: MonthlyConsumptionChart(logs: entityLogs),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          else
+            Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
@@ -542,7 +601,16 @@ class _DashboardContentState extends State<_DashboardContent> {
           ),
           const SizedBox(height: AppSpacing.xxl),
 
-          Row(
+          if (MediaQuery.of(context).size.width < 600)
+            Column(
+              children: [
+                _buildComparisonCard(comparison),
+                const SizedBox(height: AppSpacing.lg),
+                _buildForecastCard(forecast),
+              ],
+            )
+          else
+            Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(child: _buildComparisonCard(comparison)),
