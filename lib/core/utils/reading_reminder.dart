@@ -18,7 +18,7 @@ class ReadingReminderService {
       if (now.day < lastDay - 2) return;
       if (readingCountThisMonth > 0) return;
 
-      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
+      final db = await openMetaDatabase();
       final store = stringMapStoreFactory.store('settings');
       final flagKey = 'reading_reminder_${now.year}_${now.month}';
       final sent = await store.record(flagKey).get(db);

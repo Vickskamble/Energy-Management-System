@@ -30,7 +30,7 @@ class _UserCacheGuardState extends State<UserCacheGuard> {
 
   Future<void> _initMeta() async {
     try {
-      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
+      final db = await openMetaDatabase();
       final store = stringMapStoreFactory.store('meta');
       final rec = await store.record('last_user_id').get(db);
       final value = rec?['value'];
@@ -45,7 +45,7 @@ class _UserCacheGuardState extends State<UserCacheGuard> {
 
   Future<void> _saveLastUserId(String userId) async {
     try {
-      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
+      final db = await openMetaDatabase();
       final store = stringMapStoreFactory.store('meta');
       await store.record('last_user_id').put(db, {'value': userId});
     } catch (e) {

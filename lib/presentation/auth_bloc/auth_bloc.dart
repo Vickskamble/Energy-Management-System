@@ -13,6 +13,12 @@ export 'auth_state.dart';
 class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
   StreamSubscription<AuthState>? _authSub;
 
+  /// True while a manual sign-in is in flight, so the auth-state listener can
+  /// distinguish "session restored by this device" from "session created by a
+  /// fresh login" when deciding how to resolve a session-row conflict.
+  bool _loginInFlight = false;
+  bool _hadSessionBeforeLogin = false;
+
   AuthBloc() : super(const AppAuthInitial()) {
     on<AppAuthCheckRequested>(_onCheckAuth);
     on<AppAuthLoginRequested>(_onLogin);
@@ -54,6 +60,7 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
         _enforceAndEmitAuthenticated(
           userId: session.user.id,
           email: session.user.email ?? '',
+          isReturningDevice: _isReturningDevice(),
           emit: emit,
         );
       } else {
@@ -64,6 +71,11 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
       _handleUnauthenticated(emit);
     }
   }
+
+  /// A "returning device" is one whose stored session already existed before
+  /// any manual login in this app run — i.e. the row conflict (if any) can
+  /// only be its own leftover from a killed session, never another device.
+  bool _isReturningDevice() => !_loginInFlight || _hadSessionBeforeLogin;
 
   void _onCheckAuth(AppAuthCheckRequested event, Emitter<AppAuthState> emit) {
     if (!SupabaseClientManager.isInitialized) {
@@ -76,6 +88,7 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
         _enforceAndEmitAuthenticated(
           userId: session.user.id,
           email: session.user.email ?? '',
+          isReturningDevice: true,
           emit: emit,
         );
       } else {
@@ -87,28 +100,37 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
   }
 
   /// Single-device enforcement:
-  ///  - check() conflict  → sign out + show error
-  ///  - otherwise         → take over the session row, start heartbeat,
-  ///                        then emit authenticated.
+  ///  - check() conflict on a *returning* device (its own leftover row) →
+  ///    force take over, never lock the user out of their own device.
+  ///  - check() conflict on a *fresh* login → sign out + show error.
+  ///  - otherwise → take over the session row, start heartbeat,
+  ///                then emit authenticated.
   Future<void> _enforceAndEmitAuthenticated({
     required String userId,
     required String email,
+    required bool isReturningDevice,
     required Emitter<AppAuthState> emit,
   }) async {
     if (isClosed) return;
     final status = await SessionGuard.instance.check(userId);
     if (isClosed) return;
     if (status == SessionStatus.conflict) {
-      await _signOutQuietly();
-      if (!isClosed) {
-        emit(
-          const AppAuthError(
-            'This account is already signed in on another device. '
-            'Sign out there first, then try again.',
-          ),
-        );
+      if (isReturningDevice) {
+        // Same device re-launching after an app kill: the fresh row is this
+        // device's own leftover session, not another device — take it over.
+        await SessionGuard.instance.forceTakeOver(userId);
+      } else {
+        await _signOutQuietly();
+        if (!isClosed) {
+          emit(
+            const AppAuthError(
+              'This account is already signed in on another device. '
+              'Sign out there first, then try again.',
+            ),
+          );
+        }
+        return;
       }
-      return;
     }
     await SessionGuard.instance.takeOver(userId);
     SessionGuard.instance.startHeartbeat(
@@ -162,6 +184,9 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
     AppAuthLoginRequested event,
     Emitter<AppAuthState> emit,
   ) async {
+    _loginInFlight = true;
+    _hadSessionBeforeLogin =
+        Supabase.instance.client.auth.currentSession != null;
     emit(const AppAuthLoading());
     try {
       if (!SupabaseClientManager.isInitialized) {
@@ -182,6 +207,7 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
         await _enforceAndEmitAuthenticated(
           userId: user.id,
           email: user.email ?? '',
+          isReturningDevice: _isReturningDevice(),
           emit: emit,
         );
       }
@@ -192,6 +218,8 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
     } catch (e) {
       AppLogger.e('Login failed', e);
       emit(const AppAuthError('Unable to sign in. Please check your credentials.'));
+    } finally {
+      _loginInFlight = false;
     }
   }
 

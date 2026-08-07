@@ -7,6 +7,7 @@ import '../database/database_factory.dart';
 import '../utils/app_logger.dart';
 import 'supabase_client.dart';
 
+
 /// Result of a single-device session check.
 enum SessionStatus {
   /// This device is (or may become) the active session.
@@ -50,13 +51,21 @@ class SessionGuard {
   Future<String> getDeviceToken() async {
     if (_deviceToken != null) return _deviceToken!;
     try {
-      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
+      final db = await openMetaDatabase();
       final store = stringMapStoreFactory.store('meta');
       final rec = await store.record('device_token').get(db);
       var token = rec?['value'];
       if (token is String && token.isNotEmpty) {
         _deviceToken = token;
         return token;
+      }
+      // Legacy: the token may live in the old CWD-relative ems_meta.db from
+      // previous desktop builds — migrate it so no false conflict occurs.
+      final legacy = await _readLegacyToken();
+      if (legacy is String && legacy.isNotEmpty) {
+        await store.record('device_token').put(db, {'value': legacy});
+        _deviceToken = legacy;
+        return legacy;
       }
       token = const Uuid().v4();
       await store.record('device_token').put(db, {'value': token});
@@ -66,6 +75,18 @@ class SessionGuard {
       AppLogger.e('Failed to read device token (fallback in-memory)', e);
       _deviceToken = const Uuid().v4();
       return _deviceToken!;
+    }
+  }
+
+  Future<String?> _readLegacyToken() async {
+    try {
+      final db = await getDatabaseFactory().openDatabase('ems_meta.db');
+      final store = stringMapStoreFactory.store('meta');
+      final rec = await store.record('device_token').get(db);
+      final token = rec?['value'];
+      return token is String && token.isNotEmpty ? token : null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -110,6 +131,24 @@ class SessionGuard {
       }).timeout(const Duration(seconds: 10));
     } catch (e) {
       AppLogger.e('SessionGuard.takeOver failed', e);
+    }
+  }
+
+  /// Take over the session row even when another device currently holds it
+  /// (last login wins). Only used when this device proves it is a *returning*
+  /// device — a session for the same user was restored from this device's own
+  /// storage — so a leftover row from a killed app session can never lock the
+  /// user out of their own device.
+  Future<void> forceTakeOver(String userId) async {
+    try {
+      await _client
+          .from(_table)
+          .delete()
+          .eq('user_id', userId)
+          .timeout(const Duration(seconds: 10));
+      await takeOver(userId);
+    } catch (e) {
+      AppLogger.e('SessionGuard.forceTakeOver failed', e);
     }
   }
 
