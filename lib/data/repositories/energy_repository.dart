@@ -87,6 +87,11 @@ class EnergyRepository {
   }
 
   /// Get dashboard aggregate data from the cloud.
+  ///
+  /// Always runs [repairConsumptionChain] first so every meter's history
+  /// reads as one continuous flow (consumed = current reading − previous
+  /// reading), even when older/imported records stored the cumulative meter
+  /// reading as the consumed value.
   Future<DashboardData> getDashboardData() async {
     final todayStart = DateTime(
       DateTime.now().year,
@@ -99,14 +104,8 @@ class EnergyRepository {
     final nextMonthStart = DateTime(now.year, now.month + 1, 1);
 
     final allLogs = await _remote.fetchLogs(limit: _defaultFetchLimit);
-    final todayLogs = await _remote.fetchLogs(
-      from: todayStart,
-      to: tomorrowStart,
-    );
-    final monthLogs = await _remote.fetchLogs(
-      from: monthStart,
-      to: nextMonthStart,
-    );
+    final healed = await repairConsumptionChain(allLogs);
+    final hydrated = EnergyLogModel.hydrateActualReadings(healed);
 
     double activeConsumptionToday = 0;
     double maxDemandPeak = 0;
@@ -114,16 +113,19 @@ class EnergyRepository {
     double totalKvah = 0;
     double latestPf = 0;
 
-    for (final log in todayLogs) {
-      activeConsumptionToday += log.kwh;
-    }
-
-    for (final log in monthLogs) {
-      totalKwh += log.kwh;
-      totalKvah += log.kvah;
-      final actualMd = log.mdRecorded * log.multiplyingFactor;
-      if (actualMd > maxDemandPeak) {
-        maxDemandPeak = actualMd;
+    for (final log in hydrated) {
+      final t = log.loggedAt;
+      final inMonth = !t.isBefore(monthStart) && t.isBefore(nextMonthStart);
+      if (inMonth) {
+        totalKwh += log.kwh;
+        totalKvah += log.kvah;
+        final actualMd = log.mdRecorded * log.multiplyingFactor;
+        if (actualMd > maxDemandPeak) {
+          maxDemandPeak = actualMd;
+        }
+      }
+      if (!t.isBefore(todayStart) && t.isBefore(tomorrowStart)) {
+        activeConsumptionToday += log.kwh;
       }
     }
 
@@ -134,15 +136,16 @@ class EnergyRepository {
     // Actual units after applying each reading's own multiplying factor
     // (CT ratio × PT ratio of the meter it was recorded against).
     var totalConsumption = 0.0;
-    for (final log in monthLogs) {
-      totalConsumption += log.kwh * log.multiplyingFactor;
+    for (final log in hydrated) {
+      final t = log.loggedAt;
+      if (!t.isBefore(monthStart) && t.isBefore(nextMonthStart)) {
+        totalConsumption += log.kwh * log.multiplyingFactor;
+      }
     }
     totalConsumption = (totalConsumption * 100).roundToDouble() / 100;
 
     return DashboardData(
-      logs: EnergyLogModel.hydrateActualReadings(allLogs)
-          .map((m) => m.toEntity())
-          .toList(),
+      logs: hydrated.map((m) => m.toEntity()).toList(),
       estimatedBill: _calculateBill(totalConsumption),
       totalConsumption: totalConsumption,
       activeConsumptionToday: activeConsumptionToday,
@@ -150,6 +153,95 @@ class EnergyRepository {
       maxDemandPeak: maxDemandPeak,
     );
   }
+
+  /// Rebuild each meter's consumption as one continuous flow.
+  ///
+  /// For every row that has a stored ACTUAL (cumulative) meter reading, the
+  /// consumed value is recomputed as `current reading − previous reading`.
+  /// This heals/prevents the classic bug where the full cumulative reading is
+  /// stored as the consumed quantity (causing month-over-month bills to spike).
+  ///
+  /// Rows with no stored actual reading (legacy) are left untouched — their
+  /// consumed values ARE the running total and cannot be verified against a
+  /// real meter value.
+  ///
+  /// Returns the merged list (corrected rows swapped in) and pushes the fixes
+  /// back to the cloud (best-effort — failures only postpone the heal).
+  Future<List<EnergyLogModel>> repairConsumptionChain(
+    List<EnergyLogModel> raw,
+  ) async {
+    if (raw.isEmpty) return raw;
+    final sorted = List<EnergyLogModel>.of(raw)
+      ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+    final byMeter = <String, List<EnergyLogModel>>{};
+    for (final m in sorted) {
+      byMeter.putIfAbsent(m.meterName, () => []).add(m);
+    }
+
+    final fixed = <EnergyLogModel>[];
+    for (final rows in byMeter.values) {
+      double? prevKwh;
+      double? prevKvah;
+      for (final r in rows) {
+        final curKwh = r.currentKwh;
+        final curKvah = r.currentKvah;
+        if (curKwh == null) {
+          // Legacy row — carry the running cumulative forward only.
+          prevKwh = (prevKwh ?? 0) + r.kwh;
+          prevKvah = (prevKvah ?? 0) + r.kvah;
+        } else {
+          if (prevKwh != null && curKwh >= prevKwh) {
+            final wantKwh = round2(curKwh - prevKwh);
+            final wantKvah =
+                (curKvah != null && prevKvah != null && curKvah >= prevKvah)
+                ? round2(curKvah - prevKvah)
+                : r.kvah;
+            if ((wantKwh - r.kwh).abs() > 0.01 ||
+                (wantKvah - r.kvah).abs() > 0.01) {
+              fixed.add(
+                EnergyLogModel.create(
+                  id: r.id,
+                  meterName: r.meterName,
+                  kwh: wantKwh,
+                  kvah: wantKvah,
+                  currentKwh: curKwh,
+                  currentKvah: curKvah,
+                  rkvarhLag: r.rkvarhLag,
+                  rkvarhLead: r.rkvarhLead,
+                  powerFactor: r.powerFactor,
+                  mdRecorded: r.mdRecorded,
+                  contractDemand: r.contractDemand,
+                  loggedAt: r.loggedAt,
+                  isSynced: r.isSynced,
+                  multiplyingFactor: r.multiplyingFactor,
+                ),
+              );
+            }
+          }
+          // Meter-rollover (a newer lower reading) is a new baseline — the
+          // consumed value the client recorded is kept as-is.
+          prevKwh = curKwh;
+          prevKvah = curKvah ?? prevKvah;
+        }
+      }
+    }
+
+    if (fixed.isEmpty) return raw;
+    try {
+      _ensureOnline();
+      await _remote.pushLogs(fixed);
+    } catch (_) {
+      // The corrected values are still used in memory below; the rows are
+      // healed on the next successful run.
+    }
+    final byId = {for (final m in raw) m.id: m};
+    for (final m in fixed) {
+      byId[m.id] = m;
+    }
+    return byId.values.toList();
+  }
+
+  static double round2(double v) => (v * 100).roundToDouble() / 100;
 
   /// Get the latest reading for a meter (for form auto-fill).
   Future<EnergyLogEntity?> getLatestReading(String meterName) async {
@@ -221,9 +313,7 @@ class EnergyRepository {
       throw const RemoteStorageException('Supabase not initialized');
     }
     if (SupabaseClientManager.client.auth.currentUser == null) {
-      throw const RemoteStorageException(
-        'You must be signed in to save data.',
-      );
+      throw const RemoteStorageException('You must be signed in to save data.');
     }
   }
 

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
@@ -16,7 +16,7 @@ class NotificationService {
 
   Future<void> initialize() async {
     if (_initialized) return;
-    if (kIsWeb) {
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows) {
       _initialized = true;
       return;
     }
@@ -61,7 +61,7 @@ class NotificationService {
     required String body,
   }) async {
     if (_initialized) await initialize();
-    if (kIsWeb) return;
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows) return;
 
     const androidDetails = AndroidNotificationDetails(
       _channelId,

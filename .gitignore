@@ -46,3 +46,7 @@ app.*.map.json
 
 # Environment variables
 .env
+
+# Local dev artifacts
+ems_meta.db
+/release/ems.exe

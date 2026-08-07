@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/constants/app_constants.dart';
@@ -130,10 +130,7 @@ class _DashboardContent extends StatefulWidget {
   final List<dynamic> logs;
   final MonthFilterController monthFilter;
 
-  const _DashboardContent({
-    required this.logs,
-    required this.monthFilter,
-  });
+  const _DashboardContent({required this.logs, required this.monthFilter});
 
   @override
   State<_DashboardContent> createState() => _DashboardContentState();
@@ -203,9 +200,8 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   /// Logs belonging to the selected month (or current month by default).
-  List<EnergyLogEntity> get _selectedMonthLogs => _siteLogs
-      .where((l) => _selection.matches(l.loggedAt))
-      .toList();
+  List<EnergyLogEntity> get _selectedMonthLogs =>
+      _siteLogs.where((l) => _selection.matches(l.loggedAt)).toList();
 
   /// "July 2026 — " prefix on KPI cards when a non-current month is viewed.
   String get _kpiMonthLabel {
@@ -237,8 +233,10 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   double get _siteTotalConsumption {
-    return _selectedMonthLogs
-        .fold(0.0, (s, e) => s + e.kwh * e.multiplyingFactor);
+    return _selectedMonthLogs.fold(
+      0.0,
+      (s, e) => s + e.kwh * e.multiplyingFactor,
+    );
   }
 
   double get _siteMaxDemandPeak {
@@ -278,9 +276,15 @@ class _DashboardContentState extends State<_DashboardContent> {
     }
     final monthLogs = _selectedMonthLogs;
     if (monthLogs.isEmpty) return 0.0;
-    final total = monthLogs.fold(0.0, (s, l) => s + l.kwh * l.multiplyingFactor);
-    final days = DateTime(_selection.month!.year, _selection.month!.month + 1, 0)
-        .day;
+    final total = monthLogs.fold(
+      0.0,
+      (s, l) => s + l.kwh * l.multiplyingFactor,
+    );
+    final days = DateTime(
+      _selection.month!.year,
+      _selection.month!.month + 1,
+      0,
+    ).day;
     return (total / days * 100).roundToDouble() / 100;
   }
 
@@ -363,8 +367,8 @@ class _DashboardContentState extends State<_DashboardContent> {
           )
         : null;
     final opportunities = SavingOpportunityGenerator.generate(breakdown);
-    final contractOptimizer = SavingOpportunityGenerator
-        .generateContractDemandOptimizer(
+    final contractOptimizer =
+        SavingOpportunityGenerator.generateContractDemandOptimizer(
           logs: entityLogs,
           contractDemand: breakdown.contractDemand,
         );
@@ -403,14 +407,29 @@ class _DashboardContentState extends State<_DashboardContent> {
           ),
           const SizedBox(height: AppSpacing.lg),
           _buildAlertBanner(context),
-          const SizedBox(height: AppSpacing.lg),
-          AppSectionHeader(
-            title: 'Energy Overview',
-            subtitle: _kpiMonthLabel.isEmpty
-                ? 'Bill analysis and monitoring dashboard'
-                : '${_selection.label} — bill analysis & monitoring',
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: AppSectionHeader(
+                  title: 'Energy Overview',
+                  subtitle: _kpiMonthLabel.isEmpty
+                      ? 'Bill analysis and monitoring dashboard'
+                      : '${_selection.label} — bill analysis & monitoring',
+                ),
+              ),
+              Tooltip(
+                message: 'Refresh data',
+                child: IconButton.filledTonal(
+                  onPressed: () => context.read<EnergyBloc>().add(
+                    const LoadInitialDashboardData(),
+                  ),
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.lg),
 
           if (monthLogs.isEmpty) ...[
             AppCard(
@@ -493,8 +512,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     ? AppColors.danger
                     : AppColors.kpiPower,
                 decimals: 3,
-                description:
-                    _sitePowerFactor >= AppConstants.pfRebateThreshold
+                description: _sitePowerFactor >= AppConstants.pfRebateThreshold
                     ? 'Rebate earned'
                     : (_sitePowerFactor >= AppConstants.pfSurchargeThreshold
                           ? 'Near rebate'
@@ -567,26 +585,24 @@ class _DashboardContentState extends State<_DashboardContent> {
                 children: [
                   for (var i = 0; i < opportunities.length; i++) ...[
                     if (i > 0) const SizedBox(height: AppSpacing.lg),
-                    _SavingOpportunityCard(
-                      opportunity: opportunities[i],
-                    ),
+                    _SavingOpportunityCard(opportunity: opportunities[i]),
                   ],
                 ],
               )
             else
               Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < opportunities.length; i++) ...[
-                  if (i > 0) const SizedBox(width: AppSpacing.lg),
-                  Expanded(
-                    child: _SavingOpportunityCard(
-                      opportunity: opportunities[i],
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < opportunities.length; i++) ...[
+                    if (i > 0) const SizedBox(width: AppSpacing.lg),
+                    Expanded(
+                      child: _SavingOpportunityCard(
+                        opportunity: opportunities[i],
+                      ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
+              ),
             const SizedBox(height: AppSpacing.xxl),
           ],
 
@@ -608,10 +624,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 240,
-                        child: DashboardChart(
-                          logs: monthLogs,
-                          selectedMonth: _selection.month,
-                        ),
+                        child: DashboardChart(logs: entityLogs),
                       ),
                     ],
                   ),
@@ -632,10 +645,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 240,
-                        child: MonthlyConsumptionChart(
-                          logs: monthLogs,
-                          selectedMonth: _selection.month,
-                        ),
+                        child: MonthlyConsumptionChart(logs: entityLogs),
                       ),
                     ],
                   ),
@@ -644,63 +654,57 @@ class _DashboardContentState extends State<_DashboardContent> {
             )
           else
             Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 3,
-                child: AppCard(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Demand Trend (kVA)',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: AppCard(
+                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Demand Trend (kVA)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 280,
-                        child: DashboardChart(
-                          logs: monthLogs,
-                          selectedMonth: _selection.month,
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          height: 280,
+                          child: DashboardChart(logs: entityLogs),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(
-                flex: 2,
-                child: AppCard(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Monthly Consumption',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  flex: 2,
+                  child: AppCard(
+                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Monthly Consumption',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 280,
-                        child: MonthlyConsumptionChart(
-                          logs: monthLogs,
-                          selectedMonth: _selection.month,
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          height: 280,
+                          child: MonthlyConsumptionChart(logs: entityLogs),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           const SizedBox(height: AppSpacing.xxl),
 
           if (MediaQuery.of(context).size.width < 600)
@@ -713,13 +717,13 @@ class _DashboardContentState extends State<_DashboardContent> {
             )
           else
             Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _buildComparisonCard(comparison)),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(child: _buildForecastCard(forecast)),
-            ],
-          ),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildComparisonCard(comparison)),
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(child: _buildForecastCard(forecast)),
+              ],
+            ),
           const SizedBox(height: AppSpacing.xxl),
 
           if (insights.isNotEmpty) ...[
@@ -753,8 +757,8 @@ class _DashboardContentState extends State<_DashboardContent> {
         const spacing = 12.0;
         final width = MediaQuery.of(context).size.width;
         final columns = width < 600 ? 2 : 4;
-        final cardWidth = (constraints.maxWidth - spacing * (columns - 1)) /
-            columns;
+        final cardWidth =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
         return GridView.count(
           crossAxisCount: columns,
           shrinkWrap: true,
@@ -853,8 +857,8 @@ class _DashboardContentState extends State<_DashboardContent> {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: events[i].mdRecorded *
-                                  events[i].multiplyingFactor >=
+                      color:
+                          events[i].mdRecorded * events[i].multiplyingFactor >=
                               events[i].contractDemand
                           ? AppColors.danger
                           : AppColors.warning,
@@ -886,7 +890,8 @@ class _DashboardContentState extends State<_DashboardContent> {
       ..sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
     return sorted
         .where(
-          (l) => l.mdRecorded * l.multiplyingFactor >=
+          (l) =>
+              l.mdRecorded * l.multiplyingFactor >=
               l.contractDemand * AppConstants.mdWarningRatio,
         )
         .take(5)
@@ -1715,4 +1720,3 @@ class _RecommendationCard extends StatelessWidget {
     );
   }
 }
-
