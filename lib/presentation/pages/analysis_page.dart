@@ -638,7 +638,9 @@ class _AnalysisContentState extends State<_AnalysisContent> {
         _ChartSeries(
           label: names[i],
           color: color,
-          values: recent.map((e) => e.kwh).toList(),
+          values: recent
+              .map((e) => e.kwh * e.multiplyingFactor)
+              .toList(),
         ),
       );
       mdSeries.add(

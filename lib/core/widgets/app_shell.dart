@@ -102,6 +102,15 @@ class _AppShellState extends State<AppShell> {
               ),
             const Divider(),
             ListTile(
+              leading: const Icon(Icons.settings_outlined),
+              title: const Text('Settings'),
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onItemSelected(5);
+              },
+            ),
+            const Divider(),
+            ListTile(
               leading: const Icon(Icons.logout_rounded),
               title: const Text('Logout'),
               onTap: () {
@@ -129,6 +138,8 @@ class _AppShellState extends State<AppShell> {
         return Icons.description_rounded;
       case 4:
         return Icons.speed_rounded;
+      case 5:
+        return Icons.settings_rounded;
       default:
         return Icons.circle;
     }
@@ -146,6 +157,8 @@ class _AppShellState extends State<AppShell> {
         return 'Reports';
       case 4:
         return 'Meter Management';
+      case 5:
+        return 'Settings';
       default:
         return '';
     }

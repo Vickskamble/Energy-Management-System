@@ -52,7 +52,7 @@ void main() async {
     );
   };
 
-  await dotenv.load(fileName: '.env');
+  await dotenv.load(fileName: '.env', isOptional: true);
 
   try {
     await SupabaseClientManager.initialize();
