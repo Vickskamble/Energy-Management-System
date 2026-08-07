@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/utils/reading_reminder.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/month_filter_bar.dart';
 import '../../data/repositories/energy_repository.dart';
 import '../auth_bloc/auth_bloc.dart';
 import '../bloc/energy_bloc.dart';
@@ -25,6 +26,15 @@ class MainNavigationHub extends StatefulWidget {
 
 class _MainNavigationHubState extends State<MainNavigationHub> {
   int _selectedIndex = 0;
+
+  /// Shared month selection — one filter for Dashboard, Analysis & Reports.
+  final MonthFilterController _monthFilter = MonthFilterController();
+
+  @override
+  void dispose() {
+    _monthFilter.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -95,10 +105,13 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         index: _selectedIndex,
         children: [
           // Dashboard auto-refreshes only while its tab is visible.
-          DashboardPage(isActive: _selectedIndex == 0),
+          DashboardPage(
+            isActive: _selectedIndex == 0,
+            monthFilter: _monthFilter,
+          ),
           const ReadingEntryPage(),
-          const AnalysisPage(),
-          const ReportsPage(),
+          AnalysisPage(monthFilter: _monthFilter),
+          ReportsPage(monthFilter: _monthFilter),
           const MeterManagementPage(),
         ],
       ),

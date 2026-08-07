@@ -6,13 +6,211 @@ import '../../domain/entities/energy_log_entity.dart';
 
 class DashboardChart extends StatelessWidget {
   final List<EnergyLogEntity> logs;
-  const DashboardChart({super.key, required this.logs});
+
+  /// When set, shows per-day demand for that month instead of the yearly
+  /// monthly-average view.
+  final DateTime? selectedMonth;
+
+  const DashboardChart({
+    super.key,
+    required this.logs,
+    this.selectedMonth,
+  });
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final monthlySum = <int, double>{};
     final monthlyCount = <int, int>{};
+
+    if (selectedMonth != null) {
+      final daySum = <int, double>{};
+      final dayCount = <int, int>{};
+      for (final log in logs) {
+        if (log.loggedAt.year == selectedMonth!.year &&
+            log.loggedAt.month == selectedMonth!.month) {
+          daySum.update(
+            log.loggedAt.day,
+            (v) => v + log.mdRecorded,
+            ifAbsent: () => log.mdRecorded,
+          );
+          dayCount.update(log.loggedAt.day, (v) => v + 1, ifAbsent: () => 1);
+        }
+      }
+      if (daySum.isEmpty) {
+        return const SizedBox(
+          height: 220,
+          child: Center(
+            child: Text(
+              'No demand data for this month',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+        );
+      }
+      final daysInMonth = DateTime(
+        selectedMonth!.year,
+        selectedMonth!.month + 1,
+        0,
+      ).day;
+      final spots = <FlSpot>[
+        for (var d = 1; d <= daysInMonth; d++)
+          FlSpot(
+            d.toDouble(),
+            daySum.containsKey(d)
+                ? (daySum[d]! / dayCount[d]! * 100).roundToDouble() / 100
+                : 0,
+          ),
+      ];
+      final maxAvg = spots.fold(0.0, (m, s) => s.y > m ? s.y : m);
+      final contractDemand = AppConstants.defaultContractDemandKva;
+      final mdMaxY = (maxAvg > contractDemand ? maxAvg : contractDemand) * 1.2;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _legendItem(AppColors.warning, 'Avg Demand (kVA)'),
+              const SizedBox(width: 16),
+              _dashedLegendItem(AppColors.danger, 'Contract Demand'),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 240,
+            child: LineChart(
+              LineChartData(
+                minX: 1,
+                maxX: daysInMonth.toDouble(),
+                minY: 0,
+                maxY: mdMaxY,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: (mdMaxY / 4).ceilToDouble().clamp(
+                    1,
+                    double.infinity,
+                  ),
+                  getDrawingHorizontalLine: (value) =>
+                      FlLine(color: AppColors.borderLight, strokeWidth: 1),
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    axisNameWidget: _axisLabel('kVA', vertical: true),
+                    axisNameSize: 26,
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 44,
+                      getTitlesWidget: (value, meta) {
+                        if (value == meta.max) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Text(
+                            '${value.toInt()}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textSecondary,
+                              fontFamily: 'JetBrains Mono',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    axisNameWidget: _axisLabel('Day'),
+                    axisNameSize: 22,
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 28,
+                      interval: 5,
+                      getTitlesWidget: (value, meta) {
+                        final day = value.toInt();
+                        if (day < 1 || day > daysInMonth) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            '$day',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    curveSmoothness: 0.25,
+                    color: AppColors.warning,
+                    barWidth: 2.5,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: AppColors.warning.withValues(alpha: 0.08),
+                    ),
+                  ),
+                ],
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    HorizontalLine(
+                      y: contractDemand,
+                      color: AppColors.danger,
+                      strokeWidth: 1.5,
+                      dashArray: [6, 4],
+                      label: HorizontalLineLabel(
+                        show: true,
+                        alignment: Alignment.topRight,
+                        style: TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        labelResolver: (_) =>
+                            'Contract Demand (${contractDemand.toInt()} kVA)',
+                      ),
+                    ),
+                  ],
+                ),
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (touchedSpots) =>
+                        touchedSpots.map((spot) {
+                      return LineTooltipItem(
+                        'Day ${spot.x.toInt()}: '
+                        'Avg Demand ${spot.y.toStringAsFixed(1)} kVA',
+                        TextStyle(
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
     for (final log in logs) {
       if (log.loggedAt.year == now.year) {

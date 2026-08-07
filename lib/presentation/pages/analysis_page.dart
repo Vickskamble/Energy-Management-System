@@ -12,6 +12,7 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_section.dart';
 import '../../core/widgets/app_states.dart';
+import '../../core/widgets/month_filter_bar.dart';
 import '../../data/models/energy_log_model.dart';
 import '../../data/repositories/energy_repository.dart';
 import '../../data/repositories/meter_repository.dart';
@@ -21,7 +22,9 @@ import '../bloc/energy_event.dart';
 import '../bloc/energy_state.dart';
 
 class AnalysisPage extends StatelessWidget {
-  const AnalysisPage({super.key});
+  final MonthFilterController monthFilter;
+
+  const AnalysisPage({super.key, required this.monthFilter});
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +34,10 @@ class AnalysisPage extends StatelessWidget {
           EnergyInitial() || EnergyLoading() => const AppLoadingIndicator(
             message: 'Loading data...',
           ),
-          EnergySuccess(:final logs) => _AnalysisContent(logs: logs),
+          EnergySuccess(:final logs) => _AnalysisContent(
+            logs: logs,
+            monthFilter: monthFilter,
+          ),
           EnergyValidationError _ => Center(child: Text(state.message)),
           EnergyOperationFailure _ => Center(child: Text(state.message)),
         };
@@ -42,7 +48,8 @@ class AnalysisPage extends StatelessWidget {
 
 class _AnalysisContent extends StatefulWidget {
   final List<dynamic> logs;
-  const _AnalysisContent({required this.logs});
+  final MonthFilterController monthFilter;
+  const _AnalysisContent({required this.logs, required this.monthFilter});
 
   @override
   State<_AnalysisContent> createState() => _AnalysisContentState();
@@ -52,15 +59,39 @@ class _AnalysisContentState extends State<_AnalysisContent> {
   static const int _pageSize = 25;
   late int _visibleCount;
   String? _selectedMeter;
-  DateTime? _selectedMonth;
   String? _selectedSite;
   Map<String, String> _meterSites = {};
+
+  MonthFilterValue get _selection => widget.monthFilter.value;
 
   @override
   void initState() {
     super.initState();
     _visibleCount = _pageSize;
     _loadMeterSites();
+    widget.monthFilter.addListener(_onFilterChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnalysisContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.monthFilter != widget.monthFilter) {
+      oldWidget.monthFilter.removeListener(_onFilterChanged);
+      widget.monthFilter.addListener(_onFilterChanged);
+    }
+    if (oldWidget.logs.length != widget.logs.length) {
+      _visibleCount = _pageSize;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.monthFilter.removeListener(_onFilterChanged);
+    super.dispose();
+  }
+
+  void _onFilterChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadMeterSites() async {
@@ -74,14 +105,6 @@ class _AnalysisContentState extends State<_AnalysisContent> {
       });
     } catch (_) {
       // Site filter is best-effort — logs still render without it.
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _AnalysisContent oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.logs.length != widget.logs.length) {
-      _visibleCount = _pageSize;
     }
   }
 
@@ -109,13 +132,17 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     return names;
   }
 
-  /// Distinct (year, month) keys present in the data, newest first.
+  /// Distinct (year, month) keys present in the data, newest first — drives
+  /// the shared month filter bar.
   List<DateTime> get _monthKeys {
-    final keys = <DateTime>{};
+    final keys = <String, DateTime>{};
     for (final e in _siteEntities) {
-      keys.add(DateTime(e.loggedAt.year, e.loggedAt.month));
+      keys['${e.loggedAt.year}-${e.loggedAt.month}'] = DateTime(
+        e.loggedAt.year,
+        e.loggedAt.month,
+      );
     }
-    final list = keys.toList()..sort((a, b) => b.compareTo(a));
+    final list = keys.values.toList()..sort((a, b) => b.compareTo(a));
     return list;
   }
 
@@ -123,13 +150,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     final meterFiltered = _selectedMeter == null
         ? _siteEntities
         : _siteEntities.where((e) => e.meterName == _selectedMeter).toList();
-    if (_selectedMonth == null) return meterFiltered;
     return meterFiltered
-        .where(
-          (e) =>
-              e.loggedAt.year == _selectedMonth!.year &&
-              e.loggedAt.month == _selectedMonth!.month,
-        )
+        .where((e) => _selection.matches(e.loggedAt))
         .toList();
   }
 
@@ -276,26 +298,9 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     return Row(
       children: [
         Expanded(
-          child: DropdownButtonFormField<DateTime?>(
-            key: ValueKey(_selectedMonth),
-            initialValue: _selectedMonth,
-            decoration: const InputDecoration(
-              labelText: 'Month',
-              isDense: true,
-              prefixIcon: Icon(Icons.calendar_month, size: 20),
-            ),
-            items: [
-              const DropdownMenuItem<DateTime?>(
-                value: null,
-                child: Text('All Time'),
-              ),
-              for (final key in _monthKeys)
-                DropdownMenuItem<DateTime?>(
-                  value: key,
-                  child: Text(DateFormat('MMM yyyy').format(key)),
-                ),
-            ],
-            onChanged: (v) => setState(() => _selectedMonth = v),
+          child: MonthFilterBar(
+            controller: widget.monthFilter,
+            availableMonths: _monthKeys,
           ),
         ),
         const SizedBox(width: 12),
@@ -308,7 +313,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                 logs: _filtered,
                 title: 'Analysis Report',
                 subtitle:
-                    '${_filtered.length} reading(s) — ${_selectedMonth != null ? DateFormat('MMM yyyy').format(_selectedMonth!) : 'All Time'}',
+                    '${_filtered.length} reading(s) — ${_selection.label}',
               );
             } catch (e) {
               AppLogger.e('Analysis PDF export failed', e);
@@ -495,14 +500,12 @@ class _AnalysisContentState extends State<_AnalysisContent> {
 
   // ── Month-over-month comparison (Issue 5 / 4F) ────────────────────────
   Widget _buildMonthComparison() {
-    if (_selectedMonth == null || _filtered.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final prevStart = DateTime(
-      _selectedMonth!.year,
-      _selectedMonth!.month - 1,
-      1,
-    );
+    if (_filtered.isEmpty) return const SizedBox.shrink();
+    final now = DateTime.now();
+    final refMonth = _selection.isCurrent
+        ? DateTime(now.year, now.month)
+        : _selection.month!;
+    final prevStart = DateTime(refMonth.year, refMonth.month - 1, 1);
     final previous = _entities
         .where(
           (e) =>
@@ -530,7 +533,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
           ),
           const SizedBox(height: 4),
           Text(
-            '${DateFormat('MMM yyyy').format(_selectedMonth!)} vs '
+            '${DateFormat('MMM yyyy').format(refMonth)} vs '
             '${DateFormat('MMM yyyy').format(prevStart)}',
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),

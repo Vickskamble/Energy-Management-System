@@ -17,6 +17,7 @@ import '../../core/widgets/app_input.dart';
 import '../../core/widgets/app_section.dart';
 import '../../core/widgets/app_states.dart';
 import '../../core/widgets/app_table.dart';
+import '../../core/widgets/month_filter_bar.dart';
 import '../../core/calculation/bill_breakdown.dart';
 import '../../core/calculation/bill_calculator.dart';
 import '../../data/models/energy_log_model.dart';
@@ -29,7 +30,9 @@ import '../bloc/energy_event.dart';
 import '../bloc/energy_state.dart';
 
 class ReportsPage extends StatelessWidget {
-  const ReportsPage({super.key});
+  final MonthFilterController monthFilter;
+
+  const ReportsPage({super.key, required this.monthFilter});
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +55,7 @@ class ReportsPage extends StatelessWidget {
               activeConsumptionToday: activeConsumptionToday,
               currentPowerFactor: currentPowerFactor,
               maxDemandPeak: maxDemandPeak,
+              monthFilter: monthFilter,
             ),
           EnergyValidationError _ => Center(child: Text(state.message)),
           EnergyOperationFailure _ => Center(child: Text(state.message)),
@@ -61,21 +65,13 @@ class ReportsPage extends StatelessWidget {
   }
 }
 
-enum _ReportPeriod {
-  thisMonth('This Month'),
-  lastMonth('Last Month'),
-  allTime('All Time');
-
-  const _ReportPeriod(this.label);
-  final String label;
-}
-
 class _ReportsContent extends StatefulWidget {
   final List<dynamic> logs;
   final double estimatedBill;
   final double activeConsumptionToday;
   final double currentPowerFactor;
   final double maxDemandPeak;
+  final MonthFilterController monthFilter;
 
   const _ReportsContent({
     required this.logs,
@@ -83,6 +79,7 @@ class _ReportsContent extends StatefulWidget {
     required this.activeConsumptionToday,
     required this.currentPowerFactor,
     required this.maxDemandPeak,
+    required this.monthFilter,
   });
 
   @override
@@ -90,11 +87,12 @@ class _ReportsContent extends StatefulWidget {
 }
 
 class _ReportsContentState extends State<_ReportsContent> {
-  _ReportPeriod _period = _ReportPeriod.allTime;
   String? _meter;
   String? _site;
   Map<String, double> _actualBills = {};
   Map<String, String> _meterSites = {};
+
+  MonthFilterValue get _selection => widget.monthFilter.value;
 
   @override
   void initState() {
@@ -103,6 +101,7 @@ class _ReportsContentState extends State<_ReportsContent> {
       if (mounted) setState(() => _actualBills = bills);
     });
     _loadMeterSites();
+    widget.monthFilter.addListener(_onFilterChanged);
   }
 
   Future<void> _loadMeterSites() async {
@@ -115,6 +114,23 @@ class _ReportsContentState extends State<_ReportsContent> {
     } catch (_) {
       // Best-effort — reports still render without site filter.
     }
+  }
+
+  void _onFilterChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Distinct months present in the data — drives the shared filter bar.
+  List<DateTime> get _monthKeys {
+    final keys = <String, DateTime>{};
+    for (final e in _allEntities) {
+      keys['${e.loggedAt.year}-${e.loggedAt.month}'] = DateTime(
+        e.loggedAt.year,
+        e.loggedAt.month,
+      );
+    }
+    final list = keys.values.toList()..sort((a, b) => b.compareTo(a));
+    return list;
   }
 
   List<String> get _siteNames {
@@ -140,32 +156,13 @@ class _ReportsContentState extends State<_ReportsContent> {
   List<String> get _meterNames =>
       _entities.map((e) => e.meterName).toSet().toList()..sort();
 
-  /// Logs filtered by the selected meter + period (Issue 6).
+  /// Logs filtered by the selected meter + month (Issue 6).
   List<EnergyLogEntity> get _visibleLogs {
     var result = _entities;
     if (_meter != null) {
       result = result.where((e) => e.meterName == _meter).toList();
     }
-    final now = DateTime.now();
-    switch (_period) {
-      case _ReportPeriod.thisMonth:
-        return result
-            .where(
-              (e) =>
-                  e.loggedAt.year == now.year && e.loggedAt.month == now.month,
-            )
-            .toList();
-      case _ReportPeriod.lastMonth:
-        final prev = DateTime(now.year, now.month - 1, 1);
-        return result
-            .where(
-              (e) =>
-                  e.loggedAt.year == prev.year && e.loggedAt.month == prev.month,
-            )
-            .toList();
-      case _ReportPeriod.allTime:
-        return result;
-    }
+    return result.where((e) => _selection.matches(e.loggedAt)).toList();
   }
 
   Future<void> _pickAndImportExcel(BuildContext context) async {
@@ -285,7 +282,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                       title: 'Energy Management Report',
                       subtitle:
                           '${entities.length} reading(s) — '
-                          '${_period.label}${_meter != null ? ', $_meter' : ''}',
+                          '${_selection.label}${_meter != null ? ', $_meter' : ''}',
                     );
                   } catch (e) {
                     AppLogger.e('PDF export failed', e);
@@ -364,18 +361,10 @@ class _ReportsContentState extends State<_ReportsContent> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: DropdownButtonFormField<_ReportPeriod>(
-                initialValue: _period,
-                decoration: const InputDecoration(
-                  labelText: 'Period',
-                  isDense: true,
-                  prefixIcon: Icon(Icons.calendar_month, size: 20),
-                ),
-                items: [
-                  for (final p in _ReportPeriod.values)
-                    DropdownMenuItem(value: p, child: Text(p.label)),
-                ],
-                onChanged: (v) => setState(() => _period = v ?? _ReportPeriod.allTime),
+              child: MonthFilterBar(
+                controller: widget.monthFilter,
+                availableMonths: _monthKeys,
+                includeAllTime: true,
               ),
             ),
           ],

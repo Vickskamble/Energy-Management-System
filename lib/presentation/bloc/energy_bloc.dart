@@ -82,16 +82,18 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
 
       _validateConsumedValues(consumedKwh, consumedKvah);
 
-      // ── Step 3: Duplicate guard — same meter at nearly the same time ───
+      // ── Step 3: Duplicate guard — one reading per meter per day ─────────
       final duplicate = await _repository.findDuplicateReading(
         event.meterName.trim(),
         event.loggedAt,
       );
       if (duplicate != null) {
+        final d = duplicate.loggedAt;
         throw ValidationException(
-          'A reading for "${event.meterName.trim()}" already exists at '
-          '${event.loggedAt.toString().substring(0, 16)}. '
-          'Use a different time or edit the existing entry.',
+          'A reading for "${event.meterName.trim()}" already exists on '
+          '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}. '
+          'Only one entry per date is allowed — edit the existing entry '
+          'instead of adding a duplicate.',
         );
       }
 
