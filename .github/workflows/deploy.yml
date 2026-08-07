@@ -197,10 +197,6 @@ jobs:
             build_cmd: flutter build macos --release
             artifact_name: macos
             artifact_path: build/macos/Build/Products/Release/
-          - os: ubuntu-latest
-            build_cmd: flutter build linux --release
-            artifact_name: linux
-            artifact_path: build/linux/bundle/
     steps:
       - uses: actions/checkout@v4
 
@@ -217,12 +213,6 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
-
-      - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libblkid-dev
 
       - name: Build
         run: ${{ matrix.build_cmd }}
