@@ -192,7 +192,7 @@ jobs:
           - os: windows-latest
             build_cmd: flutter build windows --release
             artifact_name: windows
-            artifact_path: build/windows/runner/Release/
+            artifact_path: build/windows/x64/runner/Release/
           - os: macos-latest
             build_cmd: flutter build macos --release
             artifact_name: macos
