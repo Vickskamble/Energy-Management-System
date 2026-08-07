@@ -48,6 +48,29 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     super.initState();
     _loadMeters();
     context.read<MeterRepository>().addListener(_loadMeters);
+    // Live consumption (difference) preview as the user types.
+    _currentKwhCtrl.addListener(_onValuesChanged);
+    _previousKwhCtrl.addListener(_onValuesChanged);
+    _currentKvahCtrl.addListener(_onValuesChanged);
+    _previousKvahCtrl.addListener(_onValuesChanged);
+  }
+
+  void _onValuesChanged() {
+    if (mounted) setState(() {});
+  }
+
+  double? get _diffKwh {
+    final cur = double.tryParse(_currentKwhCtrl.text.trim());
+    final prev = double.tryParse(_previousKwhCtrl.text.trim());
+    if (cur == null || prev == null) return null;
+    return cur - prev;
+  }
+
+  double? get _diffKvah {
+    final cur = double.tryParse(_currentKvahCtrl.text.trim());
+    final prev = double.tryParse(_previousKvahCtrl.text.trim());
+    if (cur == null || prev == null) return null;
+    return cur - prev;
   }
 
   @override
@@ -88,10 +111,15 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     setState(() => _fetchingPrevious = true);
     try {
       final energyRepo = context.read<EnergyRepository>();
-      final latest = await energyRepo.getLatestReading(meterName);
-      if (latest != null && mounted) {
-        _previousKwhCtrl.text = latest.kwh.toStringAsFixed(2);
-        _previousKvahCtrl.text = latest.kvah.toStringAsFixed(2);
+      // The "previous" reading is the one recorded BEFORE the selected date —
+      // not the latest overall entry (wrong when back-filling older dates).
+      final previous = await energyRepo.getPreviousReading(
+        meterName,
+        _loggedAt,
+      );
+      if (previous != null && mounted) {
+        _previousKwhCtrl.text = previous.kwh.toStringAsFixed(2);
+        _previousKvahCtrl.text = previous.kvah.toStringAsFixed(2);
       }
     } catch (_) {
     } finally {
@@ -121,6 +149,8 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
         time.minute,
       );
     });
+    // Date changed → the correct "previous" reading changes too.
+    _fetchPreviousReading(_selectedMeter);
   }
 
   void _clearForm() {
@@ -404,6 +434,55 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                 ),
                               ],
                             ),
+                            if (_diffKwh != null || _diffKvah != null) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.06,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.2,
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.compare_arrows_rounded,
+                                      size: 18,
+                                      color: AppColors.primary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Consumption (Current − Previous)',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${(_diffKwh ?? 0).toStringAsFixed(2)} kWh · '
+                                      '${(_diffKvah ?? 0).toStringAsFixed(2)} kVAh',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: (_diffKwh ?? 0) < 0 ||
+                                                (_diffKvah ?? 0) < 0
+                                            ? AppColors.danger
+                                            : AppColors.success,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

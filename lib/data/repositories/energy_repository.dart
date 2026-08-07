@@ -13,7 +13,7 @@ class EnergyRepository {
   EnergyRepository({EnergyLogRemoteDatasource? remote})
     : _remote = remote ?? EnergyLogRemoteDatasource();
 
-  static const int _defaultFetchLimit = 500;
+  static const int _defaultFetchLimit = 2000;
 
   /// Get all logs from the cloud (most recent first).
   Future<List<EnergyLogEntity>> getAllLogs({int? limit}) async {
@@ -40,14 +40,19 @@ class EnergyRepository {
     await _remote.deleteLog(id);
   }
 
-  /// Check for a duplicate reading (same meter, near-identical time).
+  /// Check for a duplicate reading on the SAME calendar date (same meter).
+  /// One entry per meter per day — the previous reading for a day is the
+  /// reading recorded on an earlier day, so a second entry on the same date
+  /// would corrupt the consumption chain.
   Future<EnergyLogEntity?> findDuplicateReading(
     String meterName,
     DateTime loggedAt,
   ) async {
+    final dayStart = DateTime(loggedAt.year, loggedAt.month, loggedAt.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
     final models = await _remote.fetchLogs(
-      from: loggedAt.subtract(const Duration(minutes: 2)),
-      to: loggedAt.add(const Duration(minutes: 2)),
+      from: dayStart,
+      to: dayEnd,
       meterName: meterName,
       limit: 1,
     );
@@ -143,6 +148,25 @@ class EnergyRepository {
   /// Get the latest reading for a meter (for form auto-fill).
   Future<EnergyLogEntity?> getLatestReading(String meterName) async {
     final models = await _remote.fetchLogs(meterName: meterName, limit: 1);
+    if (models.isEmpty) return null;
+    return models.first.toEntity();
+  }
+
+  /// Get the most recent reading for a meter STRICTLY BEFORE [before].
+  ///
+  /// The entry form uses this as the true "previous" reading for the date
+  /// being entered — the latest overall reading is wrong when back-filling an
+  /// older date (its previous reading is whatever was recorded before that
+  /// date, not the newest entry).
+  Future<EnergyLogEntity?> getPreviousReading(
+    String meterName,
+    DateTime before,
+  ) async {
+    final models = await _remote.fetchLogs(
+      to: before.subtract(const Duration(seconds: 1)),
+      meterName: meterName,
+      limit: 1,
+    );
     if (models.isEmpty) return null;
     return models.first.toEntity();
   }

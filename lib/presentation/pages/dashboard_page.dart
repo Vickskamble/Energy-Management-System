@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/constants/app_constants.dart';
@@ -10,6 +10,7 @@ import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_kpi_card.dart';
 import '../../core/widgets/app_section.dart';
 import '../../core/widgets/app_states.dart';
+import '../../core/widgets/month_filter_bar.dart';
 import '../../core/calculation/bill_breakdown.dart';
 import '../../core/calculation/bill_calculator.dart';
 import '../../core/calculation/bill_forecast.dart';
@@ -28,7 +29,14 @@ class DashboardPage extends StatefulWidget {
   /// Only refresh automatically while this tab is visible.
   final bool isActive;
 
-  const DashboardPage({super.key, this.isActive = true});
+  /// Shared month filter â€” Dashboard, Analysis & Reports stay in sync.
+  final MonthFilterController monthFilter;
+
+  const DashboardPage({
+    super.key,
+    this.isActive = true,
+    required this.monthFilter,
+  });
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -95,7 +103,10 @@ class _DashboardPageState extends State<DashboardPage> {
             EnergyInitial() || EnergyLoading() => const AppLoadingIndicator(
               message: 'Loading dashboard...',
             ),
-            EnergySuccess(:final logs) => _DashboardContent(logs: logs),
+            EnergySuccess(:final logs) => _DashboardContent(
+              logs: logs,
+              monthFilter: widget.monthFilter,
+            ),
             EnergyValidationError e => AppErrorState(
               message: e.message,
               onRetry: () => context.read<EnergyBloc>().add(
@@ -117,9 +128,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
 class _DashboardContent extends StatefulWidget {
   final List<dynamic> logs;
+  final MonthFilterController monthFilter;
 
   const _DashboardContent({
     required this.logs,
+    required this.monthFilter,
   });
 
   @override
@@ -130,10 +143,32 @@ class _DashboardContentState extends State<_DashboardContent> {
   String? _site;
   Map<String, String> _meterSites = {};
 
+  MonthFilterValue get _selection => widget.monthFilter.value;
+
   @override
   void initState() {
     super.initState();
     _loadMeterSites();
+    widget.monthFilter.addListener(_onFilterChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _DashboardContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.monthFilter != widget.monthFilter) {
+      oldWidget.monthFilter.removeListener(_onFilterChanged);
+      widget.monthFilter.addListener(_onFilterChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.monthFilter.removeListener(_onFilterChanged);
+    super.dispose();
+  }
+
+  void _onFilterChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadMeterSites() async {
@@ -144,7 +179,7 @@ class _DashboardContentState extends State<_DashboardContent> {
         _meterSites = {for (final m in meters) m.name: m.site};
       });
     } catch (_) {
-      // Best-effort — dashboard still renders without site filter.
+      // Best-effort â€” dashboard still renders without site filter.
     }
   }
 
@@ -167,80 +202,75 @@ class _DashboardContentState extends State<_DashboardContent> {
         .toList();
   }
 
-  List<EnergyLogEntity> get _currentMonthLogs {
-    final now = DateTime.now();
-    return _siteLogs
-        .where(
-          (l) => l.loggedAt.year == now.year && l.loggedAt.month == now.month,
-        )
-        .toList();
-  }
+  /// Logs belonging to the selected month (or current month by default).
+  List<EnergyLogEntity> get _selectedMonthLogs => _siteLogs
+      .where((l) => _selection.matches(l.loggedAt))
+      .toList();
 
-  /// Month used for the monthly KPI cards: the current month when it has
-  /// readings, otherwise the most recent month with data (so cards never show
-  /// ₹0 while all-time sections show values).
-  List<EnergyLogEntity> get _kpiMonthLogs {
-    if (_currentMonthLogs.isNotEmpty) return _currentMonthLogs;
-    if (_siteLogs.isEmpty) return const [];
-    final byMonth = <String, List<EnergyLogEntity>>{};
-    for (final l in _siteLogs) {
-      final key = '${l.loggedAt.year}-${l.loggedAt.month}';
-      byMonth.putIfAbsent(key, () => []).add(l);
-    }
-    final keys = byMonth.keys.toList()..sort();
-    return byMonth[keys.last]!;
-  }
-
-  /// "July 2026 — " prefix on KPI cards when they show the fallback month
-  /// instead of the current one (empty current month).
+  /// "July 2026 â€” " prefix on KPI cards when a non-current month is viewed.
   String get _kpiMonthLabel {
-    if (_currentMonthLogs.isNotEmpty) return '';
-    if (_kpiMonthLogs.isEmpty) return '';
-    final l = _kpiMonthLogs.first.loggedAt;
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
-    ];
-    return '${months[l.month - 1]} ${l.year} — ';
+    if (_selection.isCurrent) return '';
+    return '${_selection.label} â€” ';
   }
 
-  /// Site-aware KPI values — full-data values when "All Sites".
+  /// Distinct months present in the (site-filtered) data, for the filter bar.
+  List<DateTime> get _availableMonths {
+    final keys = <String, DateTime>{};
+    for (final l in _siteLogs) {
+      keys['${l.loggedAt.year}-${l.loggedAt.month}'] = DateTime(
+        l.loggedAt.year,
+        l.loggedAt.month,
+      );
+    }
+    final list = keys.values.toList()..sort((a, b) => b.compareTo(a));
+    return list;
+  }
+
+  /// Site-aware KPI values â€” full-data values when "All Sites".
   double get _siteEstimatedBill {
     // Full estimated bill (energy + demand + charges + taxes), not just the
     // energy-charge figure stored per reading.
-    return BillCalculator.calculate(logs: _kpiMonthLogs).netBill;
+    return BillCalculator.calculate(logs: _selectedMonthLogs).netBill;
   }
 
   double get _siteTotalConsumption {
-    return _kpiMonthLogs.fold(0.0, (s, e) => s + e.kwh * e.multiplyingFactor);
+    return _selectedMonthLogs
+        .fold(0.0, (s, e) => s + e.kwh * e.multiplyingFactor);
   }
 
   double get _siteMaxDemandPeak {
-    return _kpiMonthLogs.fold(0.0, (s, e) => e.mdRecorded > s ? e.mdRecorded : s);
+    return _selectedMonthLogs.fold(0.0, (s, e) => e.mdRecorded > s ? e.mdRecorded : s);
   }
 
   double get _sitePowerFactor {
-    return BillCalculator.calculate(logs: _kpiMonthLogs).powerFactor;
+    return BillCalculator.calculate(logs: _selectedMonthLogs).powerFactor;
   }
 
-  /// Today's usage shown in meter units (kWh × MF). If no reading exists for
-  /// today, falls back to the latest reading so the card never shows ₹0.
+  /// Today's usage (current month) or the selected month's daily average.
   double get _todayUnits {
-    final now = DateTime.now();
-    final todays = _siteLogs
-        .where(
-          (l) =>
-              l.loggedAt.year == now.year &&
-              l.loggedAt.month == now.month &&
-              l.loggedAt.day == now.day,
-        )
-        .toList();
-    if (todays.isNotEmpty) {
-      return todays.fold(0.0, (s, l) => s + l.kwh * l.multiplyingFactor);
+    if (_selection.isCurrent) {
+      final now = DateTime.now();
+      final todays = _siteLogs
+          .where(
+            (l) =>
+                l.loggedAt.year == now.year &&
+                l.loggedAt.month == now.month &&
+                l.loggedAt.day == now.day,
+          )
+          .toList();
+      if (todays.isNotEmpty) {
+        return todays.fold(0.0, (s, l) => s + l.kwh * l.multiplyingFactor);
+      }
+      if (_siteLogs.isEmpty) return 0.0;
+      final last = _siteLogs.last;
+      return last.kwh * last.multiplyingFactor;
     }
-    if (_siteLogs.isEmpty) return 0.0;
-    final last = _siteLogs.last;
-    return last.kwh * last.multiplyingFactor;
+    final monthLogs = _selectedMonthLogs;
+    if (monthLogs.isEmpty) return 0.0;
+    final total = monthLogs.fold(0.0, (s, l) => s + l.kwh * l.multiplyingFactor);
+    final days = DateTime(_selection.month!.year, _selection.month!.month + 1, 0)
+        .day;
+    return (total / days * 100).roundToDouble() / 100;
   }
 
   Widget _buildSiteSelector() {
@@ -280,18 +310,14 @@ class _DashboardContentState extends State<_DashboardContent> {
   @override
   Widget build(BuildContext context) {
     final entityLogs = _siteLogs;
-    final breakdown = BillCalculator.calculate(logs: entityLogs);
+    final monthLogs = _selectedMonthLogs;
+    final breakdown = BillCalculator.calculate(logs: monthLogs);
     final kpis = BillCalculator.calculateKpis(breakdown);
     final now = DateTime.now();
-    final currentMonthLogs = entityLogs
-        .where(
-          (l) => l.loggedAt.year == now.year && l.loggedAt.month == now.month,
-        )
-        .toList();
-    // Use the most recent month with data when the current month is empty,
-    // so forecast & comparison never render blank.
-    final referenceLogs = currentMonthLogs.isEmpty ? _kpiMonthLogs : currentMonthLogs;
-    final refMonth = referenceLogs.isEmpty ? null : referenceLogs.first.loggedAt;
+    final isCurrentMonth = _selection.isCurrent;
+    final refMonth = isCurrentMonth
+        ? null
+        : DateTime(_selection.month!.year, _selection.month!.month);
     final previousMonth = refMonth == null
         ? DateTime(now.year, now.month - 1, 1)
         : DateTime(refMonth.year, refMonth.month - 1, 1);
@@ -302,24 +328,22 @@ class _DashboardContentState extends State<_DashboardContent> {
               l.loggedAt.month == previousMonth.month,
         )
         .toList();
-    final currentMonthBreakdown = referenceLogs.isEmpty
+    final currentMonthBreakdown = monthLogs.isEmpty
         ? null
-        : BillCalculator.calculate(logs: referenceLogs);
+        : BillCalculator.calculate(logs: monthLogs);
     final previousBreakdown = previousMonthLogs.isEmpty
         ? null
         : BillCalculator.calculate(logs: previousMonthLogs);
     final comparison = currentMonthBreakdown == null
         ? null
         : BillCalculator.compare(currentMonthBreakdown, previousBreakdown);
-    final forecastRef = refMonth == null
-        ? now
-        : (refMonth.year == now.year && refMonth.month == now.month)
-            ? now
-            : DateTime(refMonth.year, refMonth.month + 1, 0);
-    final forecast = BillForecastCalculator.calculate(
-      monthLogs: referenceLogs,
-      referenceDate: forecastRef,
-    );
+    // Forecast is meaningful only for the live (current) month.
+    final forecast = isCurrentMonth
+        ? BillForecastCalculator.calculate(
+            monthLogs: monthLogs,
+            referenceDate: now,
+          )
+        : null;
     final opportunities = SavingOpportunityGenerator.generate(breakdown);
     final contractOptimizer = SavingOpportunityGenerator
         .generateContractDemandOptimizer(
@@ -336,12 +360,12 @@ class _DashboardContentState extends State<_DashboardContent> {
       breakdown: breakdown,
       comparison: comparison,
       kpis: kpis,
-      logs: entityLogs,
+      logs: monthLogs,
     );
     final recommendations = RecommendationEngine.generate(
       breakdown: breakdown,
       comparison: null,
-      logs: entityLogs,
+      logs: monthLogs,
     );
 
     return RefreshIndicator(
@@ -353,27 +377,73 @@ class _DashboardContentState extends State<_DashboardContent> {
         children: [
           if (_siteNames.isNotEmpty) ...[
             _buildSiteSelector(),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.sm),
           ],
+          MonthFilterBar(
+            controller: widget.monthFilter,
+            availableMonths: _availableMonths,
+          ),
+          const SizedBox(height: AppSpacing.lg),
           _buildAlertBanner(context),
           const SizedBox(height: AppSpacing.lg),
           AppSectionHeader(
             title: 'Energy Overview',
-            subtitle: 'Bill analysis and monitoring dashboard',
+            subtitle: _kpiMonthLabel.isEmpty
+                ? 'Bill analysis and monitoring dashboard'
+                : '${_selection.label} â€” bill analysis & monitoring',
           ),
           const SizedBox(height: AppSpacing.lg),
+
+          if (monthLogs.isEmpty) ...[
+            AppCard(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const Icon(
+                        Icons.event_busy_rounded,
+                        size: 40,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        isCurrentMonth
+                            ? 'No readings yet this month'
+                            : 'No readings in ${_selection.label}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Select another month above or add readings in Reading Entry',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
 
           _kpiGrid(
             cards: [
               AppKpiCard(
                 title: 'Est. Monthly Bill',
                 value: _siteEstimatedBill,
-                suffix: '₹',
+                suffix: 'â‚¹',
                 icon: Icons.account_balance_wallet_rounded,
                 color: AppColors.kpiCost,
                 decimals: 0,
                 description:
-                    '${_kpiMonthLabel}Avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
+                    '${_kpiMonthLabel}Avg unit cost: â‚¹${breakdown.averageUnitCost.toStringAsFixed(2)}',
               ),
               AppKpiCard(
                 title: 'Total Consumption',
@@ -429,7 +499,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                           : AppColors.danger),
                 decimals: 0,
                 description: kpis.billHealthScore >= 80
-                    ? 'Good — all parameters optimized'
+                    ? 'Good â€” all parameters optimized'
                     : kpis.billHealthScore >= 60
                     ? 'Needs attention'
                     : 'Critical issues',
@@ -450,18 +520,20 @@ class _DashboardContentState extends State<_DashboardContent> {
                     : 'Improve load smoothing',
               ),
               AppKpiCard(
-                title: "Today's Usage",
+                title: _selection.isCurrent ? "Today's Usage" : 'Daily Avg',
                 value: _todayUnits,
                 suffix: 'units',
                 icon: Icons.today_rounded,
                 color: AppColors.kpiSavings,
-                description: 'Last reading — consumption in units (kWh × MF)',
+                description: _selection.isCurrent
+                    ? 'Last reading â€” consumption in units (kWh Ã— MF)'
+                    : '${_selection.label} average per day (kWh Ã— MF)',
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
 
-          _buildMdBreachCard(entityLogs),
+          _buildMdBreachCard(monthLogs),
           const SizedBox(height: AppSpacing.lg),
 
           _buildAlertsSection(context),
@@ -470,7 +542,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           if (opportunities.isNotEmpty) ...[
             AppSectionHeader(
               title: 'Bill Saving Opportunities',
-              subtitle: 'Direct monthly savings — priority order me',
+              subtitle: 'Direct monthly savings â€” priority order me',
             ),
             if (MediaQuery.of(context).size.width < 600)
               Column(
@@ -518,7 +590,10 @@ class _DashboardContentState extends State<_DashboardContent> {
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 240,
-                        child: DashboardChart(logs: entityLogs),
+                        child: DashboardChart(
+                          logs: monthLogs,
+                          selectedMonth: _selection.month,
+                        ),
                       ),
                     ],
                   ),
@@ -539,7 +614,10 @@ class _DashboardContentState extends State<_DashboardContent> {
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 240,
-                        child: MonthlyConsumptionChart(logs: entityLogs),
+                        child: MonthlyConsumptionChart(
+                          logs: monthLogs,
+                          selectedMonth: _selection.month,
+                        ),
                       ),
                     ],
                   ),
@@ -567,7 +645,10 @@ class _DashboardContentState extends State<_DashboardContent> {
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 280,
-                        child: DashboardChart(logs: entityLogs),
+                        child: DashboardChart(
+                          logs: monthLogs,
+                          selectedMonth: _selection.month,
+                        ),
                       ),
                     ],
                   ),
@@ -591,7 +672,10 @@ class _DashboardContentState extends State<_DashboardContent> {
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 280,
-                        child: MonthlyConsumptionChart(logs: entityLogs),
+                        child: MonthlyConsumptionChart(
+                          logs: monthLogs,
+                          selectedMonth: _selection.month,
+                        ),
                       ),
                     ],
                   ),
@@ -854,7 +938,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                       ),
                       const SizedBox(width: 3),
                       Text(
-                        'Saved ₹${comparison.billDifference.abs().toStringAsFixed(0)}',
+                        'Saved â‚¹${comparison.billDifference.abs().toStringAsFixed(0)}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -883,10 +967,10 @@ class _DashboardContentState extends State<_DashboardContent> {
           else ...[
             _comparisonRow(
               label: 'Est. Bill',
-              value: '₹${comparison.current.netBill.toStringAsFixed(0)}',
+              value: 'â‚¹${comparison.current.netBill.toStringAsFixed(0)}',
               chipText: comparison.previous == null
                   ? 'first month'
-                  : '${comparison.billDifference >= 0 ? '↑' : '↓'} ${comparison.billPercentChange.abs().toStringAsFixed(1)}%',
+                  : '${comparison.billDifference >= 0 ? 'â†‘' : 'â†“'} ${comparison.billPercentChange.abs().toStringAsFixed(1)}%',
               isGood: comparison.billDifference <= 0,
               chipNeutral: comparison.previous == null,
             ),
@@ -896,7 +980,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               value: '${comparison.current.totalUnits.toStringAsFixed(0)} kWh',
               chipText: comparison.previous == null
                   ? 'first month'
-                  : '${comparison.unitDifference >= 0 ? '↑' : '↓'} ${comparison.unitPercentChange.abs().toStringAsFixed(1)}%',
+                  : '${comparison.unitDifference >= 0 ? 'â†‘' : 'â†“'} ${comparison.unitPercentChange.abs().toStringAsFixed(1)}%',
               isGood: comparison.unitDifference <= 0,
               chipNeutral: comparison.previous == null,
             ),
@@ -907,7 +991,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                   '${comparison.current.billingDemand.toStringAsFixed(1)} kVA',
               chipText: comparison.previous == null
                   ? 'first month'
-                  : '${comparison.demandDifference >= 0 ? '↑' : '↓'} ${comparison.demandPercentChange.abs().toStringAsFixed(1)}%',
+                  : '${comparison.demandDifference >= 0 ? 'â†‘' : 'â†“'} ${comparison.demandPercentChange.abs().toStringAsFixed(1)}%',
               isGood: comparison.demandDifference <= 0,
               chipNeutral: comparison.previous == null,
             ),
@@ -1020,7 +1104,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             ),
             const SizedBox(height: 4),
             Text(
-              '₹${forecast.projectedBill.toStringAsFixed(0)}',
+              'â‚¹${forecast.projectedBill.toStringAsFixed(0)}',
               style: AppTypography.mono(
                 size: 28,
                 weight: FontWeight.w700,
@@ -1029,7 +1113,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             ),
             const SizedBox(height: 4),
             Text(
-              '≈ ${forecast.projectedUnits.toStringAsFixed(0)} kWh units',
+              'â‰ˆ ${forecast.projectedUnits.toStringAsFixed(0)} kWh units',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             const Divider(height: 24),
@@ -1037,7 +1121,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               children: [
                 _forecastStat(
                   'Avg / day',
-                  '₹${forecast.dailyAverageBill.toStringAsFixed(0)}',
+                  'â‚¹${forecast.dailyAverageBill.toStringAsFixed(0)}',
                 ),
                 _forecastStat(
                   'Days left',
@@ -1061,7 +1145,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Aaj ki usage rate par estimated — readings badhne par update hoga',
+              'Aaj ki usage rate par estimated â€” readings badhne par update hoga',
               style: TextStyle(
                 fontSize: 10.5,
                 fontStyle: FontStyle.italic,
@@ -1105,11 +1189,11 @@ class _DashboardContentState extends State<_DashboardContent> {
         : Icons.check_circle_rounded;
     final String text;
     if (hasPfIssue && hasMdIssue) {
-      text = '2 alerts — PF penalty & Max Demand high';
+      text = '2 alerts â€” PF penalty & Max Demand high';
     } else if (hasPfIssue) {
-      text = '1 alert — Low PF (below ${AppConstants.pfPenaltyThreshold})';
+      text = '1 alert â€” Low PF (below ${AppConstants.pfPenaltyThreshold})';
     } else if (hasMdIssue) {
-      text = '1 alert — Max Demand high';
+      text = '1 alert â€” Max Demand high';
     } else {
       text = 'All systems normal';
     }
@@ -1353,7 +1437,7 @@ class _SavingOpportunityCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            '₹${opportunity.monthlySavings.toStringAsFixed(0)}/month',
+            'â‚¹${opportunity.monthlySavings.toStringAsFixed(0)}/month',
             style: AppTypography.mono(
               size: 24,
               weight: FontWeight.w700,
@@ -1591,7 +1675,7 @@ class _RecommendationCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        'Potential savings: ₹${rec.estimatedSavings!.toStringAsFixed(0)}/month',
+                        'Potential savings: â‚¹${rec.estimatedSavings!.toStringAsFixed(0)}/month',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -1609,3 +1693,4 @@ class _RecommendationCard extends StatelessWidget {
     );
   }
 }
+
