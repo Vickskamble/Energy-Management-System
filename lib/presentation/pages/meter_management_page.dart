@@ -51,6 +51,7 @@ class MeterManagementPage extends StatelessWidget {
                 controller: nameCtrl,
                 label: 'Meter Name',
                 prefixIcon: Icons.speed_rounded,
+                maxLength: 60,
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? 'Required' : null,
               ),
@@ -59,6 +60,7 @@ class MeterManagementPage extends StatelessWidget {
                 controller: locationCtrl,
                 label: 'Location (optional)',
                 prefixIcon: Icons.location_on_outlined,
+                maxLength: 100,
               ),
               const SizedBox(height: 12),
               AppTextField(
@@ -116,6 +118,7 @@ class MeterManagementPage extends StatelessWidget {
                 label: 'Site (factory/plant)',
                 hint: 'e.g. Unit 1, Pune',
                 prefixIcon: Icons.factory_outlined,
+                maxLength: 100,
               ),
               const SizedBox(height: 8),
               const Align(

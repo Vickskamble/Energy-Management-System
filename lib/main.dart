@@ -37,10 +37,10 @@ void main() async {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              Text(
-                details.exceptionAsString(),
+              const Text(
+                'Please restart the app. If the problem persists, contact support.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
                 ),

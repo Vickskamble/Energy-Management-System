@@ -217,9 +217,12 @@ class _ReportsContentState extends State<_ReportsContent> {
     } catch (e) {
       AppLogger.e('Excel import failed', e);
       if (context.mounted) {
+        final message = e is FormatException
+            ? e.message
+            : 'Import failed. Check the file and try again.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Import failed: $e'),
+            content: Text(message),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -1158,7 +1161,11 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Import failed: $e'),
+          content: Text(
+            e is FormatException
+                ? e.message
+                : 'Import failed. Check the file and try again.',
+          ),
           backgroundColor: Colors.red.shade700,
         ),
       );

@@ -3,8 +3,18 @@
 # ============================================================
 $ErrorActionPreference = "Stop"
 
-$SUPABASE_URL = "https://onfovsadlqeebguuswzg.supabase.co"
-$ANON_KEY = "sb_publishable_Pfr0MEUpLIytdwsahd9nCQ_cKauwJIq"
+# Credentials are read from environment variables - NEVER hardcode
+# them here. Set before running:
+#   $env:SUPABASE_URL = "https://your-project.supabase.co"
+#   $env:SUPABASE_ANON_KEY = "sb_publishable_..."
+#   $env:DEMO_EMAIL = "demo@example.com"
+#   $env:DEMO_PASSWORD = "StrongPass123!"
+$SUPABASE_URL = $env:SUPABASE_URL
+$ANON_KEY = $env:SUPABASE_ANON_KEY
+if (-not $SUPABASE_URL -or -not $ANON_KEY) {
+    Write-Error "SUPABASE_URL and SUPABASE_ANON_KEY environment variables must be set."
+    exit 1
+}
 
 # ---------- Constants (match app_constants.dart) ----------
 $MULTIPLYING_FACTOR = 5.0
@@ -27,8 +37,12 @@ function Round4($val) { [Math]::Round($val, 4) }
 
 # ---------- Step 1: Create test user ----------
 Write-Host "=== Creating test user ==="
-$testEmail = "demo@powerems.com"
-$testPass = "demo1234"
+$testEmail = $env:DEMO_EMAIL
+$testPass = $env:DEMO_PASSWORD
+if (-not $testEmail -or -not $testPass) {
+    Write-Error "DEMO_EMAIL and DEMO_PASSWORD environment variables must be set."
+    exit 1
+}
 
 $body = @{ email = $testEmail; password = $testPass } | ConvertTo-Json
 try {

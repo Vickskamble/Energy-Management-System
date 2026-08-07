@@ -56,6 +56,21 @@ ALTER TABLE energy_logs ADD COLUMN IF NOT EXISTS multiplying_factor DOUBLE PRECI
 CREATE INDEX IF NOT EXISTS idx_energy_logs_meter ON energy_logs(meter_name);
 CREATE INDEX IF NOT EXISTS idx_energy_logs_logged_at ON energy_logs(logged_at);
 
+-- Deduplicate existing readings before adding the unique index
+-- (keeps the newest row per (user_id, meter_name, logged_at)).
+DELETE FROM energy_logs a
+USING energy_logs b
+WHERE a.id <> b.id
+  AND a.user_id IS NOT DISTINCT FROM b.user_id
+  AND a.meter_name = b.meter_name
+  AND a.logged_at = b.logged_at
+  AND a.created_at < b.created_at;
+
+-- Prevent duplicate readings (double-submit / concurrent import TOCTOU)
+-- SECURITY.md gap G7.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_energy_logs_user_meter_date
+  ON energy_logs(user_id, meter_name, logged_at);
+
 -- 2. sites
 CREATE TABLE IF NOT EXISTS sites (
   id UUID PRIMARY KEY,

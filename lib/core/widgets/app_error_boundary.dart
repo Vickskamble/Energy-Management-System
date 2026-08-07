@@ -28,7 +28,6 @@ class _ErrorBoundaryStateState extends State<_ErrorBoundaryState> {
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
-      final details = _error!;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.xxxxl),
@@ -42,22 +41,16 @@ class _ErrorBoundaryStateState extends State<_ErrorBoundaryState> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Rendering Error',
+                'Something went wrong',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              Text(
-                details.exceptionAsString(),
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                details.stack?.toString().split('\n').take(5).join('\n') ?? '',
+              const Text(
+                'Please retry. If the problem persists, contact support.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppColors.textSecondary.withValues(alpha: 0.5),
-                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
                 ),
               ),
               const SizedBox(height: 24),

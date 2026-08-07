@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/validation_rules.dart';
 import '../../core/widgets/app_button.dart';
 import '../auth_bloc/auth_bloc.dart';
 
@@ -71,13 +72,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       prefixIcon: Icon(Icons.email_outlined),
                     ),
                     keyboardType: TextInputType.emailAddress,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Email required';
-                      }
-                      if (!v.contains('@')) return 'Invalid email';
-                      return null;
-                    },
+                    validator: ValidationRules.validateEmail,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -85,6 +80,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     obscureText: _obscurePass,
                     decoration: InputDecoration(
                       labelText: 'Password',
+                      hintText: 'Min ${ValidationRules.minPasswordLength} chars, letter + number',
                       prefixIcon: const Icon(Icons.lock_outlined),
                       suffixIcon: InkWell(
                         onTap: () =>
@@ -97,11 +93,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
                     ),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Password required';
-                      if (v.length < 6) return 'Min 6 characters';
-                      return null;
-                    },
+                    validator: ValidationRules.validatePassword,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(

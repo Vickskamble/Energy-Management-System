@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'secure_supabase_storage.dart';
 
 class SupabaseClientManager {
   static SupabaseClient? _instance;
@@ -16,7 +17,13 @@ class SupabaseClientManager {
       );
     }
 
-    await Supabase.initialize(url: url, publishableKey: anonKey);
+    await Supabase.initialize(
+      url: url,
+      publishableKey: anonKey,
+      authOptions: FlutterAuthClientOptions(
+        localStorage: SecureSupabaseStorage(),
+      ),
+    );
 
     _instance = Supabase.instance.client;
     return _instance!;

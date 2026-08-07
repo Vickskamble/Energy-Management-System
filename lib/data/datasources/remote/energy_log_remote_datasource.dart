@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/error/exceptions.dart';
 import '../../../core/network/supabase_client.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../models/energy_log_model.dart';
 
 class EnergyLogRemoteDatasource {
@@ -33,9 +34,9 @@ class EnergyLogRemoteDatasource {
           .select();
     } catch (e) {
       if (e is RemoteStorageException) rethrow;
+      AppLogger.e('pushLogs failed', e);
       throw RemoteStorageException(
-        'Unable to sync data. Check your connection and try again.\n'
-        'Detail: $e',
+        'Unable to sync data. Check your connection and try again.',
       );
     }
   }
