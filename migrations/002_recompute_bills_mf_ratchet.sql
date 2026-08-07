@@ -41,16 +41,16 @@ SET
   taxes = ROUND((kwh * multiplying_factor * 0.279)::numeric, 2),
   pf_rebate = CASE
     WHEN power_factor >= 0.95 THEN
-      ROUND(((kwh * multiplying_factor * 8.44) +
-             (GREATEST(md_recorded * multiplying_factor,
-                       contract_demand * 0.75) * 650.0)) * 0.01::numeric, 2)
+      ROUND((((kwh * multiplying_factor * 8.44) +
+              (GREATEST(md_recorded * multiplying_factor,
+                        contract_demand * 0.75) * 650.0)) * 0.01)::numeric, 2)
     ELSE 0
   END,
   pf_surcharge = CASE
     WHEN power_factor < 0.90 THEN
-      ROUND(((kwh * multiplying_factor * 8.44) +
-             (GREATEST(md_recorded * multiplying_factor,
-                       contract_demand * 0.75) * 650.0)) * 0.05::numeric, 2)
+      ROUND((((kwh * multiplying_factor * 8.44) +
+              (GREATEST(md_recorded * multiplying_factor,
+                        contract_demand * 0.75) * 650.0)) * 0.05)::numeric, 2)
     ELSE 0
   END,
   net_bill = ROUND(
@@ -79,8 +79,12 @@ SET
          (kwh * multiplying_factor * 0.81)) * subsidy / 100
       ELSE 0 END)
     )::numeric, 2),
-  estimated_bill = ROUND((kwh * multiplying_factor * 8.44)::numeric, 2),
-  avg_unit_cost = CASE
+  estimated_bill = ROUND((kwh * multiplying_factor * 8.44)::numeric, 2);
+
+-- avg_unit_cost needs the NEW net_bill, so it runs as a separate pass
+-- (within one UPDATE every SET expression sees the OLD row values).
+UPDATE public.energy_logs
+SET avg_unit_cost = CASE
     WHEN kwh * multiplying_factor > 0 THEN
       ROUND((net_bill / (kwh * multiplying_factor))::numeric, 2)
     ELSE 0
