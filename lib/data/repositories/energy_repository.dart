@@ -55,12 +55,27 @@ class EnergyRepository {
     return models.first.toEntity();
   }
 
-  /// Bulk-save imported readings (PDF import) directly to the cloud.
+  /// Bulk-save imported readings directly to the cloud.
+  ///
+  /// Dedupes against existing rows for the same (meter, date) window to avoid
+  /// duplicate readings from double-submit or repeated imports
+  /// (SECURITY.md gap G7). Returns the number of rows actually inserted.
   Future<int> bulkSaveReadings(List<EnergyLogModel> models) async {
     if (models.isEmpty) return 0;
     _ensureOnline();
-    await _remote.pushLogs(models);
-    return models.length;
+
+    final toInsert = <EnergyLogModel>[];
+    for (final model in models) {
+      final existing = await findDuplicateReading(
+        model.meterName,
+        model.loggedAt,
+      );
+      if (existing == null) toInsert.add(model);
+    }
+    if (toInsert.isEmpty) return 0;
+
+    await _remote.pushLogs(toInsert);
+    return toInsert.length;
   }
 
   /// Get dashboard aggregate data from the cloud.

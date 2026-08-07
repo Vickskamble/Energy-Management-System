@@ -49,10 +49,24 @@ class ExcelReadingDraft {
 class ExcelImportService {
   ExcelImportService._();
 
+  /// Max compressed workbook size (bytes) — guards against crafted files
+  /// that exhaust memory (SECURITY.md gap G8).
+  static const int maxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+
+  /// Max readings extracted from a single file (row-count guard).
+  static const int maxReadingsPerFile = 5000;
+
   static Future<List<ExcelReadingDraft>> extractReadings(
     Uint8List bytes, {
     ExcelColumnMap? columnMap,
   }) async {
+    if (bytes.lengthInBytes > maxFileSizeBytes) {
+      throw const FormatException(
+        'Excel file is too large (max ${maxFileSizeBytes ~/ (1024 * 1024)} MB '
+        'allowed). Please split the file and try again.',
+      );
+    }
+
     final Excel excel;
     try {
       excel = Excel.decodeBytes(bytes);
@@ -66,12 +80,19 @@ class ExcelImportService {
     final drafts = <ExcelReadingDraft>[];
     for (final sheet in excel.tables.values) {
       drafts.addAll(_parseSheet(sheet, columnMap));
+      if (drafts.length > maxReadingsPerFile) break;
     }
     if (drafts.isEmpty) {
       throw const FormatException(
         'No readings found in the selected Excel file. '
         'Expected headers: Meter, Reading Date, kWh, MD Recorded '
         '(kVAh / rkVARh Lag / rkVARh Lead optional).',
+      );
+    }
+    if (drafts.length > maxReadingsPerFile) {
+      throw FormatException(
+        'File has more than $maxReadingsPerFile readings. '
+        'Split the file and import in batches.',
       );
     }
     return drafts;

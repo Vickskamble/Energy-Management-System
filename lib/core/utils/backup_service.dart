@@ -21,6 +21,10 @@ class BackupService {
 
   static const int _version = 2;
 
+  /// Max restore file size (bytes) — guards against crafted files that
+  /// exhaust memory or JSON nesting (SECURITY.md gap G8).
+  static const int maxRestoreSizeBytes = 20 * 1024 * 1024; // 20 MB
+
   static Future<void> exportBackup() async {
     final client = SupabaseClientManager.client;
     final uid = client.auth.currentUser?.id;
@@ -75,6 +79,12 @@ class BackupService {
     }
     final bytes = result.files.first.bytes;
     if (bytes == null) throw StateError('Could not read backup file');
+    if (bytes.lengthInBytes > BackupService.maxRestoreSizeBytes) {
+      throw StateError(
+        'Backup file is too large (max '
+        '${BackupService.maxRestoreSizeBytes ~/ (1024 * 1024)} MB allowed).',
+      );
+    }
 
     final root = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
     if (root['ems_backup'] != _version) {

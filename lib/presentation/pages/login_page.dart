@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/validation_rules.dart';
 import '../../core/widgets/app_button.dart';
 import '../auth_bloc/auth_bloc.dart';
 import 'register_page.dart';
@@ -103,15 +104,7 @@ class _LoginPageState extends State<LoginPage>
                                   prefixIcon: Icon(Icons.email_outlined),
                                 ),
                                 keyboardType: TextInputType.emailAddress,
-                                validator: (v) {
-                                  if (v == null || v.trim().isEmpty) {
-                                    return 'Email is required';
-                                  }
-                                  if (!v.contains('@')) {
-                                    return 'Enter a valid email';
-                                  }
-                                  return null;
-                                },
+                                validator: ValidationRules.validateEmail,
                               ),
                               const SizedBox(height: 16),
                               TextFormField(
@@ -244,13 +237,7 @@ class _LoginPageState extends State<LoginPage>
               labelText: 'Email address',
               prefixIcon: Icon(Icons.email_outlined),
             ),
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) {
-                return 'Email required';
-              }
-              if (!v.contains('@')) return 'Enter a valid email';
-              return null;
-            },
+            validator: ValidationRules.validateEmail,
           ),
         ),
         actions: [
