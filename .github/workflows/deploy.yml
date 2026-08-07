@@ -68,30 +68,6 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
 
-      # ----- Desktop Builds -----
-      - name: Build Windows
-        run: flutter build windows --release
-        if: success()
-
-      - name: Build macOS
-        run: flutter build macos --release
-        if: success()
-
-      - name: Build Linux
-        run: flutter build linux --release
-        if: success()
-
-      - name: Upload Desktop Artifacts
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: desktop
-          path: |
-            build/windows/runner/Release/
-            build/macos/Build/Products/Release/
-            build/linux/bundle/
-          retention-days: 7
-
       # ----- Web -----
       - name: Build Web
         run: flutter build web --release --base-href=/Energy-Management-System/
@@ -204,3 +180,51 @@ jobs:
           echo "rate limiting beyond platform defaults, app-level DoS protection,"
           echo "certificate pinning, local data encryption."
         if: success()
+
+  build-desktop:
+    runs-on: ${{ matrix.os }}
+    needs: build-and-deploy
+    if: always()
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            build_cmd: flutter build windows --release
+            artifact_name: windows
+            artifact_path: build/windows/runner/Release/
+          - os: macos-latest
+            build_cmd: flutter build macos --release
+            artifact_name: macos
+            artifact_path: build/macos/Build/Products/Release/
+          - os: ubuntu-latest
+            build_cmd: flutter build linux --release
+            artifact_name: linux
+            artifact_path: build/linux/bundle/
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create .env from secrets
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build
+        run: ${{ matrix.build_cmd }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          retention-days: 7
