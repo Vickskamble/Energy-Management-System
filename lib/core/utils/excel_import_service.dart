@@ -14,6 +14,8 @@ class ExcelReadingDraft {
     required this.loggedAt,
     this.kwh = 0,
     this.kvah = 0,
+    this.currentKwh,
+    this.currentKvah,
     this.rkvarhLag = 0,
     this.rkvarhLead = 0,
     this.mdRecorded = 0,
@@ -23,8 +25,16 @@ class ExcelReadingDraft {
 
   String meterName;
   DateTime loggedAt;
+
+  /// Consumed units for this period (current − previous).
   double kwh;
   double kvah;
+
+  /// ACTUAL meter readings as recorded — the meter's cumulative total.
+  /// Null when the file only carries per-day consumption values.
+  double? currentKwh;
+  double? currentKvah;
+
   double rkvarhLag;
   double rkvarhLead;
   double mdRecorded;
@@ -36,7 +46,11 @@ class ExcelReadingDraft {
   /// Human-readable source, e.g. "Row 5" (1-based Excel row number).
   final String sourceLabel;
 
-  bool get isValid => kwh > 0 && mdRecorded > 0;
+  /// A draft is importable when it has consumption (kWh) OR an actual meter
+  /// reading, plus a demand value. The opening row of a cumulative series
+  /// (consumption 0, but a real meter reading) counts as importable — it
+  /// anchors the actual-reading chain.
+  bool get isValid => (kwh > 0 || (currentKwh ?? 0) > 0) && mdRecorded > 0;
 }
 
 /// Bulk Excel import — reads readings (with dates) from a client-supplied
@@ -207,6 +221,26 @@ class ExcelImportService {
           cols.prevKvah,
         );
       }
+
+      // Actual (cumulative) meter readings — kept alongside consumed so the
+      // client sees real meter values on Analysis/Reports. Available when the
+      // file carries cumulative readings or explicit Current/Previous columns.
+      final double? actualKwh;
+      if (kwhSeries != null && cols.kwh != null) {
+        actualKwh = _cellNumber(row[cols.kwh!]);
+      } else if (cols.currentKwh != null) {
+        actualKwh = _cellNumber(row[cols.currentKwh!]);
+      } else {
+        actualKwh = null;
+      }
+      final double? actualKvah;
+      if (kvahSeries != null && cols.kvah != null) {
+        actualKvah = _cellNumber(row[cols.kvah!]);
+      } else if (cols.currentKvah != null) {
+        actualKvah = _cellNumber(row[cols.currentKvah!]);
+      } else {
+        actualKvah = null;
+      }
       final double lag;
       if (lagSeries != null) {
         lag = lagSeries[i - (headerRow + 1)];
@@ -242,6 +276,8 @@ class ExcelImportService {
           loggedAt: loggedAt,
           kwh: kwh,
           kvah: kvah,
+          currentKwh: actualKwh,
+          currentKvah: actualKvah,
           rkvarhLag: lag,
           rkvarhLead: lead,
           mdRecorded: md,

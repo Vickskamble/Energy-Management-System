@@ -76,9 +76,15 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
       // ── Step 1: Validate inputs ─────────────────────────────────────────
       _validateFormInputs(event);
 
-      // ── Step 2: Calculate consumed values ────────────────────────────────
-      final consumedKwh = event.currentKwh - event.previousKwh;
-      final consumedKvah = event.currentKvah - event.previousKvah;
+      // ── Step 2: Previous cumulative reading from the database ───────────
+      // Source of truth is the DB — never trust form-supplied previous values
+      // (clients could override them). consumed = current − previous.
+      final prev = await _repository.getPreviousCumulative(
+        event.meterName.trim(),
+        event.loggedAt,
+      );
+      final consumedKwh = event.currentKwh - prev.kwh;
+      final consumedKvah = event.currentKvah - prev.kvah;
 
       _validateConsumedValues(consumedKwh, consumedKvah);
 
@@ -123,6 +129,8 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
         meterName: event.meterName,
         kwh: consumedKwh,
         kvah: consumedKvah,
+        currentKwh: event.currentKwh,
+        currentKvah: event.currentKvah,
         rkvarhLag: event.rkvarhLag,
         rkvarhLead: event.rkvarhLead,
         powerFactor: powerFactor,
@@ -197,23 +205,6 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
     }
     if (event.loggedAt.isAfter(DateTime.now())) {
       throw const ValidationException('Reading date cannot be in the future');
-    }
-
-    // Guard: Current reading must be >= previous reading
-    if (event.currentKwh < event.previousKwh) {
-      throw ValidationException(
-        'Current kWh (${event.currentKwh}) must be ≥ '
-        'previous kWh (${event.previousKwh}). '
-        'Check meter reading — cumulative values cannot decrease.',
-      );
-    }
-
-    if (event.currentKvah < event.previousKvah) {
-      throw ValidationException(
-        'Current kVAh (${event.currentKvah}) must be ≥ '
-        'previous kVAh (${event.previousKvah}). '
-        'Check meter reading — cumulative values cannot decrease.',
-      );
     }
   }
 
