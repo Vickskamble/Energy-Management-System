@@ -15,10 +15,13 @@ class EnergyRepository {
 
   static const int _defaultFetchLimit = 2000;
 
-  /// Get all logs from the cloud (most recent first).
+  /// Get all logs from the cloud (most recent first), with actual readings
+  /// hydrated for legacy rows that predate the current_kwh/current_kvah
+  /// columns.
   Future<List<EnergyLogEntity>> getAllLogs({int? limit}) async {
     final models = await _remote.fetchLogs(limit: limit ?? _defaultFetchLimit);
-    return models.map((m) => m.toEntity()).toList();
+    final hydrated = EnergyLogModel.hydrateActualReadings(models);
+    return hydrated.map((m) => m.toEntity()).toList();
   }
 
   /// Save a reading directly to Supabase.
@@ -136,7 +139,9 @@ class EnergyRepository {
     totalConsumption = (totalConsumption * 100).roundToDouble() / 100;
 
     return DashboardData(
-      logs: allLogs.map((m) => m.toEntity()).toList(),
+      logs: EnergyLogModel.hydrateActualReadings(allLogs)
+          .map((m) => m.toEntity())
+          .toList(),
       estimatedBill: _calculateBill(totalConsumption),
       totalConsumption: totalConsumption,
       activeConsumptionToday: activeConsumptionToday,
@@ -169,6 +174,27 @@ class EnergyRepository {
     );
     if (models.isEmpty) return null;
     return models.first.toEntity();
+  }
+
+  /// The meter's ACTUAL cumulative readings just before [before] — the
+  /// values the entry form uses to compute consumed = current − previous.
+  ///
+  /// Uses the stored actual reading when available; legacy rows fall back to
+  /// the running sum of consumed values up to that point. Returns (0, 0) for
+  /// the first ever entry of a meter (consumption measured from zero).
+  Future<({double kwh, double kvah})> getPreviousCumulative(
+    String meterName,
+    DateTime before,
+  ) async {
+    final logs = await _remote.fetchLogs(
+      to: before.subtract(const Duration(seconds: 1)),
+      meterName: meterName,
+      limit: _defaultFetchLimit,
+    );
+    if (logs.isEmpty) return (kwh: 0.0, kvah: 0.0);
+    final hydrated = EnergyLogModel.hydrateActualReadings(logs);
+    final last = hydrated.last;
+    return (kwh: last.currentKwh ?? 0, kvah: last.currentKvah ?? 0);
   }
 
   /// Get daily consumption for current month (for monthly chart).

@@ -125,7 +125,9 @@ class PdfReportService {
       headers: [
         'Date',
         'Meter',
-        'kWh',
+        'Reading kWh',
+        'Consumed kWh',
+        'Reading kVAh',
         'PF',
         'MD (kVA)',
         'Est. Bill (₹)',
@@ -136,7 +138,9 @@ class PdfReportService {
             (l) => [
               '${l.loggedAt.day.toString().padLeft(2, '0')}/${l.loggedAt.month.toString().padLeft(2, '0')}/${l.loggedAt.year.toString().substring(2)} ${l.loggedAt.hour.toString().padLeft(2, '0')}:${l.loggedAt.minute.toString().padLeft(2, '0')}',
               l.meterName,
+              l.currentKwh != null ? l.currentKwh!.toStringAsFixed(1) : '—',
               l.kwh.toStringAsFixed(1),
+              l.currentKvah != null ? l.currentKvah!.toStringAsFixed(1) : '—',
               l.powerFactor.toStringAsFixed(3),
               l.mdRecorded.toStringAsFixed(1),
               l.estimatedBill.toStringAsFixed(0),
@@ -158,7 +162,9 @@ class PdfReportService {
         3: pw.Alignment.centerRight,
         4: pw.Alignment.centerRight,
         5: pw.Alignment.centerRight,
-        6: pw.Alignment.center,
+        6: pw.Alignment.centerRight,
+        7: pw.Alignment.centerRight,
+        8: pw.Alignment.center,
       },
       border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
       headerAlignments: {
@@ -168,7 +174,9 @@ class PdfReportService {
         3: pw.Alignment.centerRight,
         4: pw.Alignment.centerRight,
         5: pw.Alignment.centerRight,
-        6: pw.Alignment.center,
+        6: pw.Alignment.centerRight,
+        7: pw.Alignment.centerRight,
+        8: pw.Alignment.center,
       },
     );
   }

@@ -36,12 +36,15 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
   String _selectedMeter = '';
   DateTime _loggedAt = DateTime.now();
   final _currentKwhCtrl = TextEditingController();
-  final _previousKwhCtrl = TextEditingController();
   final _currentKvahCtrl = TextEditingController();
-  final _previousKvahCtrl = TextEditingController();
   final _rkvarhLagCtrl = TextEditingController();
   final _rkvarhLeadCtrl = TextEditingController();
   final _mdRecordedCtrl = TextEditingController();
+
+  /// Previous cumulative readings fetched from the DB for the selected
+  /// date/meter — read-only, never editable by the client.
+  double _prevCumulativeKwh = 0;
+  double _prevCumulativeKvah = 0;
 
   @override
   void initState() {
@@ -50,9 +53,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     context.read<MeterRepository>().addListener(_loadMeters);
     // Live consumption (difference) preview as the user types.
     _currentKwhCtrl.addListener(_onValuesChanged);
-    _previousKwhCtrl.addListener(_onValuesChanged);
     _currentKvahCtrl.addListener(_onValuesChanged);
-    _previousKvahCtrl.addListener(_onValuesChanged);
   }
 
   void _onValuesChanged() {
@@ -61,25 +62,21 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
 
   double? get _diffKwh {
     final cur = double.tryParse(_currentKwhCtrl.text.trim());
-    final prev = double.tryParse(_previousKwhCtrl.text.trim());
-    if (cur == null || prev == null) return null;
-    return cur - prev;
+    if (cur == null) return null;
+    return cur - _prevCumulativeKwh;
   }
 
   double? get _diffKvah {
     final cur = double.tryParse(_currentKvahCtrl.text.trim());
-    final prev = double.tryParse(_previousKvahCtrl.text.trim());
-    if (cur == null || prev == null) return null;
-    return cur - prev;
+    if (cur == null) return null;
+    return cur - _prevCumulativeKvah;
   }
 
   @override
   void dispose() {
     context.read<MeterRepository>().removeListener(_loadMeters);
     _currentKwhCtrl.dispose();
-    _previousKwhCtrl.dispose();
     _currentKvahCtrl.dispose();
-    _previousKvahCtrl.dispose();
     _rkvarhLagCtrl.dispose();
     _rkvarhLeadCtrl.dispose();
     _mdRecordedCtrl.dispose();
@@ -111,15 +108,18 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     setState(() => _fetchingPrevious = true);
     try {
       final energyRepo = context.read<EnergyRepository>();
-      // The "previous" reading is the one recorded BEFORE the selected date —
-      // not the latest overall entry (wrong when back-filling older dates).
-      final previous = await energyRepo.getPreviousReading(
+      // Previous = the meter's ACTUAL cumulative reading recorded BEFORE the
+      // selected date — computed from the DB (stored reading, or running sum
+      // for legacy rows). Never trusted from the form.
+      final prev = await energyRepo.getPreviousCumulative(
         meterName,
         _loggedAt,
       );
-      if (previous != null && mounted) {
-        _previousKwhCtrl.text = previous.kwh.toStringAsFixed(2);
-        _previousKvahCtrl.text = previous.kvah.toStringAsFixed(2);
+      if (mounted) {
+        setState(() {
+          _prevCumulativeKwh = prev.kwh;
+          _prevCumulativeKvah = prev.kvah;
+        });
       }
     } catch (_) {
     } finally {
@@ -156,14 +156,14 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
   void _clearForm() {
     _formKey.currentState?.reset();
     _currentKwhCtrl.clear();
-    _previousKwhCtrl.clear();
     _currentKvahCtrl.clear();
-    _previousKvahCtrl.clear();
     _rkvarhLagCtrl.clear();
     _rkvarhLeadCtrl.clear();
     _mdRecordedCtrl.clear();
     setState(() {
       _loggedAt = DateTime.now();
+      _prevCumulativeKwh = 0;
+      _prevCumulativeKvah = 0;
       if (_meters.isNotEmpty) {
         _selectedMeter = _meters.first.name;
         _fetchPreviousReading(_selectedMeter);
@@ -188,9 +188,9 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
       SubmitManualReadingForm(
         meterName: _selectedMeter,
         currentKwh: double.parse(_currentKwhCtrl.text.trim()),
-        previousKwh: double.parse(_previousKwhCtrl.text.trim()),
+        previousKwh: _prevCumulativeKwh,
         currentKvah: double.parse(_currentKvahCtrl.text.trim()),
-        previousKvah: double.parse(_previousKvahCtrl.text.trim()),
+        previousKvah: _prevCumulativeKvah,
         rkvarhLag: double.tryParse(_rkvarhLagCtrl.text.trim()) ?? 0,
         rkvarhLead: double.tryParse(_rkvarhLeadCtrl.text.trim()) ?? 0,
         mdRecorded: double.parse(_mdRecordedCtrl.text.trim()),
@@ -373,66 +373,26 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: AppTextField(
-                                    controller: _currentKwhCtrl,
-                                    label: 'Current kWh',
-                                    prefixIcon: Icons.bolt,
-                                    keyboardType:
-                                        TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                    validator: _requiredNumberValidator,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: AppTextField(
-                                    controller: _previousKwhCtrl,
-                                    label: 'Previous kWh',
-                                    hint: 'Auto-fetched',
-                                    prefixIcon: Icons.history,
-                                    keyboardType:
-                                        TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                    validator: _requiredNumberValidator,
-                                  ),
-                                ),
-                              ],
+                            AppTextField(
+                              controller: _currentKwhCtrl,
+                              label: 'Current kWh Reading',
+                              hint: 'Meter display value',
+                              prefixIcon: Icons.bolt,
+                              keyboardType: TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              validator: _requiredNumberValidator,
                             ),
                             const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: AppTextField(
-                                    controller: _currentKvahCtrl,
-                                    label: 'Current kVAh',
-                                    prefixIcon: Icons.electrical_services,
-                                    keyboardType:
-                                        TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                    validator: _requiredNumberValidator,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: AppTextField(
-                                    controller: _previousKvahCtrl,
-                                    label: 'Previous kVAh',
-                                    hint: 'Auto-fetched',
-                                    prefixIcon: Icons.history,
-                                    keyboardType:
-                                        TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                    validator: _requiredNumberValidator,
-                                  ),
-                                ),
-                              ],
+                            AppTextField(
+                              controller: _currentKvahCtrl,
+                              label: 'Current kVAh Reading',
+                              hint: 'Meter display value',
+                              prefixIcon: Icons.electrical_services,
+                              keyboardType: TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              validator: _requiredNumberValidator,
                             ),
                             if (_diffKwh != null || _diffKvah != null) ...[
                               const SizedBox(height: 12),
@@ -449,35 +409,62 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                     ),
                                   ),
                                 ),
-                                child: Row(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(
-                                      Icons.compare_arrows_rounded,
-                                      size: 18,
-                                      color: AppColors.primary,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Consumption (Current − Previous)',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.compare_arrows_rounded,
+                                          size: 18,
+                                          color: AppColors.primary,
                                         ),
-                                      ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Consumption (Current − Previous)',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '${(_diffKwh ?? 0).toStringAsFixed(2)} kWh · '
+                                          '${(_diffKvah ?? 0).toStringAsFixed(2)} kVAh',
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: (_diffKwh ?? 0) < 0 ||
+                                                    (_diffKvah ?? 0) < 0
+                                                ? AppColors.danger
+                                                : AppColors.success,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '${(_diffKwh ?? 0).toStringAsFixed(2)} kWh · '
-                                      '${(_diffKvah ?? 0).toStringAsFixed(2)} kVAh',
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: (_diffKwh ?? 0) < 0 ||
-                                                (_diffKvah ?? 0) < 0
-                                            ? AppColors.danger
-                                            : AppColors.success,
-                                      ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.history,
+                                          size: 14,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Previous (auto, from DB): '
+                                            '${_prevCumulativeKwh.toStringAsFixed(2)} kWh · '
+                                            '${_prevCumulativeKvah.toStringAsFixed(2)} kVAh',
+                                            style: const TextStyle(
+                                              fontSize: 11.5,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),

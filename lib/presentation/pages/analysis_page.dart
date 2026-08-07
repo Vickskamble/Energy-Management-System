@@ -1095,6 +1095,20 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                                   color: AppColors.textSecondary,
                                 ),
                               ),
+                              if (log.currentKwh != null ||
+                                  log.currentKvah != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Reading: '
+                                  '${log.currentKwh?.toStringAsFixed(1) ?? '—'} kWh · '
+                                  '${log.currentKvah?.toStringAsFixed(1) ?? '—'} kVAh',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: AppColors.textSecondary,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -1321,6 +1335,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     meterName: log.meterName,
                     kwh: double.parse(kwhCtrl.text.trim()),
                     kvah: double.parse(kvahCtrl.text.trim()),
+                    currentKwh: log.currentKwh,
+                    currentKvah: log.currentKvah,
                     rkvarhLag: double.tryParse(rkvarhLagCtrl.text.trim()) ?? 0,
                     rkvarhLead: double.tryParse(rkvarhLeadCtrl.text.trim()) ??
                         0,

@@ -390,8 +390,10 @@ class _ReportsContentState extends State<_ReportsContent> {
                   columns: const [
                     'Date',
                     'Meter',
-                    'kWh',
-                    'Unit Cost',
+                    'Reading kWh',
+                    'Consumed kWh',
+                    'Reading kVAh',
+                    'Consumed kVAh',
                     'PF',
                     'MD (kVA)',
                     'Bill',
@@ -860,12 +862,19 @@ class _ReportsContentState extends State<_ReportsContent> {
           (log) => [
             Text(dateFmt.format(log.loggedAt)),
             Text(log.meterName),
+            Text(
+              log.currentKwh != null
+                  ? log.currentKwh!.toStringAsFixed(1)
+                  : '—',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
             Text(log.kwh.toStringAsFixed(1)),
             Text(
-              log.kwh > 0
-                  ? '₹${(log.estimatedBill / log.kwh).toStringAsFixed(2)}'
+              log.currentKvah != null
+                  ? log.currentKvah!.toStringAsFixed(1)
                   : '—',
             ),
+            Text(log.kvah.toStringAsFixed(1)),
             Text(log.powerFactor.toStringAsFixed(3)),
             Text(log.mdRecorded.toStringAsFixed(1)),
             Text('₹ ${log.estimatedBill.toStringAsFixed(0)}'),
@@ -1107,6 +1116,8 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
           meterName: e.meterName,
           kwh: e.kwh,
           kvah: e.kvah,
+          currentKwh: e.currentKwh,
+          currentKvah: e.currentKvah,
           rkvarhLag: e.lag,
           rkvarhLead: e.lead,
           powerFactor: e.powerFactor,
@@ -1277,7 +1288,7 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
                 Expanded(
                   child: AppTextField(
                     controller: e.kwhCtrl,
-                    label: 'Units (kWh)',
+                    label: 'Consumed (kWh)',
                     prefixIcon: Icons.bolt,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
@@ -1287,8 +1298,34 @@ class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
                 Expanded(
                   child: AppTextField(
                     controller: e.kvahCtrl,
-                    label: 'kVAh',
+                    label: 'Consumed kVAh',
                     prefixIcon: Icons.electrical_services,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: AppTextField(
+                    controller: e.currentKwhCtrl,
+                    label: 'Actual Reading kWh',
+                    hint: 'Optional — meter display value',
+                    prefixIcon: Icons.speed,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppTextField(
+                    controller: e.currentKvahCtrl,
+                    label: 'Actual Reading kVAh',
+                    hint: 'Optional',
+                    prefixIcon: Icons.speed,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                   ),
@@ -1413,6 +1450,16 @@ class _DraftEditor {
       ),
       kwhCtrl = TextEditingController(text: _fmt(draft.kwh)),
       kvahCtrl = TextEditingController(text: _fmt(draft.kvah)),
+      currentKwhCtrl = TextEditingController(
+        text: draft.currentKwh != null
+            ? draft.currentKwh!.toStringAsFixed(2)
+            : '',
+      ),
+      currentKvahCtrl = TextEditingController(
+        text: draft.currentKvah != null
+            ? draft.currentKvah!.toStringAsFixed(2)
+            : '',
+      ),
       lagCtrl = TextEditingController(text: _fmt(draft.rkvarhLag)),
       leadCtrl = TextEditingController(text: _fmt(draft.rkvarhLead)),
       mdCtrl = TextEditingController(text: _fmt(draft.mdRecorded)),
@@ -1427,6 +1474,8 @@ class _DraftEditor {
   final TextEditingController dateCtrl;
   final TextEditingController kwhCtrl;
   final TextEditingController kvahCtrl;
+  final TextEditingController currentKwhCtrl;
+  final TextEditingController currentKvahCtrl;
   final TextEditingController lagCtrl;
   final TextEditingController leadCtrl;
   final TextEditingController mdCtrl;
@@ -1440,6 +1489,18 @@ class _DraftEditor {
   double get lag => double.tryParse(lagCtrl.text.trim()) ?? 0;
   double get lead => double.tryParse(leadCtrl.text.trim()) ?? 0;
 
+  /// Actual (cumulative) meter reading — blank means "not known" (the system
+  /// reconstructs it from the consumption chain on read).
+  double? get currentKwh {
+    final v = double.tryParse(currentKwhCtrl.text.trim());
+    return v == null || v <= 0 ? null : v;
+  }
+
+  double? get currentKvah {
+    final v = double.tryParse(currentKvahCtrl.text.trim());
+    return v == null || v <= 0 ? null : v;
+  }
+
   /// PF as imported from the file (or edited by the user). Null → let the
   /// system calculate from kWh/kVAh.
   double? get powerFactor {
@@ -1448,7 +1509,9 @@ class _DraftEditor {
     return v > 1 ? v / 100 : v;
   }
 
-  bool get valid => kwh > 0 && md > 0;
+  /// Importable when it has consumption or an actual reading, plus MD.
+  /// Opening rows (0 consumption, real reading) anchor the reading chain.
+  bool get valid => (kwh > 0 || currentKwh != null) && md > 0;
 
   DateTime get loggedAt {
     final m = RegExp(
@@ -1470,6 +1533,8 @@ class _DraftEditor {
     dateCtrl.dispose();
     kwhCtrl.dispose();
     kvahCtrl.dispose();
+    currentKwhCtrl.dispose();
+    currentKvahCtrl.dispose();
     lagCtrl.dispose();
     leadCtrl.dispose();
     mdCtrl.dispose();

@@ -62,6 +62,9 @@ void main() {
       expect(a.rkvarhLag, 5.5);
       expect(a.rkvarhLead, 1.25);
       expect(a.mdRecorded, 42);
+      // Small per-day values → no cumulative series, so no actual reading.
+      expect(a.currentKwh, isNull);
+      expect(a.currentKvah, isNull);
       expect(a.isValid, isTrue);
       expect(a.sourceLabel, 'Row 2');
 
@@ -122,6 +125,8 @@ void main() {
 
       expect(drafts, hasLength(1));
       expect(drafts.first.kwh, 300);
+      // The actual meter reading is kept alongside consumed.
+      expect(drafts.first.currentKwh, 10500);
     });
 
     test('skips invalid rows (zero kWh and zero MD)', () async {
@@ -228,6 +233,11 @@ void main() {
       expect(drafts[0].kvah, 0);
       expect(drafts[0].mdRecorded, 126);
       expect(drafts[0].sourceLabel, contains('opening'));
+      // The actual cumulative reading is kept alongside the consumed value.
+      expect(drafts[0].currentKwh, 57037);
+      expect(drafts[0].currentKvah, 59109);
+      expect(drafts[1].currentKwh, 57123);
+      expect(drafts[1].currentKvah, 59201);
       // Subsequent rows = current − previous cumulative value.
       expect(drafts[1].kwh, 86); // 57123 − 57037
       expect(drafts[1].kvah, 92); // 59201 − 59109

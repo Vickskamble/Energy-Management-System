@@ -11,6 +11,13 @@ class EnergyLogModel {
   final String meterName;
   final double kwh;
   final double kvah;
+
+  /// ACTUAL (cumulative) meter reading this entry was recorded against.
+  /// Null for legacy rows — [hydrateActualReadings] reconstructs it as the
+  /// running sum of consumed values per meter.
+  final double? currentKwh;
+  final double? currentKvah;
+
   final double rkvarhLag;
   final double rkvarhLead;
   final double powerFactor;
@@ -41,6 +48,8 @@ class EnergyLogModel {
     required this.meterName,
     required this.kwh,
     required this.kvah,
+    this.currentKwh,
+    this.currentKvah,
     required this.rkvarhLag,
     required this.rkvarhLead,
     required this.powerFactor,
@@ -71,6 +80,8 @@ class EnergyLogModel {
     meterName: meterName,
     kwh: kwh,
     kvah: kvah,
+    currentKwh: currentKwh,
+    currentKvah: currentKvah,
     rkvarhLag: rkvarhLag,
     rkvarhLead: rkvarhLead,
     powerFactor: powerFactor,
@@ -101,6 +112,8 @@ class EnergyLogModel {
     meterName: entity.meterName,
     kwh: entity.kwh,
     kvah: entity.kvah,
+    currentKwh: entity.currentKwh,
+    currentKvah: entity.currentKvah,
     rkvarhLag: entity.rkvarhLag,
     rkvarhLead: entity.rkvarhLead,
     powerFactor: entity.powerFactor,
@@ -131,6 +144,8 @@ class EnergyLogModel {
     'meter_name': meterName,
     'kwh': _toPrecision(kwh, 2),
     'kvah': _toPrecision(kvah, 2),
+    if (currentKwh != null) 'current_kwh': _toPrecision(currentKwh!, 2),
+    if (currentKvah != null) 'current_kvah': _toPrecision(currentKvah!, 2),
     'rkvarh_lag': _toPrecision(rkvarhLag, 2),
     'rkvarh_lead': _toPrecision(rkvarhLead, 2),
     'power_factor': _toPrecision(powerFactor, 3),
@@ -162,6 +177,8 @@ class EnergyLogModel {
       meterName: map['meter_name'] as String,
       kwh: _parseDouble(map['kwh']),
       kvah: _parseDouble(map['kvah']),
+      currentKwh: _parseNullableDouble(map['current_kwh']),
+      currentKvah: _parseNullableDouble(map['current_kvah']),
       rkvarhLag: _parseDouble(map['rkvarh_lag']),
       rkvarhLead: _parseDouble(map['rkvarh_lead']),
       powerFactor: _parseDouble(map['power_factor']),
@@ -193,6 +210,8 @@ class EnergyLogModel {
     'meter_name': meterName,
     'kwh': (kwh * 100).round() / 100,
     'kvah': (kvah * 100).round() / 100,
+    if (currentKwh != null) 'current_kwh': (currentKwh! * 100).round() / 100,
+    if (currentKvah != null) 'current_kvah': (currentKvah! * 100).round() / 100,
     'rkvarh_lag': (rkvarhLag * 100).round() / 100,
     'rkvarh_lead': (rkvarhLead * 100).round() / 100,
     'power_factor': (powerFactor * 1000).round() / 1000,
@@ -223,6 +242,8 @@ class EnergyLogModel {
       meterName: json['meter_name'] as String,
       kwh: (json['kwh'] as num).toDouble(),
       kvah: (json['kvah'] as num).toDouble(),
+      currentKwh: (json['current_kwh'] as num?)?.toDouble(),
+      currentKvah: (json['current_kvah'] as num?)?.toDouble(),
       rkvarhLag: (json['rkvarh_lag'] as num).toDouble(),
       rkvarhLead: (json['rkvarh_lead'] as num).toDouble(),
       powerFactor: (json['power_factor'] as num).toDouble(),
@@ -254,6 +275,8 @@ class EnergyLogModel {
     required String meterName,
     required double kwh,
     required double kvah,
+    double? currentKwh,
+    double? currentKvah,
     double rkvarhLag = 0,
     double rkvarhLead = 0,
     double? powerFactor,
@@ -339,6 +362,9 @@ class EnergyLogModel {
       meterName: meterName,
       kwh: (kwh * 100).round() / 100,
       kvah: (kvah * 100).round() / 100,
+      currentKwh: currentKwh == null ? null : (currentKwh * 100).round() / 100,
+      currentKvah:
+          currentKvah == null ? null : (currentKvah * 100).round() / 100,
       rkvarhLag: (rkvarhLag * 100).round() / 100,
       rkvarhLead: (rkvarhLead * 100).round() / 100,
       powerFactor: (pf * 1000).round() / 1000,
@@ -365,6 +391,79 @@ class EnergyLogModel {
     );
   }
 
+  /// Fills [currentKwh]/[currentKvah] for legacy rows that have no stored
+  /// actual reading, using the running sum of consumed values per meter in
+  /// date order — i.e. the meter's cumulative value AT that entry. Rows with
+  /// stored actual readings are left untouched.
+  ///
+  /// When a meter has rows WITH stored readings, those act as anchors: legacy
+  /// rows after an anchor continue from the anchor value (the consumed chain
+  /// alone would drift, because meters don't start from zero).
+  ///
+  /// Legacy rows before any anchor are summed from zero (best effort — the
+  /// true opening reading is not in the DB).
+  static List<EnergyLogModel> hydrateActualReadings(
+    List<EnergyLogModel> logs,
+  ) {
+    final sorted = List<EnergyLogModel>.of(logs)
+      ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+    final anchorKwh = <String, double>{};
+    final anchorKvah = <String, double>{};
+    final tailKwh = <String, double>{};
+    final tailKvah = <String, double>{};
+    return sorted.map((m) {
+      final kwhAt = m.currentKwh ??
+          (anchorKwh[m.meterName] ?? 0) + (tailKwh[m.meterName] ?? 0) + m.kwh;
+      final kvahAt = m.currentKvah ??
+          (anchorKvah[m.meterName] ?? 0) + (tailKvah[m.meterName] ?? 0) +
+              m.kvah;
+      if (m.currentKwh != null) {
+        anchorKwh[m.meterName] = m.currentKwh!;
+        tailKwh[m.meterName] = 0;
+      } else {
+        tailKwh[m.meterName] = (tailKwh[m.meterName] ?? 0) + m.kwh;
+      }
+      if (m.currentKvah != null) {
+        anchorKvah[m.meterName] = m.currentKvah!;
+        tailKvah[m.meterName] = 0;
+      } else {
+        tailKvah[m.meterName] = (tailKvah[m.meterName] ?? 0) + m.kvah;
+      }
+      if (m.currentKwh != null && m.currentKvah != null) return m;
+      return EnergyLogModel(
+        id: m.id,
+        meterName: m.meterName,
+        kwh: m.kwh,
+        kvah: m.kvah,
+        currentKwh: kwhAt,
+        currentKvah: kvahAt,
+        rkvarhLag: m.rkvarhLag,
+        rkvarhLead: m.rkvarhLead,
+        powerFactor: m.powerFactor,
+        mdRecorded: m.mdRecorded,
+        contractDemand: m.contractDemand,
+        estimatedBill: m.estimatedBill,
+        loggedAt: m.loggedAt,
+        isSynced: m.isSynced,
+        userId: m.userId,
+        energyCharges: m.energyCharges,
+        demandCharges: m.demandCharges,
+        facCharges: m.facCharges,
+        wheelingCharges: m.wheelingCharges,
+        electricityDuty: m.electricityDuty,
+        taxes: m.taxes,
+        pfRebate: m.pfRebate,
+        pfSurcharge: m.pfSurcharge,
+        subsidy: m.subsidy,
+        netBill: m.netBill,
+        billingDemand: m.billingDemand,
+        loadFactor: m.loadFactor,
+        avgUnitCost: m.avgUnitCost,
+        multiplyingFactor: m.multiplyingFactor,
+      );
+    }).toList();
+  }
+
   static String? _tryGetCurrentUserId() {
     try {
       return Supabase.instance.client.auth.currentSession?.user.id;
@@ -378,6 +477,13 @@ class EnergyLogModel {
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value) ?? 0.0;
     return 0.0;
+  }
+
+  static double? _parseNullableDouble(Object? value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
   }
 
   static double _toPrecision(double value, int decimals) {

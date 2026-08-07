@@ -3,6 +3,12 @@ class EnergyLogEntity {
   final String meterName;
   final double kwh;
   final double kvah;
+
+  /// ACTUAL (cumulative) meter reading this entry was recorded against.
+  /// Null for legacy rows — hydrate reads it as the running sum of consumed.
+  final double? currentKwh;
+  final double? currentKvah;
+
   final double rkvarhLag;
   final double rkvarhLead;
   final double powerFactor;
@@ -33,6 +39,8 @@ class EnergyLogEntity {
     required this.meterName,
     required this.kwh,
     required this.kvah,
+    this.currentKwh,
+    this.currentKvah,
     required this.rkvarhLag,
     required this.rkvarhLead,
     required this.powerFactor,
@@ -63,6 +71,8 @@ class EnergyLogEntity {
     String? meterName,
     double? kwh,
     double? kvah,
+    double? currentKwh,
+    double? currentKvah,
     double? rkvarhLag,
     double? rkvarhLead,
     double? powerFactor,
@@ -92,6 +102,8 @@ class EnergyLogEntity {
       meterName: meterName ?? this.meterName,
       kwh: kwh ?? this.kwh,
       kvah: kvah ?? this.kvah,
+      currentKwh: currentKwh ?? this.currentKwh,
+      currentKvah: currentKvah ?? this.currentKvah,
       rkvarhLag: rkvarhLag ?? this.rkvarhLag,
       rkvarhLead: rkvarhLead ?? this.rkvarhLead,
       powerFactor: powerFactor ?? this.powerFactor,
@@ -131,6 +143,7 @@ class EnergyLogEntity {
   @override
   String toString() =>
       'EnergyLogEntity(id: $id, meterName: $meterName, kwh: $kwh, '
-      'kvah: $kvah, pf: $powerFactor, md: $mdRecorded, '
+      'kvah: $kvah, currentKwh: $currentKwh, currentKvah: $currentKvah, '
+      'pf: $powerFactor, md: $mdRecorded, '
       'bill: $estimatedBill, synced: $isSynced)';
 }

@@ -10,7 +10,7 @@ class ExportService {
     final buffer = StringBuffer();
 
     buffer.writeln(
-      'ID,Meter,kWh,kVAh,Power Factor,MD (kW),Contract Demand (kW),Est. Bill (₹),Logged At,Synced',
+      'ID,Meter,Reading kWh,Consumed kWh,Reading kVAh,Consumed kVAh,Power Factor,MD (kW),Contract Demand (kW),Est. Bill (₹),Logged At,Synced',
     );
 
     for (final log in logs) {
@@ -18,7 +18,9 @@ class ExportService {
         [
           _escapeCsv(log.id),
           _escapeCsv(log.meterName),
+          log.currentKwh?.toStringAsFixed(2) ?? '',
           log.kwh.toStringAsFixed(2),
+          log.currentKvah?.toStringAsFixed(2) ?? '',
           log.kvah.toStringAsFixed(2),
           log.powerFactor.toStringAsFixed(3),
           log.mdRecorded.toStringAsFixed(2),
