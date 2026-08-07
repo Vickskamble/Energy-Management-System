@@ -21,23 +21,21 @@ class DashboardChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final monthlySum = <int, double>{};
-    final monthlyCount = <int, int>{};
 
     if (selectedMonth != null) {
-      final daySum = <int, double>{};
-      final dayCount = <int, int>{};
+      final dayMax = <int, double>{};
       for (final log in logs) {
         if (log.loggedAt.year == selectedMonth!.year &&
             log.loggedAt.month == selectedMonth!.month) {
-          daySum.update(
+          final actualMd = log.mdRecorded * log.multiplyingFactor;
+          dayMax.update(
             log.loggedAt.day,
-            (v) => v + log.mdRecorded,
-            ifAbsent: () => log.mdRecorded,
+            (v) => actualMd > v ? actualMd : v,
+            ifAbsent: () => actualMd,
           );
-          dayCount.update(log.loggedAt.day, (v) => v + 1, ifAbsent: () => 1);
         }
       }
-      if (daySum.isEmpty) {
+      if (dayMax.isEmpty) {
         return const SizedBox(
           height: 220,
           child: Center(
@@ -57,8 +55,8 @@ class DashboardChart extends StatelessWidget {
         for (var d = 1; d <= daysInMonth; d++)
           FlSpot(
             d.toDouble(),
-            daySum.containsKey(d)
-                ? (daySum[d]! / dayCount[d]! * 100).roundToDouble() / 100
+            dayMax.containsKey(d)
+                ? (dayMax[d]! * 100).roundToDouble() / 100
                 : 0,
           ),
       ];
@@ -71,7 +69,7 @@ class DashboardChart extends StatelessWidget {
         children: [
           Row(
             children: [
-              _legendItem(AppColors.warning, 'Avg Demand (kVA)'),
+              _legendItem(AppColors.warning, 'Max Demand (kVA)'),
               const SizedBox(width: 16),
               _dashedLegendItem(AppColors.danger, 'Contract Demand'),
             ],
@@ -195,7 +193,7 @@ class DashboardChart extends StatelessWidget {
                         touchedSpots.map((spot) {
                       return LineTooltipItem(
                         'Day ${spot.x.toInt()}: '
-                        'Avg Demand ${spot.y.toStringAsFixed(1)} kVA',
+                        'Max Demand ${spot.y.toStringAsFixed(1)} kVA',
                         TextStyle(
                           color: AppColors.warning,
                           fontWeight: FontWeight.bold,
@@ -215,12 +213,12 @@ class DashboardChart extends StatelessWidget {
     for (final log in logs) {
       if (log.loggedAt.year == now.year) {
         final month = log.loggedAt.month;
+        final actualMd = log.mdRecorded * log.multiplyingFactor;
         monthlySum.update(
           month,
-          (v) => v + log.mdRecorded,
-          ifAbsent: () => log.mdRecorded,
+          (v) => actualMd > v ? actualMd : v,
+          ifAbsent: () => actualMd,
         );
-        monthlyCount.update(month, (v) => v + 1, ifAbsent: () => 1);
       }
     }
 
@@ -236,19 +234,17 @@ class DashboardChart extends StatelessWidget {
       );
     }
 
-    final avgPerMonth = List<double>.filled(12, 0);
+    final maxPerMonth = List<double>.filled(12, 0);
     for (final entry in monthlySum.entries) {
-      avgPerMonth[entry.key - 1] =
-          ((entry.value / monthlyCount[entry.key]!) * 100).roundToDouble() /
-          100;
+      maxPerMonth[entry.key - 1] = (entry.value * 100).roundToDouble() / 100;
     }
 
     final spots = <FlSpot>[
-      for (int i = 0; i < 12; i++) FlSpot(i.toDouble(), avgPerMonth[i]),
+      for (int i = 0; i < 12; i++) FlSpot(i.toDouble(), maxPerMonth[i]),
     ];
 
     final contractDemand = AppConstants.defaultContractDemandKva;
-    final maxAvg = avgPerMonth.reduce((a, b) => a > b ? a : b);
+    final maxAvg = maxPerMonth.reduce((a, b) => a > b ? a : b);
     final mdMaxY = (maxAvg > contractDemand ? maxAvg : contractDemand) * 1.2;
 
     return Column(
@@ -256,7 +252,7 @@ class DashboardChart extends StatelessWidget {
       children: [
         Row(
           children: [
-            _legendItem(AppColors.warning, 'Avg Demand (kVA)'),
+            _legendItem(AppColors.warning, 'Max Demand (kVA)'),
             const SizedBox(width: 16),
             _dashedLegendItem(AppColors.danger, 'Contract Demand'),
           ],
@@ -353,7 +349,7 @@ class DashboardChart extends StatelessWidget {
                   getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
                     return LineTooltipItem(
                       'Month ${spot.x.toInt() + 1}: '
-                      'Avg Demand ${spot.y.toStringAsFixed(1)} kVA',
+                      'Max Demand ${spot.y.toStringAsFixed(1)} kVA',
                       TextStyle(
                         color: AppColors.warning,
                         fontWeight: FontWeight.bold,

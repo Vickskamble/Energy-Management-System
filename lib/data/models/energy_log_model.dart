@@ -290,7 +290,7 @@ class EnergyLogModel {
     final pf = powerFactor ?? CalculationEngine.calculatePowerFactor(kwh, kvah);
     final totalUnits = kwh * multiplyingFactor;
     final billingDemand = CalculationEngine.calculateBillingDemand(
-      mdRecorded,
+      mdRecorded * multiplyingFactor,
       contractDemand,
     );
 

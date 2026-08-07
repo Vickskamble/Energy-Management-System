@@ -12,6 +12,13 @@ class AppConstants {
   static const double mdWarningRatio = 0.9;
   static const double pfCriticalThreshold = 0.90;
 
+  /// Billing demand floor — always at least this % of contract demand.
+  static const double billingDemandFloorPercent = 0.75;
+
+  /// Ratchet window — the highest monthly demand of the preceding N months
+  /// is always considered in the billing demand of the current month.
+  static const int ratchetWindowMonths = 11;
+
   static const double demandChargePerKva = 650.00;
   static const double facRatePerUnit = 0.30;
   static const double wheelingChargePerUnit = 0.81;

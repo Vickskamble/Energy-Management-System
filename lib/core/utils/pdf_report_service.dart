@@ -63,7 +63,9 @@ class PdfReportService {
     final totalBill = logs.fold<double>(0, (sum, l) => sum + l.estimatedBill);
     final peakMd = logs.fold<double>(
       0,
-      (peak, l) => l.mdRecorded > peak ? l.mdRecorded : peak,
+      (peak, l) => l.mdRecorded * l.multiplyingFactor > peak
+          ? l.mdRecorded * l.multiplyingFactor
+          : peak,
     );
     final avgPf = logs.isEmpty
         ? 0.0
@@ -142,7 +144,7 @@ class PdfReportService {
               l.kwh.toStringAsFixed(1),
               l.currentKvah != null ? l.currentKvah!.toStringAsFixed(1) : '—',
               l.powerFactor.toStringAsFixed(3),
-              l.mdRecorded.toStringAsFixed(1),
+              (l.mdRecorded * l.multiplyingFactor).toStringAsFixed(1),
               l.estimatedBill.toStringAsFixed(0),
               l.isSynced ? 'Cloud' : 'Pending',
             ],

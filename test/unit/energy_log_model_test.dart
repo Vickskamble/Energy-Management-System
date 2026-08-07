@@ -89,4 +89,30 @@ void main() {
       expect(EnergyLogModel.hydrateActualReadings([]), isEmpty);
     });
   });
+
+  group('EnergyLogModel.create billing demand (MD × MF)', () {
+    test('billing demand uses MD × multiplying factor', () {
+      final model = EnergyLogModel.create(
+        meterName: 'M1',
+        kwh: 100,
+        kvah: 120,
+        mdRecorded: 40,
+        loggedAt: DateTime(2026, 7, 1),
+      );
+      // 40 × 5 = 200 > 201 × 0.75 = 150.75
+      expect(model.billingDemand, 200);
+    });
+
+    test('contract floor applies when MD × MF is below 75% of contract', () {
+      final model = EnergyLogModel.create(
+        meterName: 'M1',
+        kwh: 100,
+        kvah: 120,
+        mdRecorded: 10,
+        loggedAt: DateTime(2026, 7, 1),
+      );
+      // 10 × 5 = 50 < 150.75 → floor
+      expect(model.billingDemand, closeTo(150.75, 0.01));
+    });
+  });
 }

@@ -34,6 +34,11 @@ class EnergyLogEntity {
   final double avgUnitCost;
   final double multiplyingFactor;
 
+  /// ACTUAL demand in kVA — the raw MD recorded by the meter (Excel/manual)
+  /// scaled by the meter's multiplying factor (CT/PT ratio). All displays and
+  /// calculations use this value; [mdRecorded] stays the raw meter reading.
+  double get actualMd => mdRecorded * multiplyingFactor;
+
   const EnergyLogEntity({
     required this.id,
     required this.meterName,

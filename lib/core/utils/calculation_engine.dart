@@ -30,7 +30,7 @@ class CalculationEngine {
     double mdRecorded,
     double contractDemand,
   ) {
-    return max(mdRecorded, contractDemand * 0.75);
+    return max(mdRecorded, contractDemand * AppConstants.billingDemandFloorPercent);
   }
 
   static double calculateEnergyCharges(double totalUnits, double rate) {

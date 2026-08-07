@@ -121,8 +121,9 @@ class EnergyRepository {
     for (final log in monthLogs) {
       totalKwh += log.kwh;
       totalKvah += log.kvah;
-      if (log.mdRecorded > maxDemandPeak) {
-        maxDemandPeak = log.mdRecorded;
+      final actualMd = log.mdRecorded * log.multiplyingFactor;
+      if (actualMd > maxDemandPeak) {
+        maxDemandPeak = actualMd;
       }
     }
 

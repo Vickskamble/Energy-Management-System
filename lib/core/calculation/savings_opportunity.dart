@@ -122,7 +122,8 @@ class SavingOpportunityGenerator {
       var peak = 0.0;
       for (final e in logs) {
         if (e.loggedAt.year == month.year && e.loggedAt.month == month.month) {
-          if (e.mdRecorded > peak) peak = e.mdRecorded;
+          final actualMd = e.mdRecorded * e.multiplyingFactor;
+          if (actualMd > peak) peak = actualMd;
         }
       }
       monthlyPeaks.add(peak);

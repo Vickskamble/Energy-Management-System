@@ -37,6 +37,7 @@ class DataValidator {
     required double? powerFactor,
     required double? contractDemand,
     bool isRequired = true,
+    double multiplyingFactor = AppConstants.multiplyingFactor,
   }) {
     final errors = <String>[];
     final warnings = <String>[];
@@ -75,18 +76,22 @@ class DataValidator {
     } else if (mdRecorded < 0) {
       errors.add('Maximum Demand cannot be negative (got $mdRecorded)');
     } else {
-      passed.add('Maximum Demand = $mdRecorded kW');
+      passed.add(
+        'Maximum Demand = ${mdRecorded * multiplyingFactor} kVA '
+        '(raw $mdRecorded × MF $multiplyingFactor)',
+      );
     }
 
     if (contractDemand != null && mdRecorded != null && contractDemand > 0) {
-      if (mdRecorded > contractDemand) {
+      final actualMd = mdRecorded * multiplyingFactor;
+      if (actualMd > contractDemand) {
         warnings.add(
-          'MD ($mdRecorded) exceeds Contract Demand ($contractDemand)',
+          'MD ($actualMd kVA) exceeds Contract Demand ($contractDemand)',
         );
       }
-      if (mdRecorded > contractDemand * 0.9) {
+      if (actualMd > contractDemand * 0.9) {
         warnings.add(
-          'MD ($mdRecorded) is >90% of Contract Demand ($contractDemand)',
+          'MD ($actualMd kVA) is >90% of Contract Demand ($contractDemand)',
         );
       }
     }

@@ -29,7 +29,7 @@ class DashboardPage extends StatefulWidget {
   /// Only refresh automatically while this tab is visible.
   final bool isActive;
 
-  /// Shared month filter â€” Dashboard, Analysis & Reports stay in sync.
+  /// Shared month filter — Dashboard, Analysis & Reports stay in sync.
   final MonthFilterController monthFilter;
 
   const DashboardPage({
@@ -179,7 +179,7 @@ class _DashboardContentState extends State<_DashboardContent> {
         _meterSites = {for (final m in meters) m.name: m.site};
       });
     } catch (_) {
-      // Best-effort â€” dashboard still renders without site filter.
+      // Best-effort — dashboard still renders without site filter.
     }
   }
 
@@ -207,10 +207,10 @@ class _DashboardContentState extends State<_DashboardContent> {
       .where((l) => _selection.matches(l.loggedAt))
       .toList();
 
-  /// "July 2026 â€” " prefix on KPI cards when a non-current month is viewed.
+  /// "July 2026 — " prefix on KPI cards when a non-current month is viewed.
   String get _kpiMonthLabel {
     if (_selection.isCurrent) return '';
-    return '${_selection.label} â€” ';
+    return '${_selection.label} — ';
   }
 
   /// Distinct months present in the (site-filtered) data, for the filter bar.
@@ -226,11 +226,14 @@ class _DashboardContentState extends State<_DashboardContent> {
     return list;
   }
 
-  /// Site-aware KPI values â€” full-data values when "All Sites".
+  /// Site-aware KPI values — full-data values when "All Sites".
   double get _siteEstimatedBill {
     // Full estimated bill (energy + demand + charges + taxes), not just the
     // energy-charge figure stored per reading.
-    return BillCalculator.calculate(logs: _selectedMonthLogs).netBill;
+    return BillCalculator.calculate(
+      logs: _selectedMonthLogs,
+      ratchetLogs: _siteLogs,
+    ).netBill;
   }
 
   double get _siteTotalConsumption {
@@ -239,11 +242,19 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   double get _siteMaxDemandPeak {
-    return _selectedMonthLogs.fold(0.0, (s, e) => e.mdRecorded > s ? e.mdRecorded : s);
+    return _selectedMonthLogs.fold(
+      0.0,
+      (s, e) => e.mdRecorded * e.multiplyingFactor > s
+          ? e.mdRecorded * e.multiplyingFactor
+          : s,
+    );
   }
 
   double get _sitePowerFactor {
-    return BillCalculator.calculate(logs: _selectedMonthLogs).powerFactor;
+    return BillCalculator.calculate(
+      logs: _selectedMonthLogs,
+      ratchetLogs: _siteLogs,
+    ).powerFactor;
   }
 
   /// Today's usage (current month) or the selected month's daily average.
@@ -311,7 +322,10 @@ class _DashboardContentState extends State<_DashboardContent> {
   Widget build(BuildContext context) {
     final entityLogs = _siteLogs;
     final monthLogs = _selectedMonthLogs;
-    final breakdown = BillCalculator.calculate(logs: monthLogs);
+    final breakdown = BillCalculator.calculate(
+      logs: monthLogs,
+      ratchetLogs: entityLogs,
+    );
     final kpis = BillCalculator.calculateKpis(breakdown);
     final now = DateTime.now();
     final isCurrentMonth = _selection.isCurrent;
@@ -330,10 +344,13 @@ class _DashboardContentState extends State<_DashboardContent> {
         .toList();
     final currentMonthBreakdown = monthLogs.isEmpty
         ? null
-        : BillCalculator.calculate(logs: monthLogs);
+        : BillCalculator.calculate(logs: monthLogs, ratchetLogs: entityLogs);
     final previousBreakdown = previousMonthLogs.isEmpty
         ? null
-        : BillCalculator.calculate(logs: previousMonthLogs);
+        : BillCalculator.calculate(
+            logs: previousMonthLogs,
+            ratchetLogs: entityLogs,
+          );
     final comparison = currentMonthBreakdown == null
         ? null
         : BillCalculator.compare(currentMonthBreakdown, previousBreakdown);
@@ -342,6 +359,7 @@ class _DashboardContentState extends State<_DashboardContent> {
         ? BillForecastCalculator.calculate(
             monthLogs: monthLogs,
             referenceDate: now,
+            ratchetLogs: entityLogs,
           )
         : null;
     final opportunities = SavingOpportunityGenerator.generate(breakdown);
@@ -390,7 +408,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             title: 'Energy Overview',
             subtitle: _kpiMonthLabel.isEmpty
                 ? 'Bill analysis and monitoring dashboard'
-                : '${_selection.label} â€” bill analysis & monitoring',
+                : '${_selection.label} — bill analysis & monitoring',
           ),
           const SizedBox(height: AppSpacing.lg),
 
@@ -438,12 +456,12 @@ class _DashboardContentState extends State<_DashboardContent> {
               AppKpiCard(
                 title: 'Est. Monthly Bill',
                 value: _siteEstimatedBill,
-                suffix: 'â‚¹',
+                suffix: '₹',
                 icon: Icons.account_balance_wallet_rounded,
                 color: AppColors.kpiCost,
                 decimals: 0,
                 description:
-                    '${_kpiMonthLabel}Avg unit cost: â‚¹${breakdown.averageUnitCost.toStringAsFixed(2)}',
+                    '${_kpiMonthLabel}Avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
               ),
               AppKpiCard(
                 title: 'Total Consumption',
@@ -499,7 +517,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                           : AppColors.danger),
                 decimals: 0,
                 description: kpis.billHealthScore >= 80
-                    ? 'Good â€” all parameters optimized'
+                    ? 'Good — all parameters optimized'
                     : kpis.billHealthScore >= 60
                     ? 'Needs attention'
                     : 'Critical issues',
@@ -526,8 +544,8 @@ class _DashboardContentState extends State<_DashboardContent> {
                 icon: Icons.today_rounded,
                 color: AppColors.kpiSavings,
                 description: _selection.isCurrent
-                    ? 'Last reading â€” consumption in units (kWh Ã— MF)'
-                    : '${_selection.label} average per day (kWh Ã— MF)',
+                    ? 'Last reading — consumption in units (kWh × MF)'
+                    : '${_selection.label} average per day (kWh × MF)',
               ),
             ],
           ),
@@ -542,7 +560,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           if (opportunities.isNotEmpty) ...[
             AppSectionHeader(
               title: 'Bill Saving Opportunities',
-              subtitle: 'Direct monthly savings â€” priority order me',
+              subtitle: 'Direct monthly savings — priority order me',
             ),
             if (MediaQuery.of(context).size.width < 600)
               Column(
@@ -820,7 +838,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     ),
                   ),
                   Text(
-                    '${events[i].mdRecorded.toStringAsFixed(1)} / '
+                    '${(events[i].mdRecorded * events[i].multiplyingFactor).toStringAsFixed(1)} / '
                     '${events[i].contractDemand.toStringAsFixed(0)} kVA',
                     style: const TextStyle(
                       fontSize: 12,
@@ -835,13 +853,16 @@ class _DashboardContentState extends State<_DashboardContent> {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: events[i].mdRecorded >= events[i].contractDemand
+                      color: events[i].mdRecorded *
+                                  events[i].multiplyingFactor >=
+                              events[i].contractDemand
                           ? AppColors.danger
                           : AppColors.warning,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      events[i].mdRecorded >= events[i].contractDemand
+                      events[i].mdRecorded * events[i].multiplyingFactor >=
+                              events[i].contractDemand
                           ? 'BREACH'
                           : 'NEAR',
                       style: const TextStyle(
@@ -865,7 +886,8 @@ class _DashboardContentState extends State<_DashboardContent> {
       ..sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
     return sorted
         .where(
-          (l) => l.mdRecorded >= l.contractDemand * AppConstants.mdWarningRatio,
+          (l) => l.mdRecorded * l.multiplyingFactor >=
+              l.contractDemand * AppConstants.mdWarningRatio,
         )
         .take(5)
         .toList();
@@ -938,7 +960,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                       ),
                       const SizedBox(width: 3),
                       Text(
-                        'Saved â‚¹${comparison.billDifference.abs().toStringAsFixed(0)}',
+                        'Saved ₹${comparison.billDifference.abs().toStringAsFixed(0)}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -967,10 +989,10 @@ class _DashboardContentState extends State<_DashboardContent> {
           else ...[
             _comparisonRow(
               label: 'Est. Bill',
-              value: 'â‚¹${comparison.current.netBill.toStringAsFixed(0)}',
+              value: '₹${comparison.current.netBill.toStringAsFixed(0)}',
               chipText: comparison.previous == null
                   ? 'first month'
-                  : '${comparison.billDifference >= 0 ? 'â†‘' : 'â†“'} ${comparison.billPercentChange.abs().toStringAsFixed(1)}%',
+                  : '${comparison.billDifference >= 0 ? '↑' : '↓'} ${comparison.billPercentChange.abs().toStringAsFixed(1)}%',
               isGood: comparison.billDifference <= 0,
               chipNeutral: comparison.previous == null,
             ),
@@ -980,7 +1002,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               value: '${comparison.current.totalUnits.toStringAsFixed(0)} kWh',
               chipText: comparison.previous == null
                   ? 'first month'
-                  : '${comparison.unitDifference >= 0 ? 'â†‘' : 'â†“'} ${comparison.unitPercentChange.abs().toStringAsFixed(1)}%',
+                  : '${comparison.unitDifference >= 0 ? '↑' : '↓'} ${comparison.unitPercentChange.abs().toStringAsFixed(1)}%',
               isGood: comparison.unitDifference <= 0,
               chipNeutral: comparison.previous == null,
             ),
@@ -991,7 +1013,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                   '${comparison.current.billingDemand.toStringAsFixed(1)} kVA',
               chipText: comparison.previous == null
                   ? 'first month'
-                  : '${comparison.demandDifference >= 0 ? 'â†‘' : 'â†“'} ${comparison.demandPercentChange.abs().toStringAsFixed(1)}%',
+                  : '${comparison.demandDifference >= 0 ? '↑' : '↓'} ${comparison.demandPercentChange.abs().toStringAsFixed(1)}%',
               isGood: comparison.demandDifference <= 0,
               chipNeutral: comparison.previous == null,
             ),
@@ -1104,7 +1126,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             ),
             const SizedBox(height: 4),
             Text(
-              'â‚¹${forecast.projectedBill.toStringAsFixed(0)}',
+              '₹${forecast.projectedBill.toStringAsFixed(0)}',
               style: AppTypography.mono(
                 size: 28,
                 weight: FontWeight.w700,
@@ -1113,7 +1135,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             ),
             const SizedBox(height: 4),
             Text(
-              'â‰ˆ ${forecast.projectedUnits.toStringAsFixed(0)} kWh units',
+              '≈ ${forecast.projectedUnits.toStringAsFixed(0)} kWh units',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             const Divider(height: 24),
@@ -1121,7 +1143,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               children: [
                 _forecastStat(
                   'Avg / day',
-                  'â‚¹${forecast.dailyAverageBill.toStringAsFixed(0)}',
+                  '₹${forecast.dailyAverageBill.toStringAsFixed(0)}',
                 ),
                 _forecastStat(
                   'Days left',
@@ -1145,7 +1167,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Aaj ki usage rate par estimated â€” readings badhne par update hoga',
+              'Aaj ki usage rate par estimated — readings badhne par update hoga',
               style: TextStyle(
                 fontSize: 10.5,
                 fontStyle: FontStyle.italic,
@@ -1189,11 +1211,11 @@ class _DashboardContentState extends State<_DashboardContent> {
         : Icons.check_circle_rounded;
     final String text;
     if (hasPfIssue && hasMdIssue) {
-      text = '2 alerts â€” PF penalty & Max Demand high';
+      text = '2 alerts — PF penalty & Max Demand high';
     } else if (hasPfIssue) {
-      text = '1 alert â€” Low PF (below ${AppConstants.pfPenaltyThreshold})';
+      text = '1 alert — Low PF (below ${AppConstants.pfPenaltyThreshold})';
     } else if (hasMdIssue) {
-      text = '1 alert â€” Max Demand high';
+      text = '1 alert — Max Demand high';
     } else {
       text = 'All systems normal';
     }
@@ -1437,7 +1459,7 @@ class _SavingOpportunityCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'â‚¹${opportunity.monthlySavings.toStringAsFixed(0)}/month',
+            '₹${opportunity.monthlySavings.toStringAsFixed(0)}/month',
             style: AppTypography.mono(
               size: 24,
               weight: FontWeight.w700,
@@ -1675,7 +1697,7 @@ class _RecommendationCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        'Potential savings: â‚¹${rec.estimatedSavings!.toStringAsFixed(0)}/month',
+                        'Potential savings: ₹${rec.estimatedSavings!.toStringAsFixed(0)}/month',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

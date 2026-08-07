@@ -4,10 +4,10 @@ import '../theme/app_colors.dart';
 
 /// Month selection shared by all analytics screens.
 ///
-/// - [month] == null and [allTime] == false â†’ "This Month": auto-follows the
+/// - [month] == null and [allTime] == false → "This Month": auto-follows the
 ///   current month, so every screen shows live data when a new month starts.
-/// - [allTime] == true â†’ no month filter (Reports "All Time").
-/// - otherwise â†’ the exact (year, month) the user picked.
+/// - [allTime] == true → no month filter (Reports "All Time").
+/// - otherwise → the exact (year, month) the user picked.
 class MonthFilterValue {
   const MonthFilterValue.current() : month = null, allTime = false;
   const MonthFilterValue.allTime() : month = null, allTime = true;
@@ -52,12 +52,12 @@ class MonthFilterController extends ValueNotifier<MonthFilterValue> {
 /// Top filter bar: "This Month" + every month present in the data + optional
 /// "All Time" + a calendar picker for any month.
 ///
-/// Place it at the top of every analytics screen â€” the same controller is
+/// Place it at the top of every analytics screen — the same controller is
 /// shared across screens, so picking a month on one screen applies everywhere.
 class MonthFilterBar extends StatelessWidget {
   final MonthFilterController controller;
 
-  /// Distinct months present in the data (any order â€” deduped + sorted here).
+  /// Distinct months present in the data (any order — deduped + sorted here).
   final List<DateTime> availableMonths;
 
   /// Show the "All Time" option (used by Reports).

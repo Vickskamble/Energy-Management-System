@@ -253,64 +253,118 @@ class _ReportsContentState extends State<_ReportsContent> {
   Widget build(BuildContext context) {
     final currencyFmt = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
     final entityLogs = _visibleLogs;
-    final breakdown = BillCalculator.calculate(logs: entityLogs);
+    final breakdown = BillCalculator.calculate(
+      logs: entityLogs,
+      ratchetLogs: _allEntities,
+    );
     final kpis = BillCalculator.calculateKpis(breakdown);
 
+    final isNarrow = MediaQuery.of(context).size.width < 600;
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.page),
       children: [
         AppSectionHeader(
           title: 'Reports',
           subtitle: 'Executive summary and detailed analysis',
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppButtonOutline(
-                label: 'Import Data',
-                icon: Icons.file_upload_outlined,
-                onPressed: () => _pickAndImportExcel(context),
-              ),
-              const SizedBox(width: 8),
-              AppButtonOutline(
-                label: 'PDF',
-                icon: Icons.picture_as_pdf_outlined,
-                onPressed: () async {
-                  final entities = _visibleLogs;
-                  try {
-                    await PdfReportService.exportPdf(
-                      logs: entities,
-                      title: 'Energy Management Report',
-                      subtitle:
-                          '${entities.length} reading(s) — '
-                          '${_selection.label}${_meter != null ? ', $_meter' : ''}',
-                    );
-                  } catch (e) {
-                    AppLogger.e('PDF export failed', e);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('PDF export failed: $e'),
-                          backgroundColor: Colors.red.shade700,
-                        ),
-                      );
-                    }
-                  }
-                },
-              ),
-              const SizedBox(width: 8),
-              AppButtonOutline(
-                label: 'Export CSV',
-                icon: Icons.file_download_rounded,
-                onPressed: () => ExportService().exportCsv(_visibleLogs),
-              ),
-            ],
-          ),
+          trailing: isNarrow
+              ? null
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppButtonOutline(
+                      label: 'Import Data',
+                      icon: Icons.file_upload_outlined,
+                      onPressed: () => _pickAndImportExcel(context),
+                    ),
+                    const SizedBox(width: 8),
+                    AppButtonOutline(
+                      label: 'PDF',
+                      icon: Icons.picture_as_pdf_outlined,
+                      onPressed: () async {
+                        final entities = _visibleLogs;
+                        try {
+                          await PdfReportService.exportPdf(
+                            logs: entities,
+                            title: 'Energy Management Report',
+                            subtitle:
+                                '${entities.length} reading(s) — '
+                                '${_selection.label}${_meter != null ? ', $_meter' : ''}',
+                          );
+                        } catch (e) {
+                          AppLogger.e('PDF export failed', e);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('PDF export failed: $e'),
+                                backgroundColor: Colors.red.shade700,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    AppButtonOutline(
+                      label: 'Export CSV',
+                      icon: Icons.file_download_rounded,
+                      onPressed: () => ExportService().exportCsv(_visibleLogs),
+                    ),
+                  ],
+                ),
         ),
+        if (isNarrow) ...[
+          const SizedBox(height: 4),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                AppButtonOutline(
+                  label: 'Import Data',
+                  icon: Icons.file_upload_outlined,
+                  onPressed: () => _pickAndImportExcel(context),
+                ),
+                const SizedBox(width: 8),
+                AppButtonOutline(
+                  label: 'PDF',
+                  icon: Icons.picture_as_pdf_outlined,
+                  onPressed: () async {
+                    final entities = _visibleLogs;
+                    try {
+                      await PdfReportService.exportPdf(
+                        logs: entities,
+                        title: 'Energy Management Report',
+                        subtitle:
+                            '${entities.length} reading(s) — '
+                            '${_selection.label}${_meter != null ? ', $_meter' : ''}',
+                      );
+                    } catch (e) {
+                      AppLogger.e('PDF export failed', e);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('PDF export failed: $e'),
+                            backgroundColor: Colors.red.shade700,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+                AppButtonOutline(
+                  label: 'Export CSV',
+                  icon: Icons.file_download_rounded,
+                  onPressed: () => ExportService().exportCsv(_visibleLogs),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<String?>(
+        if (isNarrow)
+          Column(
+            children: [
+              DropdownButtonFormField<String?>(
                 key: ValueKey(_site),
                 initialValue: _site,
                 decoration: const InputDecoration(
@@ -334,10 +388,8 @@ class _ReportsContentState extends State<_ReportsContent> {
                   _meter = null;
                 }),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: DropdownButtonFormField<String?>(
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
                 key: ValueKey(_meter),
                 initialValue: _meter,
                 decoration: const InputDecoration(
@@ -358,17 +410,77 @@ class _ReportsContentState extends State<_ReportsContent> {
                 ],
                 onChanged: (v) => setState(() => _meter = v),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: MonthFilterBar(
+              const SizedBox(height: 12),
+              MonthFilterBar(
                 controller: widget.monthFilter,
                 availableMonths: _monthKeys,
                 includeAllTime: true,
               ),
-            ),
-          ],
-        ),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String?>(
+                  key: ValueKey(_site),
+                  initialValue: _site,
+                  decoration: const InputDecoration(
+                    labelText: 'Site',
+                    isDense: true,
+                    prefixIcon: Icon(Icons.factory_outlined, size: 20),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('All Sites'),
+                    ),
+                    for (final site in _siteNames)
+                      DropdownMenuItem<String?>(
+                        value: site,
+                        child: Text(site),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _site = v;
+                    _meter = null;
+                  }),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<String?>(
+                  key: ValueKey(_meter),
+                  initialValue: _meter,
+                  decoration: const InputDecoration(
+                    labelText: 'Meter',
+                    isDense: true,
+                    prefixIcon: Icon(Icons.speed_rounded, size: 20),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('All Meters'),
+                    ),
+                    for (final name in _meterNames)
+                      DropdownMenuItem<String?>(
+                        value: name,
+                        child: Text(name),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() => _meter = v),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: MonthFilterBar(
+                  controller: widget.monthFilter,
+                  availableMonths: _monthKeys,
+                  includeAllTime: true,
+                ),
+              ),
+            ],
+          ),
         _buildExecutiveSummary(currencyFmt, entityLogs, breakdown, kpis),
         const SizedBox(height: AppSpacing.lg),
         _buildMonthlyHistory(),
@@ -446,13 +558,25 @@ class _ReportsContentState extends State<_ReportsContent> {
                   ],
                 ),
               ),
-              AppButtonOutline(
+              if (MediaQuery.of(context).size.width >= 600)
+                AppButtonOutline(
+                  label: 'Enter Actual Bill',
+                  icon: Icons.edit_note_rounded,
+                  onPressed: () => _promptActualBill(context, months),
+                ),
+            ],
+          ),
+          if (MediaQuery.of(context).size.width < 600) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: AppButtonOutline(
                 label: 'Enter Actual Bill',
                 icon: Icons.edit_note_rounded,
                 onPressed: () => _promptActualBill(context, months),
               ),
-            ],
-          ),
+            ),
+          ],
           const SizedBox(height: 16),
           if (months.isEmpty)
             const Text(
@@ -511,50 +635,107 @@ class _ReportsContentState extends State<_ReportsContent> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 500;
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'Est. ${currencyFmt.format(estimated)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        actual == null
+                            ? '—'
+                            : 'Actual ${currencyFmt.format(actual)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      diffText,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: diffColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              'Est. ${currencyFmt.format(estimated)}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
+              Expanded(
+                child: Text(
+                  'Est. ${currencyFmt.format(estimated)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              actual == null
-                  ? '—'
-                  : 'Actual ${currencyFmt.format(actual)}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
+              Expanded(
+                child: Text(
+                  actual == null
+                      ? '—'
+                      : 'Actual ${currencyFmt.format(actual)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              diffText,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: diffColor,
+              Expanded(
+                child: Text(
+                  diffText,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: diffColor,
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -773,58 +954,100 @@ class _ReportsContentState extends State<_ReportsContent> {
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const Divider(height: 24),
-          Row(
-            children: [
-              _summaryItem(
-                'Est. Net Bill',
-                currencyFmt.format(breakdown.netBill),
-                AppColors.kpiCost,
-              ),
-              _summaryItem(
-                'Total Units',
-                '${breakdown.totalUnits.toStringAsFixed(0)} kWh',
-                AppColors.kpiEnergy,
-              ),
-              _summaryItem(
-                'Avg Unit Cost',
-                '₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
-                AppColors.kpiCost,
-              ),
-              _summaryItem(
-                'Bill Health',
-                '${kpis.billHealthScore.toStringAsFixed(0)}/100',
-                kpis.billHealthScore >= 80
-                    ? AppColors.success
-                    : AppColors.warning,
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth < 360 ? 2 : 4;
+              final width =
+                  (constraints.maxWidth - 12 * (columns - 1)) / columns;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: width,
+                    child: _summaryItem(
+                      'Est. Net Bill',
+                      currencyFmt.format(breakdown.netBill),
+                      AppColors.kpiCost,
+                    ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: _summaryItem(
+                      'Total Units',
+                      '${breakdown.totalUnits.toStringAsFixed(0)} kWh',
+                      AppColors.kpiEnergy,
+                    ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: _summaryItem(
+                      'Avg Unit Cost',
+                      '₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
+                      AppColors.kpiCost,
+                    ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: _summaryItem(
+                      'Bill Health',
+                      '${kpis.billHealthScore.toStringAsFixed(0)}/100',
+                      kpis.billHealthScore >= 80
+                          ? AppColors.success
+                          : AppColors.warning,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              _summaryItem(
-                'Power Factor',
-                breakdown.powerFactor.toStringAsFixed(3),
-                AppColors.kpiPower,
-              ),
-              _summaryItem(
-                'Billing Demand',
-                '${breakdown.billingDemand.toStringAsFixed(1)} kVA',
-                AppColors.kpiDemand,
-              ),
-              _summaryItem(
-                'Load Factor',
-                '${(breakdown.loadFactor * 100).toStringAsFixed(0)}%',
-                breakdown.loadFactor >= 0.75
-                    ? AppColors.success
-                    : AppColors.warning,
-              ),
-              _summaryItem(
-                'Energy Score',
-                '${kpis.energyScore.toStringAsFixed(0)}/100',
-                AppColors.kpiEfficiency,
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth < 360 ? 2 : 4;
+              final width =
+                  (constraints.maxWidth - 12 * (columns - 1)) / columns;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: width,
+                    child: _summaryItem(
+                      'Power Factor',
+                      breakdown.powerFactor.toStringAsFixed(3),
+                      AppColors.kpiPower,
+                    ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: _summaryItem(
+                      'Billing Demand',
+                      '${breakdown.billingDemand.toStringAsFixed(1)} kVA',
+                      AppColors.kpiDemand,
+                    ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: _summaryItem(
+                      'Load Factor',
+                      '${(breakdown.loadFactor * 100).toStringAsFixed(0)}%',
+                      breakdown.loadFactor >= 0.75
+                          ? AppColors.success
+                          : AppColors.warning,
+                    ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: _summaryItem(
+                      'Energy Score',
+                      '${kpis.energyScore.toStringAsFixed(0)}/100',
+                      AppColors.kpiEfficiency,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -832,25 +1055,23 @@ class _ReportsContentState extends State<_ReportsContent> {
   }
 
   Widget _summaryItem(String label, String value, Color color) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: color,
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -876,7 +1097,9 @@ class _ReportsContentState extends State<_ReportsContent> {
             ),
             Text(log.kvah.toStringAsFixed(1)),
             Text(log.powerFactor.toStringAsFixed(3)),
-            Text(log.mdRecorded.toStringAsFixed(1)),
+            Text(
+              (log.mdRecorded * log.multiplyingFactor).toStringAsFixed(1),
+            ),
             Text('₹ ${log.estimatedBill.toStringAsFixed(0)}'),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

@@ -35,14 +35,14 @@ void main() {
 
       expect(breakdown.totalUnits, 1000); // 200 kWh × 5 MF
       expect(breakdown.powerFactor, closeTo(0.800, 0.001));
-      expect(breakdown.billingDemand, 300); // max(300, 400×0.75)
+      expect(breakdown.billingDemand, 1500); // max(300 raw × 5 MF, 400×0.75)
       expect(breakdown.energyCharges, closeTo(8440, 0.01)); // 1000 × 8.44
-      expect(breakdown.demandCharges, closeTo(195000, 0.01)); // 300 × 650
+      expect(breakdown.demandCharges, closeTo(975000, 0.01)); // 1500 × 650
       expect(breakdown.facCharges, closeTo(300, 0.01)); // 1000 × 0.30
       expect(breakdown.wheelingCharges, closeTo(810, 0.01)); // 1000 × 0.81
       expect(breakdown.electricityDuty, closeTo(275, 0.01)); // 1000 × 0.275
       expect(breakdown.taxes, closeTo(279, 0.01)); // 1000 × 0.279
-      expect(breakdown.pfSurcharge, closeTo(10172, 0.01)); // PF 0.8 < 0.9 → 5%
+      expect(breakdown.pfSurcharge, closeTo(49172, 0.01)); // PF 0.8 < 0.9 → 5%
       expect(breakdown.pfRebate, 0);
       expect(breakdown.loadFactor, 1.0);
     });
@@ -53,7 +53,7 @@ void main() {
       );
 
       expect(breakdown.powerFactor, 1.0);
-      expect(breakdown.pfRebate, closeTo(2034.4, 0.01)); // 1% of (8440+195000)
+      expect(breakdown.pfRebate, closeTo(9834.4, 0.01)); // 1% of (8440+975000)
       expect(breakdown.pfSurcharge, 0);
     });
 
@@ -73,6 +73,81 @@ void main() {
       );
 
       expect(breakdown.billingDemand, 300); // 400 × 0.75 floor
+    });
+
+    test('ratchet: preceding month peak (MD × MF) is considered', () {
+      final breakdown = BillCalculator.calculate(
+        logs: [_log(kwh: 100, kvah: 120, md: 10)],
+        contractDemand: 400,
+        ratchetLogs: [
+          EnergyLogEntity(
+            id: 'dec',
+            meterName: 'Meter-01',
+            kwh: 90,
+            kvah: 100,
+            rkvarhLag: 0,
+            rkvarhLead: 0,
+            powerFactor: 0.9,
+            mdRecorded: 60, // Dec 2025 → 60 × 5 = 300
+            contractDemand: 400,
+            estimatedBill: 0,
+            loggedAt: DateTime(2025, 12, 15),
+            multiplyingFactor: 5,
+          ),
+        ],
+      );
+
+      expect(breakdown.billingDemand, 300); // ratchet peak beats current + floor
+    });
+
+    test('ratchet: current month demand breaks the ratchet peak', () {
+      final breakdown = BillCalculator.calculate(
+        logs: [_log(kwh: 100, kvah: 120, md: 100)],
+        contractDemand: 400,
+        ratchetLogs: [
+          EnergyLogEntity(
+            id: 'dec',
+            meterName: 'Meter-01',
+            kwh: 90,
+            kvah: 100,
+            rkvarhLag: 0,
+            rkvarhLead: 0,
+            powerFactor: 0.9,
+            mdRecorded: 60, // 60 × 5 = 300
+            contractDemand: 400,
+            estimatedBill: 0,
+            loggedAt: DateTime(2025, 12, 15),
+            multiplyingFactor: 5,
+          ),
+        ],
+      );
+
+      expect(breakdown.billingDemand, 500); // 100 × 5 = 500 > 300
+    });
+
+    test('ratchet: peaks older than the window are ignored', () {
+      final breakdown = BillCalculator.calculate(
+        logs: [_log(kwh: 100, kvah: 120, md: 10)],
+        contractDemand: 400,
+        ratchetLogs: [
+          EnergyLogEntity(
+            id: 'old',
+            meterName: 'Meter-01',
+            kwh: 90,
+            kvah: 100,
+            rkvarhLag: 0,
+            rkvarhLead: 0,
+            powerFactor: 0.9,
+            mdRecorded: 500, // Jan 2025 — outside 11-month window
+            contractDemand: 400,
+            estimatedBill: 0,
+            loggedAt: DateTime(2025, 1, 15),
+            multiplyingFactor: 5,
+          ),
+        ],
+      );
+
+      expect(breakdown.billingDemand, 300); // only the contract floor applies
     });
 
     test('returns zeroed breakdown for empty logs', () {
@@ -122,7 +197,7 @@ void main() {
   group('BillCalculator.calculateKpis', () {
     test('perfect parameters score 100', () {
       final breakdown = BillCalculator.calculate(
-        logs: [_log(kwh: 200, kvah: 200, md: 300)],
+        logs: [_log(kwh: 200, kvah: 200, md: 60)], // 60 × 5 = 300 ≤ 400
         contractDemand: 400,
       );
       final kpis = BillCalculator.calculateKpis(breakdown);

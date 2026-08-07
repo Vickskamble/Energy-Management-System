@@ -19,6 +19,9 @@ class BillCalculator {
     List<double>? todMultipliers,
     double regionSubsidy = 0,
     double rebateSection106 = 0,
+    List<EnergyLogEntity>? ratchetLogs,
+    double ratchetFloorPercent = AppConstants.billingDemandFloorPercent,
+    int ratchetMonths = AppConstants.ratchetWindowMonths,
   }) {
     final effectiveEnergyRate = energyRate ?? AppConfig.tariffPerUnit;
     final effectiveDemandRate = demandRate ?? AppConfig.demandChargePerKva;
@@ -38,8 +41,9 @@ class BillCalculator {
     for (final log in logs) {
       totalKwh += log.kwh;
       totalKvah += log.kvah;
-      if (log.mdRecorded > peakMd) peakMd = log.mdRecorded;
-      sumMd += log.mdRecorded;
+      final actualMd = log.mdRecorded * log.multiplyingFactor;
+      if (actualMd > peakMd) peakMd = actualMd;
+      sumMd += actualMd;
       mdCount++;
     }
 
@@ -55,6 +59,8 @@ class BillCalculator {
     final billingDemand = EnergyCalculator.calculateBillingDemand(
       peakMd,
       contractDemand,
+      ratchetFloorPercent: ratchetFloorPercent,
+      ratchetPeak: _ratchetPeak(logs, ratchetLogs, ratchetMonths),
     );
     final avgDemand = mdCount > 0 ? sumMd / mdCount.toDouble() : 0.0;
     final loadFactor = EnergyCalculator.calculateLoadFactor(avgDemand, peakMd);
@@ -256,8 +262,56 @@ class BillCalculator {
     );
   }
 
-  static BillBreakdown _emptyBreakdown(double contractDemand) {
-    return BillBreakdown(
+  /// Ratchet peak — the highest monthly demand (actual kVA = MD × MF) over
+  /// the trailing window [latest month of [logs] − [ratchetMonths] months ..
+  /// latest month]. The monthly maximum is computed from the full history
+  /// ([ratchetLogs]); once a peak occurs it stays in the billing demand of
+  /// every following month until a higher one breaks it or it leaves the
+  /// window. Returns 0 when no history is provided (old behavior: only the
+  /// current month + contract floor apply).
+  static double _ratchetPeak(
+    List<EnergyLogEntity> logs,
+    List<EnergyLogEntity>? ratchetLogs,
+    int ratchetMonths,
+  ) {
+    if (ratchetLogs == null || ratchetLogs.isEmpty || ratchetMonths < 1) {
+      return 0;
+    }
+    DateTime? latestMonth;
+    for (final log in logs) {
+      final m = DateTime(log.loggedAt.year, log.loggedAt.month);
+      if (latestMonth == null || m.isAfter(latestMonth)) latestMonth = m;
+    }
+    if (latestMonth == null) return 0;
+
+    final windowStart = DateTime(
+      latestMonth.year,
+      latestMonth.month - ratchetMonths,
+      1,
+    );
+    final windowEnd = DateTime(latestMonth.year, latestMonth.month + 1, 1);
+    final monthlyMax = <int, double>{};
+    for (final log in ratchetLogs) {
+      if (log.loggedAt.isBefore(windowStart) ||
+          !log.loggedAt.isBefore(windowEnd)) {
+        continue;
+      }
+      final key = log.loggedAt.year * 12 + (log.loggedAt.month - 1);
+      final actualMd = log.mdRecorded * log.multiplyingFactor;
+      monthlyMax.update(
+        key,
+        (v) => actualMd > v ? actualMd : v,
+        ifAbsent: () => actualMd,
+      );
+    }
+    var ratchetPeak = 0.0;
+    for (final v in monthlyMax.values) {
+      if (v > ratchetPeak) ratchetPeak = v;
+    }
+    return ratchetPeak;
+  }
+
+  static BillBreakdown _emptyBreakdown(double contractDemand) {    return BillBreakdown(
       totalUnits: 0,
       energyCharges: 0,
       demandCharges: 0,
