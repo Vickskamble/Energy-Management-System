@@ -11,9 +11,14 @@ class EnergyCalculator {
 
   static double calculateBillingDemand(
     double mdRecorded,
-    double contractDemand,
-  ) {
-    return max(mdRecorded, contractDemand * 0.75);
+    double contractDemand, {
+    double ratchetFloorPercent = AppConstants.billingDemandFloorPercent,
+    double ratchetPeak = 0,
+  }) {
+    return max(
+      max(mdRecorded, ratchetPeak),
+      contractDemand * ratchetFloorPercent,
+    );
   }
 
   static double calculateEnergyCharges(double totalUnits, double rate) {

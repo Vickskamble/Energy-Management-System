@@ -23,7 +23,7 @@ class ExportService {
           log.currentKvah?.toStringAsFixed(2) ?? '',
           log.kvah.toStringAsFixed(2),
           log.powerFactor.toStringAsFixed(3),
-          log.mdRecorded.toStringAsFixed(2),
+          (log.mdRecorded * log.multiplyingFactor).toStringAsFixed(2),
           log.contractDemand.toStringAsFixed(2),
           log.estimatedBill.toStringAsFixed(2),
           _escapeCsv(dateFmt.format(log.loggedAt)),

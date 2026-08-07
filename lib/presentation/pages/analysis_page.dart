@@ -334,7 +334,10 @@ class _AnalysisContentState extends State<_AnalysisContent> {
 
   // ── Bill breakdown (Issue 5 — was only on Dashboard) ──────────────────
   Widget _buildBillAnalysis() {
-    final breakdown = BillCalculator.calculate(logs: _filtered);
+    final breakdown = BillCalculator.calculate(
+      logs: _filtered,
+      ratchetLogs: _entities,
+    );
     if (breakdown.totalUnits <= 0) return const SizedBox.shrink();
     final currencyFmt = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
     final rows = <(String, double, Color)>[
@@ -517,8 +520,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     if (previous.isEmpty) return const SizedBox.shrink();
 
     final comparison = BillCalculator.compare(
-      BillCalculator.calculate(logs: _filtered),
-      BillCalculator.calculate(logs: previous),
+      BillCalculator.calculate(logs: _filtered, ratchetLogs: _entities),
+      BillCalculator.calculate(logs: previous, ratchetLogs: _entities),
     );
     final currencyFmt = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
     final current = comparison.current;
@@ -642,7 +645,9 @@ class _AnalysisContentState extends State<_AnalysisContent> {
         _ChartSeries(
           label: names[i],
           color: color,
-          values: recent.map((e) => e.mdRecorded).toList(),
+          values: recent
+              .map((e) => e.mdRecorded * e.multiplyingFactor)
+              .toList(),
         ),
       );
     }
@@ -723,7 +728,9 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     final contract = monthLogs.last.contractDemand;
     if (contract <= 0) return const SizedBox.shrink();
     final threshold = contract * AppConstants.mdWarningRatio;
-    final peakMd = monthLogs.map((e) => e.mdRecorded).reduce((a, b) => a > b ? a : b);
+    final peakMd = monthLogs
+        .map((e) => e.mdRecorded * e.multiplyingFactor)
+        .reduce((a, b) => a > b ? a : b);
 
     // MD growth rate (kVA/day) — least-squares over (days, md).
     final start = monthLogs.first.loggedAt;
@@ -731,7 +738,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     final n = monthLogs.length;
     for (final e in monthLogs) {
       final x = e.loggedAt.difference(start).inDays.toDouble();
-      final y = e.mdRecorded;
+      final y = e.mdRecorded * e.multiplyingFactor;
       sumX += x;
       sumY += y;
       sumXy += x * y;
@@ -1150,7 +1157,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                         ),
                         _dataCell(
                           'MD (kVA)',
-                          log.mdRecorded.toStringAsFixed(1),
+                          (log.mdRecorded * log.multiplyingFactor)
+                              .toStringAsFixed(1),
                           AppColors.kpiDemand,
                         ),
                         _dataCell(

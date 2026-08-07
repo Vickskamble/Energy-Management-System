@@ -25,11 +25,15 @@ class BillForecastCalculator {
   static BillForecast? calculate({
     required List<EnergyLogEntity> monthLogs,
     DateTime? referenceDate,
+    List<EnergyLogEntity>? ratchetLogs,
   }) {
     final now = referenceDate ?? DateTime.now();
     if (monthLogs.isEmpty) return null;
 
-    final monthBreakdown = BillCalculator.calculate(logs: monthLogs);
+    final monthBreakdown = BillCalculator.calculate(
+      logs: monthLogs,
+      ratchetLogs: ratchetLogs,
+    );
     final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
     final daysElapsed = now.day.clamp(1, daysInMonth);
     final scale = daysInMonth / daysElapsed.toDouble();
