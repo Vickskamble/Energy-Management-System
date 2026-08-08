@@ -99,11 +99,11 @@ void main() {
         mdRecorded: 40,
         loggedAt: DateTime(2026, 7, 1),
       );
-      // 40 × 5 = 200 > 201 × 0.75 = 150.75
+      // 40 × 5 = 200 (75% of contract is reference only — not billed)
       expect(model.billingDemand, 200);
     });
 
-    test('contract floor applies when MD × MF is below 75% of contract', () {
+    test('billing demand is the recorded MD — no contract floor', () {
       final model = EnergyLogModel.create(
         meterName: 'M1',
         kwh: 100,
@@ -111,8 +111,8 @@ void main() {
         mdRecorded: 10,
         loggedAt: DateTime(2026, 7, 1),
       );
-      // 10 × 5 = 50 < 150.75 → floor
-      expect(model.billingDemand, closeTo(150.75, 0.01));
+      // 10 × 5 = 50 — the 75% floor never applies to the bill
+      expect(model.billingDemand, closeTo(50, 0.01));
     });
   });
 }

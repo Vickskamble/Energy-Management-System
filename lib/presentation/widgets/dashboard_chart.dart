@@ -50,9 +50,13 @@ class DashboardChart extends StatelessWidget {
         ),
     ];
 
-    final contractDemand = AppConfig.contractDemandKva;
+    // 75% of MD — reference only (the user must stay ABOVE this level).
+    // It is never part of the bill; billing demand = max(recorded MD,
+    // preceding-11-month high).
+    final referenceDemand = AppConfig.billingDemandFloorKva;
     final maxAvg = spots.fold(0.0, (m, s) => s.y > m ? s.y : m);
-    final mdMaxY = (maxAvg > contractDemand ? maxAvg : contractDemand) * 1.2;
+    final mdMaxY =
+        (maxAvg > referenceDemand ? maxAvg : referenceDemand) * 1.2;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,7 +65,7 @@ class DashboardChart extends StatelessWidget {
           children: [
             _legendItem(AppColors.warning, 'Max Demand (kVA)'),
             const SizedBox(width: 16),
-            _dashedLegendItem(AppColors.danger, 'Contract Demand'),
+            _dashedLegendItem(AppColors.danger, '75% of MD (stay above)'),
           ],
         ),
         const SizedBox(height: 8),
@@ -142,7 +146,7 @@ class DashboardChart extends StatelessWidget {
               extraLinesData: ExtraLinesData(
                 horizontalLines: [
                   HorizontalLine(
-                    y: contractDemand,
+                    y: referenceDemand,
                     color: AppColors.danger,
                     strokeWidth: 1.5,
                     dashArray: [6, 4],
@@ -155,7 +159,7 @@ class DashboardChart extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                       labelResolver: (_) =>
-                          'Contract Demand (${contractDemand.toInt()} kVA)',
+                          '75% of MD (${referenceDemand.toInt()} kVA)',
                     ),
                   ),
                 ],

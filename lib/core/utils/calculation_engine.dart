@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:decimal/decimal.dart';
 import '../constants/app_constants.dart';
 
@@ -30,7 +29,9 @@ class CalculationEngine {
     double mdRecorded,
     double contractDemand,
   ) {
-    return max(mdRecorded, contractDemand * AppConstants.billingDemandFloorPercent);
+    // Billed on the RECORDED demand — the 75% of contract value is only a
+    // reference level (chart), never part of the bill.
+    return mdRecorded;
   }
 
   static double calculateEnergyCharges(double totalUnits, double rate) {
