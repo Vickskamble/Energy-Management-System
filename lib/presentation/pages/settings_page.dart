@@ -461,8 +461,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Billing demand = max(recorded MD, 75% of MD, highest '
-                  'demand of the preceding 11 months, contract). Recorded '
+                  'Billing demand = max(recorded MD, highest demand of the '
+                  'preceding 11 months). 75% of MD is only a REFERENCE level '
+                  'to stay above — it is never used in the bill. Recorded '
                   'monthly highs enter automatically and stay in the window '
                   'for the next 11 months until a higher reading breaks them. '
                   'Enter demands from your past bills only for months with no '

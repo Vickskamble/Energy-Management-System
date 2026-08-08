@@ -35,7 +35,7 @@ void main() {
 
       expect(breakdown.totalUnits, 1250); // 250 kVAh × 5 MF (billed on kVAh)
       expect(breakdown.powerFactor, closeTo(0.800, 0.001));
-      expect(breakdown.billingDemand, 1500); // max(300 raw × 5 MF, 400×0.75)
+      expect(breakdown.billingDemand, 1500); // recorded 300 raw × 5 MF
       expect(breakdown.energyCharges, closeTo(10550, 0.01)); // 1250 × 8.44
       expect(breakdown.demandCharges, closeTo(975000, 0.01)); // 1500 × 650
       expect(breakdown.facCharges, closeTo(375, 0.01)); // 1250 × 0.30
@@ -66,13 +66,13 @@ void main() {
       expect(breakdown.energyCharges, closeTo(12500, 0.01)); // 1250 kVAh × 10
     });
 
-    test('billing demand never falls below 75% of contract demand', () {
+    test('billing demand uses recorded MD — 75% is reference only', () {
       final breakdown = BillCalculator.calculate(
         logs: [_log(kwh: 100, kvah: 120, md: 50)],
         contractDemand: 400,
       );
 
-      expect(breakdown.billingDemand, 300); // 400 × 0.75 floor
+      expect(breakdown.billingDemand, 250); // 50 × 5 MF — no contract floor
     });
 
     test('ratchet: preceding month peak (MD × MF) is considered', () {
@@ -147,7 +147,7 @@ void main() {
         ],
       );
 
-      expect(breakdown.billingDemand, 300); // only the contract floor applies
+      expect(breakdown.billingDemand, 50); // 10 × 5 MF — no floor, no ratchet
     });
 
     test('returns zeroed breakdown for empty logs', () {

@@ -20,7 +20,6 @@ class BillCalculator {
     double regionSubsidy = 0,
     double rebateSection106 = 0,
     List<EnergyLogEntity>? ratchetLogs,
-    double ratchetFloorPercent = AppConstants.billingDemandFloorPercent,
     int ratchetMonths = AppConstants.ratchetWindowMonths,
     List<double>? manualRatchetDemandKva,
   }) {
@@ -63,7 +62,6 @@ class BillCalculator {
     final billingDemand = EnergyCalculator.calculateBillingDemand(
       peakMd,
       effectiveContractDemand,
-      ratchetFloorPercent: ratchetFloorPercent,
       ratchetPeak: _ratchetPeak(logs, ratchetLogs, ratchetMonths,
           manualRatchetDemandKva:
               manualRatchetDemandKva ?? AppConfig.precedingDemandKva),

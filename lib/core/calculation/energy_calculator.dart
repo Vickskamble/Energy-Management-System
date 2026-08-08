@@ -9,16 +9,15 @@ class EnergyCalculator {
     return (kwh / kvah).clamp(0.000, 1.000);
   }
 
+  /// Billing demand = max(recorded MD, 11-month preceding high).
+  /// The 75% of contract value is NOT part of the bill — it is only a
+  /// reference level the user should stay above (shown on charts).
   static double calculateBillingDemand(
     double mdRecorded,
     double contractDemand, {
-    double ratchetFloorPercent = AppConstants.billingDemandFloorPercent,
     double ratchetPeak = 0,
   }) {
-    return max(
-      max(mdRecorded, ratchetPeak),
-      contractDemand * ratchetFloorPercent,
-    );
+    return max(mdRecorded, ratchetPeak);
   }
 
   static double calculateEnergyCharges(double totalUnits, double rate) {
