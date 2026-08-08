@@ -49,7 +49,8 @@ void main() {
 
       expect(forecast.daysElapsed, 10);
       expect(forecast.daysInMonth, 31);
-      expect(forecast.projectedUnits, closeTo(6200, 0.01));
+      // (250 kVAh × 5 MF) × 2 logs = 2500 units, scaled 31/10
+      expect(forecast.projectedUnits, closeTo(7750, 0.01));
     });
 
     test('projects a positive bill consistent with the breakdown', () {
@@ -60,9 +61,9 @@ void main() {
 
       expect(forecast.projectedBill, greaterThan(0));
       expect(forecast.dailyAverageBill, greaterThan(0));
-      // 6200 units: energy 52328 + demand 975000 + FAC 1860 + wheeling 5022
-      // + duty 1705 + tax 1729.80 + surcharge 51366.40 - rebate 0 - subsidy 0
-      expect(forecast.projectedBill, closeTo(1089011.20, 0.01));
+      // 7750 kVAh units: energy 65410 + demand 975000 + FAC 2325 + wheeling
+      // 6277.5 + duty 2131.25 + tax 2162.25 + surcharge 52020.5 − rebate − 0
+      expect(forecast.projectedBill, closeTo(1105326.50, 0.01));
     });
 
     test('scales by the number of days in the reference month', () {
@@ -75,7 +76,8 @@ void main() {
 
       expect(forecast.daysElapsed, 15);
       expect(forecast.daysInMonth, 28);
-      expect(forecast.projectedUnits, closeTo(933.33, 0.01));
+      // (120 kVAh × 5 MF) = 600 units, scaled 28/15
+      expect(forecast.projectedUnits, closeTo(1120, 0.01));
     });
   });
 }

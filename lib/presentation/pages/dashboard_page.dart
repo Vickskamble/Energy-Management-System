@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../core/config/app_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -92,7 +93,7 @@ class _DashboardPageState extends State<DashboardPage> {
           if (state.maxDemandPeak >= AppConstants.mdWarningThresholdKva) {
             NotificationService.instance.showMdAlert(
               state.maxDemandPeak,
-              AppConstants.defaultContractDemandKva,
+              AppConfig.contractDemandKva,
             );
           }
         }

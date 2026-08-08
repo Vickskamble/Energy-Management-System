@@ -33,16 +33,16 @@ void main() {
         logs: [_log(kwh: 200, kvah: 250, md: 300)],
       );
 
-      expect(breakdown.totalUnits, 1000); // 200 kWh × 5 MF
+      expect(breakdown.totalUnits, 1250); // 250 kVAh × 5 MF (billed on kVAh)
       expect(breakdown.powerFactor, closeTo(0.800, 0.001));
       expect(breakdown.billingDemand, 1500); // max(300 raw × 5 MF, 400×0.75)
-      expect(breakdown.energyCharges, closeTo(8440, 0.01)); // 1000 × 8.44
+      expect(breakdown.energyCharges, closeTo(10550, 0.01)); // 1250 × 8.44
       expect(breakdown.demandCharges, closeTo(975000, 0.01)); // 1500 × 650
-      expect(breakdown.facCharges, closeTo(300, 0.01)); // 1000 × 0.30
-      expect(breakdown.wheelingCharges, closeTo(810, 0.01)); // 1000 × 0.81
-      expect(breakdown.electricityDuty, closeTo(275, 0.01)); // 1000 × 0.275
-      expect(breakdown.taxes, closeTo(279, 0.01)); // 1000 × 0.279
-      expect(breakdown.pfSurcharge, closeTo(49172, 0.01)); // PF 0.8 < 0.9 → 5%
+      expect(breakdown.facCharges, closeTo(375, 0.01)); // 1250 × 0.30
+      expect(breakdown.wheelingCharges, closeTo(1012.5, 0.01)); // 1250 × 0.81
+      expect(breakdown.electricityDuty, closeTo(343.75, 0.01)); // 1250 × 0.275
+      expect(breakdown.taxes, closeTo(348.75, 0.01)); // 1250 × 0.279
+      expect(breakdown.pfSurcharge, closeTo(49277.5, 0.01)); // PF 0.8 < 0.9 → 5%
       expect(breakdown.pfRebate, 0);
       expect(breakdown.loadFactor, 1.0);
     });
@@ -63,7 +63,7 @@ void main() {
         energyRate: 10.0,
       );
 
-      expect(breakdown.energyCharges, closeTo(10000, 0.01));
+      expect(breakdown.energyCharges, closeTo(12500, 0.01)); // 1250 kVAh × 10
     });
 
     test('billing demand never falls below 75% of contract demand', () {
@@ -182,7 +182,7 @@ void main() {
           0.01,
         ),
       );
-      expect(comparison.unitDifference, closeTo(500, 0.01));
+      expect(comparison.unitDifference, closeTo(650, 0.01)); // 1250 − 600 kVAh
     });
 
     test('handles null previous month', () {

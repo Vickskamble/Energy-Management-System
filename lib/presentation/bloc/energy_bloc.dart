@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../core/config/app_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/utils/calculation_engine.dart';
@@ -79,14 +80,23 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
       // ── Step 2: Previous cumulative reading from the database ───────────
       // Source of truth is the DB — never trust form-supplied previous values
       // (clients could override them). consumed = current − previous.
+      // When the meter has NO actual earlier reading (first entry, renamed
+      // meter or legacy rows with no stored reading), the consumption for
+      // THIS entry is 0 — it becomes the baseline, and units are computed
+      // only when the next reading is recorded (no full-reading spikes).
       final prev = await _repository.getPreviousCumulative(
         event.meterName.trim(),
         event.loggedAt,
       );
-      final consumedKwh = event.currentKwh - prev.kwh;
-      final consumedKvah = event.currentKvah - prev.kvah;
+      final hasPreviousReading = prev.kwh > 0 || prev.kvah > 0;
+      final consumedKwh =
+          hasPreviousReading ? event.currentKwh - prev.kwh : 0.0;
+      final consumedKvah =
+          hasPreviousReading ? event.currentKvah - prev.kvah : 0.0;
 
-      _validateConsumedValues(consumedKwh, consumedKvah);
+      if (hasPreviousReading) {
+        _validateConsumedValues(consumedKwh, consumedKvah);
+      }
 
       // ── Step 3: Duplicate guard — one reading per meter per day ─────────
       final duplicate = await _repository.findDuplicateReading(
@@ -135,7 +145,7 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
         rkvarhLead: event.rkvarhLead,
         powerFactor: powerFactor,
         mdRecorded: event.mdRecorded,
-        contractDemand: AppConstants.defaultContractDemandKva,
+        contractDemand: AppConfig.contractDemandKva,
         loggedAt: event.loggedAt,
         multiplyingFactor: meterMf,
       );

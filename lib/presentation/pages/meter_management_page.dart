@@ -8,6 +8,7 @@ import '../../core/widgets/app_input.dart';
 import '../../core/widgets/app_section.dart';
 import '../../core/widgets/app_states.dart';
 import '../../data/models/meter_model.dart';
+import '../../data/repositories/energy_repository.dart';
 import '../../data/repositories/meter_repository.dart';
 
 class MeterManagementPage extends StatelessWidget {
@@ -22,6 +23,22 @@ class MeterManagementPage extends StatelessWidget {
     BuildContext context, {
     MeterModel? existing,
   }) async {
+    // Meter name cannot change once readings exist against it — renaming
+    // breaks the previous-reading chain (consumed = current − previous) and
+    // manufactures bill spikes (e.g. "Maintenance Feeder" → "Main Feeder").
+    var hasReadings = false;
+    if (existing != null) {
+      try {
+        hasReadings = await context
+                .read<EnergyRepository>()
+                .getLatestReading(existing.name) !=
+            null;
+      } catch (_) {
+        // Offline / fetch failure → keep the lock off and re-check on save.
+      }
+    }
+    final nameLocked = existing != null && hasReadings;
+
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
     final locationCtrl = TextEditingController(text: existing?.location ?? '');
     final demandCtrl = TextEditingController(
@@ -36,6 +53,7 @@ class MeterManagementPage extends StatelessWidget {
     final siteCtrl = TextEditingController(text: existing?.site ?? 'Main Site');
     final formKey = GlobalKey<FormState>();
 
+    if (!context.mounted) return;
     await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -52,9 +70,40 @@ class MeterManagementPage extends StatelessWidget {
                 label: 'Meter Name',
                 prefixIcon: Icons.speed_rounded,
                 maxLength: 60,
+                readOnly: nameLocked,
+                hint: nameLocked
+                    ? 'Locked — readings already exist'
+                    : null,
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? 'Required' : null,
               ),
+              if (nameLocked) ...[
+                const SizedBox(height: 8),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lock_outline,
+                        size: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Name is locked because readings exist for this '
+                          'meter — renaming would break consumption tracking. '
+                          'Other fields can still be edited.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               AppTextField(
                 controller: locationCtrl,
@@ -138,9 +187,42 @@ class MeterManagementPage extends StatelessWidget {
           ),
           AppButton(
             label: 'Save',
-            onPressed: () {
+            onPressed: () async {
               if (!formKey.currentState!.validate()) return;
               final repo = context.read<MeterRepository>();
+              final energyRepo = context.read<EnergyRepository>();
+              final messenger = ScaffoldMessenger.of(ctx);
+              final nav = Navigator.of(ctx);
+              // Hard guard: never allow a rename once readings exist —
+              // re-verified over the network so a failed lock fetch at
+              // dialog-open can never slip a rename through.
+              final willRename =
+                  existing != null && nameCtrl.text.trim() != existing.name;
+              if (willRename) {
+                var locked = nameLocked;
+                if (!locked) {
+                  try {
+                    locked =
+                        await energyRepo.getLatestReading(existing.name) !=
+                            null;
+                  } catch (_) {
+                    // Unreachable → reject the rename to stay safe.
+                    locked = true;
+                  }
+                }
+                if (locked) {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Meter name cannot be changed — readings already '
+                        'exist against this meter.',
+                      ),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+              }
               final meter = existing != null
                   ? MeterModel(
                       id: existing.id,
@@ -173,7 +255,7 @@ class MeterManagementPage extends StatelessWidget {
               } else {
                 repo.saveMeter(meter);
               }
-              Navigator.pop(ctx, true);
+              nav.pop(true);
             },
           ),
         ],
