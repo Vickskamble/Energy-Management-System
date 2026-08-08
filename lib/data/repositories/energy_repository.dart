@@ -112,7 +112,6 @@ class EnergyRepository {
     double totalKwh = 0;
     double totalKvah = 0;
     double latestPf = 0;
-
     for (final log in hydrated) {
       final t = log.loggedAt;
       final inMonth = !t.isBefore(monthStart) && t.isBefore(nextMonthStart);
@@ -133,13 +132,14 @@ class EnergyRepository {
       latestPf = (totalKwh / totalKvah).clamp(0.0, 1.0);
     }
 
-    // Actual units after applying each reading's own multiplying factor
-    // (CT ratio × PT ratio of the meter it was recorded against).
+    // Actual billing units after applying each reading's own multiplying
+    // factor (CT ratio × PT ratio of the meter it was recorded against) —
+    // always billed on kVAh (apparent energy).
     var totalConsumption = 0.0;
     for (final log in hydrated) {
       final t = log.loggedAt;
       if (!t.isBefore(monthStart) && t.isBefore(nextMonthStart)) {
-        totalConsumption += log.kwh * log.multiplyingFactor;
+        totalConsumption += log.kvah * log.multiplyingFactor;
       }
     }
     totalConsumption = (totalConsumption * 100).roundToDouble() / 100;
@@ -186,14 +186,27 @@ class EnergyRepository {
         final curKwh = r.currentKwh;
         final curKvah = r.currentKvah;
         if (curKwh == null) {
-          // Legacy row — carry the running cumulative forward only.
-          prevKwh = (prevKwh ?? 0) + r.kwh;
-          prevKvah = (prevKvah ?? 0) + r.kvah;
+          // Legacy row (no stored actual reading) — its reconstructed
+          // cumulative is NOT a trustworthy baseline, so it breaks the
+          // chain: the next stored reading starts a fresh comparison.
+          prevKwh = null;
+          prevKvah = null;
         } else {
-          if (prevKwh != null && curKwh >= prevKwh) {
-            final wantKwh = round2(curKwh - prevKwh);
+          // Only rows whose stored consumed ≈ full cumulative reading look
+          // corrupted (the old import stored reading-as-consumption). Never
+          // touch correctly entered rows — that would manufacture spikes on
+          // healthy days.
+          final corruptKwh = r.kwh > 0 && r.kwh >= curKwh * 0.8;
+          final corruptKvah = curKvah != null &&
+              curKvah > 0 &&
+              r.kvah > 0 &&
+              r.kvah >= curKvah * 0.8;
+          if ((corruptKwh || corruptKvah) &&
+              prevKwh != null &&
+              curKwh >= prevKwh) {
+            final wantKwh = corruptKwh ? round2(curKwh - prevKwh) : r.kwh;
             final wantKvah =
-                (curKvah != null && prevKvah != null && curKvah >= prevKvah)
+                (corruptKvah && prevKvah != null && curKvah >= prevKvah)
                 ? round2(curKvah - prevKvah)
                 : r.kvah;
             if ((wantKwh - r.kwh).abs() > 0.01 ||
@@ -318,7 +331,7 @@ class EnergyRepository {
   }
 
   /// Bill = Total Units × configured tariff
-  /// where Total Units = sum(consumed_kwh) × multiplyingFactor (5)
+  /// where Total Units = sum(consumed_kvah) × multiplyingFactor (5)
   double _calculateBill(double totalConsumption) {
     return (totalConsumption * AppConfig.tariffPerUnit * 100).roundToDouble() /
         100;

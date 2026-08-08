@@ -9,7 +9,7 @@ class BillCalculator {
 
   static BillBreakdown calculate({
     required List<EnergyLogEntity> logs,
-    double contractDemand = AppConstants.defaultContractDemandKva,
+    double? contractDemand,
     double? energyRate,
     double? demandRate,
     double? facRate,
@@ -22,7 +22,9 @@ class BillCalculator {
     List<EnergyLogEntity>? ratchetLogs,
     double ratchetFloorPercent = AppConstants.billingDemandFloorPercent,
     int ratchetMonths = AppConstants.ratchetWindowMonths,
+    List<double> manualRatchetDemandKva = const [],
   }) {
+    final effectiveContractDemand = contractDemand ?? AppConfig.contractDemandKva;
     final effectiveEnergyRate = energyRate ?? AppConfig.tariffPerUnit;
     final effectiveDemandRate = demandRate ?? AppConfig.demandChargePerKva;
     final effectiveFacRate = facRate ?? AppConfig.facRatePerUnit;
@@ -30,7 +32,7 @@ class BillCalculator {
     final effectiveEdRate = electricityDutyPerUnit ?? AppConfig.electricityDutyPerUnit;
     final effectiveTaxRate = taxPerUnit ?? AppConfig.taxPerUnit;
     final effectiveTod = todMultipliers ?? AppConfig.todMultipliers;
-    if (logs.isEmpty) return _emptyBreakdown(contractDemand);
+    if (logs.isEmpty) return _emptyBreakdown(effectiveContractDemand);
 
     double totalKwh = 0;
     double totalKvah = 0;
@@ -50,17 +52,20 @@ class BillCalculator {
     final powerFactor = totalKvah > 0
         ? EnergyCalculator.calculatePowerFactor(totalKwh, totalKvah)
         : 0.0;
-    // Units use each reading's own multiplying factor (CT ratio × PT ratio)
-    // so meters with different MF never distort the bill (Issue 13).
+    // Billing units are measured from the kVAh (apparent) energy — the
+    // meter reads cumulative kWh/kVAh, each reading's own multiplying factor
+    // (CT × PT ratio) is applied so meters with different MF never distort
+    // the bill. Always billed on kVAh.
     double totalUnits = 0;
     for (final log in logs) {
-      totalUnits += log.kwh * log.multiplyingFactor;
+      totalUnits += log.kvah * log.multiplyingFactor;
     }
     final billingDemand = EnergyCalculator.calculateBillingDemand(
       peakMd,
-      contractDemand,
+      effectiveContractDemand,
       ratchetFloorPercent: ratchetFloorPercent,
-      ratchetPeak: _ratchetPeak(logs, ratchetLogs, ratchetMonths),
+      ratchetPeak: _ratchetPeak(logs, ratchetLogs, ratchetMonths,
+          manualRatchetDemandKva: manualRatchetDemandKva),
     );
     final avgDemand = mdCount > 0 ? sumMd / mdCount.toDouble() : 0.0;
     final loadFactor = EnergyCalculator.calculateLoadFactor(avgDemand, peakMd);
@@ -152,7 +157,7 @@ class BillCalculator {
       rebateSection106: (rebateSection106 * 100).roundToDouble() / 100,
       netBill: (netBill * 100).roundToDouble() / 100,
       billingDemand: (billingDemand * 100).roundToDouble() / 100,
-      contractDemand: contractDemand,
+      contractDemand: effectiveContractDemand,
       powerFactor: (powerFactor * 1000).roundToDouble() / 1000,
       loadFactor: (loadFactor * 1000).roundToDouble() / 1000,
       averageUnitCost: (averageUnitCost * 100).roundToDouble() / 100,
@@ -262,20 +267,28 @@ class BillCalculator {
     );
   }
 
-  /// Ratchet peak — the highest monthly demand (actual kVA = MD × MF) over
-  /// the trailing window [latest month of [logs] − [ratchetMonths] months ..
-  /// latest month]. The monthly maximum is computed from the full history
-  /// ([ratchetLogs]); once a peak occurs it stays in the billing demand of
-  /// every following month until a higher one breaks it or it leaves the
-  /// window. Returns 0 when no history is provided (old behavior: only the
-  /// current month + contract floor apply).
+  /// Ratchet peak — the highest demand considered in the billing demand of
+  /// the current month. Two sources are combined:
+  ///  1. The highest monthly demand (actual kVA = MD × MF) over the trailing
+  ///     window [latest month of [logs] − [ratchetMonths] months .. latest
+  ///     month] computed from the full history ([ratchetLogs]) — once a peak
+  ///     occurs it stays in the billing demand of every following month until
+  ///     a higher one breaks it or it leaves the window.
+  ///  2. User-provided preceding-11-month demands ([manualRatchetDemandKva])
+  ///     entered in Settings → Billing so bills match the discom's own
+  ///     ratchet even before the app has 11 months of history.
   static double _ratchetPeak(
     List<EnergyLogEntity> logs,
     List<EnergyLogEntity>? ratchetLogs,
-    int ratchetMonths,
-  ) {
+    int ratchetMonths, {
+    List<double> manualRatchetDemandKva = const [],
+  }) {
+    final manualPeak = manualRatchetDemandKva.fold(
+      0.0,
+      (peak, v) => v > peak ? v : peak,
+    );
     if (ratchetLogs == null || ratchetLogs.isEmpty || ratchetMonths < 1) {
-      return 0;
+      return manualPeak;
     }
     DateTime? latestMonth;
     for (final log in logs) {
@@ -308,6 +321,7 @@ class BillCalculator {
     for (final v in monthlyMax.values) {
       if (v > ratchetPeak) ratchetPeak = v;
     }
+    if (manualPeak > ratchetPeak) ratchetPeak = manualPeak;
     return ratchetPeak;
   }
 

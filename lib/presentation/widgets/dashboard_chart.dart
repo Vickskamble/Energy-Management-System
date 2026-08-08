@@ -1,6 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import '../../core/constants/app_constants.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/entities/energy_log_entity.dart';
 
@@ -50,7 +50,7 @@ class DashboardChart extends StatelessWidget {
         ),
     ];
 
-    final contractDemand = AppConstants.defaultContractDemandKva;
+    final contractDemand = AppConfig.contractDemandKva;
     final maxAvg = spots.fold(0.0, (m, s) => s.y > m ? s.y : m);
     final mdMaxY = (maxAvg > contractDemand ? maxAvg : contractDemand) * 1.2;
 

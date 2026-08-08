@@ -15,6 +15,8 @@ class AppConfig {
   static double _electricityDutyPerUnit = AppConstants.electricityDutyPerUnit;
   static double _taxPerUnit = AppConstants.taxPerUnit;
   static double _subsidyPercent = AppConstants.subsidyPercent;
+  static double _contractDemandKva = AppConstants.defaultContractDemandKva;
+  static List<double> _precedingDemandKva = List.filled(11, 0);
   static double _regionSubsidyAmount = 0.0;
   static double _rebateSection106 = 0.0;
 
@@ -64,6 +66,32 @@ class AppConfig {
     if (value >= 0) _subsidyPercent = value;
   }
 
+  /// Contract (MD) demand in kVA — the meter's sanctioned demand. The
+  /// billing demand is never below 75% of this value.
+  static double get contractDemandKva => _contractDemandKva;
+  static set contractDemandKva(double value) {
+    if (value > 0) _contractDemandKva = value;
+  }
+
+  /// User-provided recorded demand (kVA) of the preceding 11 months —
+  /// used as the billing-demand ratchet window (11-month preceding high).
+  /// Index 0 = oldest, index 10 = most recent preceding month.
+  static List<double> get precedingDemandKva =>
+      List.unmodifiable(_precedingDemandKva);
+  static set precedingDemandKva(List<double> value) {
+    if (value.isEmpty) return;
+    final padded = List<double>.of(value);
+    while (padded.length < 11) {
+      padded.insert(0, 0);
+    }
+    _precedingDemandKva = padded.take(11).toList();
+  }
+
+  /// Auto-computed — 75% of contract MD, the billing demand floor
+  /// (displayed in Settings, not editable).
+  static double get billingDemandFloorKva =>
+      _contractDemandKva * AppConstants.billingDemandFloorPercent;
+
   /// Region subsidy flat amount deduction (₹).
   static double get regionSubsidyAmount => _regionSubsidyAmount;
   static set regionSubsidyAmount(double value) {
@@ -90,6 +118,8 @@ class AppConfig {
     _electricityDutyPerUnit = AppConstants.electricityDutyPerUnit;
     _taxPerUnit = AppConstants.taxPerUnit;
     _subsidyPercent = AppConstants.subsidyPercent;
+    _contractDemandKva = AppConstants.defaultContractDemandKva;
+    _precedingDemandKva = List.filled(11, 0);
     _regionSubsidyAmount = 0.0;
     _rebateSection106 = 0.0;
     _todMultipliers = [1.0, 1.0, 1.0, 1.0];
@@ -156,6 +186,14 @@ class TariffStore {
     }
 
     setDouble('subsidy_percent', (v) => AppConfig.subsidyPercent = v);
+    setDouble('contract_demand_kva', (v) => AppConfig.contractDemandKva = v);
+
+    final preceding = map['preceding_months_demand_kva'];
+    if (preceding is List) {
+      AppConfig.precedingDemandKva =
+          preceding.map((e) => (e as num?)?.toDouble() ?? 0).toList();
+    }
+
     setDouble('region_subsidy_amount', (v) => AppConfig.regionSubsidyAmount = v);
     setDouble('rebate_section_106', (v) => AppConfig.rebateSection106 = v);
 
@@ -173,6 +211,8 @@ class TariffStore {
     required double electricityDutyPerUnit,
     required double taxPerUnit,
     required double subsidyPercent,
+    double contractDemandKva = AppConstants.defaultContractDemandKva,
+    List<double>? precedingDemandKva,
     double regionSubsidyAmount = 0.0,
     double rebateSection106 = 0.0,
     List<double>? todMultipliers,
@@ -190,6 +230,9 @@ class TariffStore {
         'electricity_duty_per_unit': electricityDutyPerUnit,
         'tax_per_unit': taxPerUnit,
         'subsidy_percent': subsidyPercent,
+        'contract_demand_kva': contractDemandKva,
+        'preceding_months_demand_kva':
+            precedingDemandKva ?? AppConfig.precedingDemandKva,
         'region_subsidy_amount': regionSubsidyAmount,
         'rebate_section_106': rebateSection106,
         'tod_multipliers': todMultipliers ?? AppConfig.todMultipliers,
@@ -207,6 +250,10 @@ class TariffStore {
       AppConfig.electricityDutyPerUnit = electricityDutyPerUnit;
       AppConfig.taxPerUnit = taxPerUnit;
       AppConfig.subsidyPercent = subsidyPercent;
+      AppConfig.contractDemandKva = contractDemandKva;
+      if (precedingDemandKva != null) {
+        AppConfig.precedingDemandKva = precedingDemandKva;
+      }
       AppConfig.regionSubsidyAmount = regionSubsidyAmount;
       AppConfig.rebateSection106 = rebateSection106;
       if (todMultipliers != null) AppConfig.todMultipliers = todMultipliers;

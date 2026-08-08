@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import '../../core/constants/app_constants.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/notification_service.dart';
@@ -87,7 +87,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     for (final m in _meters) {
       if (m.name == _selectedMeter) return m.contractDemandKw;
     }
-    return AppConstants.defaultContractDemandKva;
+    return AppConfig.contractDemandKva;
   }
 
   Future<void> _loadMeters() async {
@@ -181,10 +181,45 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     return double.tryParse(v.trim()) == null ? 'Enter a valid number' : null;
   }
 
-  void _submit() {
+  bool get _noPreviousReading =>
+      _prevCumulativeKwh <= 0 && _prevCumulativeKvah <= 0;
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final bloc = context.read<EnergyBloc>();
+
+    // No actual earlier reading on record (first entry, renamed meter or
+    // legacy rows without stored readings) → this entry is saved as the new
+    // baseline with 0 units. Alert the user and only save after they confirm.
+    if (_noPreviousReading) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+          title: const Text('No previous reading available'),
+          content: const Text(
+            'No earlier cumulative reading was found for this meter. '
+            'This entry will be saved with 0 units (it becomes the baseline). '
+            'Consumption will be calculated only when the next reading is '
+            'recorded.\n\nDo you still want to save it?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Save anyway'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
+
     _lastSubmitWasManual = true;
-    context.read<EnergyBloc>().add(
+    bloc.add(
       SubmitManualReadingForm(
         meterName: _selectedMeter,
         currentKwh: double.parse(_currentKwhCtrl.text.trim()),
@@ -394,7 +429,42 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                               ),
                               validator: _requiredNumberValidator,
                             ),
-                            if (_diffKwh != null || _diffKvah != null) ...[
+                            if (_noPreviousReading) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.orange.withValues(alpha: 0.35),
+                                  ),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      size: 20,
+                                      color: Colors.orange,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        'No previous reading found — this entry '
+                                        'will be saved with 0 units. Consumption '
+                                        'will be calculated when the next reading '
+                                        'is recorded.',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else if (_diffKwh != null ||
+                                _diffKvah != null) ...[
                               const SizedBox(height: 12),
                               Container(
                                 padding: const EdgeInsets.all(12),

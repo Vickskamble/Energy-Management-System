@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../core/config/app_config.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/network/supabase_client.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -35,7 +37,18 @@ class _SettingsScreenState extends State<SettingsScreen>
   final _dutyCtrl = TextEditingController();
   final _taxCtrl = TextEditingController();
   final _subsidyCtrl = TextEditingController();
+  final _mdCtrl = TextEditingController();
+  final _precedingCtrls = List.generate(11, (_) => TextEditingController());
   final _tariffFormKey = GlobalKey<FormState>();
+
+  /// Labels for the preceding 11 months (oldest → most recent).
+  List<String> get _precedingMonthLabels {
+    final now = DateTime.now();
+    return List.generate(11, (i) {
+      final d = DateTime(now.year, now.month - (10 - i));
+      return DateFormat('MMM yy').format(d);
+    });
+  }
 
   @override
   void initState() {
@@ -48,6 +61,18 @@ class _SettingsScreenState extends State<SettingsScreen>
     _dutyCtrl.text = AppConfig.electricityDutyPerUnit.toStringAsFixed(2);
     _taxCtrl.text = AppConfig.taxPerUnit.toStringAsFixed(2);
     _subsidyCtrl.text = AppConfig.subsidyPercent.toStringAsFixed(2);
+    _mdCtrl.text = AppConfig.contractDemandKva.toStringAsFixed(0);
+    final preceding = AppConfig.precedingDemandKva;
+    for (var i = 0; i < 11; i++) {
+      if (preceding[i] > 0) {
+        _precedingCtrls[i].text = preceding[i].toStringAsFixed(2);
+      }
+    }
+    _mdCtrl.addListener(_onMdChanged);
+  }
+
+  void _onMdChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -60,6 +85,11 @@ class _SettingsScreenState extends State<SettingsScreen>
     _dutyCtrl.dispose();
     _taxCtrl.dispose();
     _subsidyCtrl.dispose();
+    _mdCtrl.removeListener(_onMdChanged);
+    _mdCtrl.dispose();
+    for (final c in _precedingCtrls) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -220,6 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     String label,
     String hint, {
     bool mustBePositive = false,
+    bool optional = false,
   }) {
     return TextFormField(
       controller: controller,
@@ -229,12 +260,21 @@ class _SettingsScreenState extends State<SettingsScreen>
         hintText: hint,
         isDense: true,
       ),
-      validator: (v) => _rateValidator(v, mustBePositive: mustBePositive),
+      validator: optional
+          ? (v) {
+              if (v == null || v.trim().isEmpty) return null;
+              return _rateValidator(v, mustBePositive: mustBePositive);
+            }
+          : (v) => _rateValidator(v, mustBePositive: mustBePositive),
     );
   }
 
   Future<void> _saveTariff() async {
     if (!_tariffFormKey.currentState!.validate()) return;
+    for (final c in _precedingCtrls) {
+      final v = c.text.trim();
+      if (v.isNotEmpty && double.tryParse(v) == null) return;
+    }
     try {
       await TariffStore.saveAll(
         tariffPerUnit: double.parse(_tariffCtrl.text.trim()),
@@ -244,6 +284,11 @@ class _SettingsScreenState extends State<SettingsScreen>
         electricityDutyPerUnit: double.parse(_dutyCtrl.text.trim()),
         taxPerUnit: double.parse(_taxCtrl.text.trim()),
         subsidyPercent: double.parse(_subsidyCtrl.text.trim()),
+        contractDemandKva: double.parse(_mdCtrl.text.trim()),
+        precedingDemandKva: [
+          for (final c in _precedingCtrls)
+            double.tryParse(c.text.trim()) ?? 0,
+        ],
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -274,6 +319,10 @@ class _SettingsScreenState extends State<SettingsScreen>
     _dutyCtrl.text = AppConfig.electricityDutyPerUnit.toStringAsFixed(2);
     _taxCtrl.text = AppConfig.taxPerUnit.toStringAsFixed(2);
     _subsidyCtrl.text = AppConfig.subsidyPercent.toStringAsFixed(2);
+    _mdCtrl.text = AppConfig.contractDemandKva.toStringAsFixed(0);
+    for (final c in _precedingCtrls) {
+      c.clear();
+    }
     await TariffStore.saveAll(
       tariffPerUnit: AppConfig.tariffPerUnit,
       demandChargePerKva: AppConfig.demandChargePerKva,
@@ -282,6 +331,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       electricityDutyPerUnit: AppConfig.electricityDutyPerUnit,
       taxPerUnit: AppConfig.taxPerUnit,
       subsidyPercent: AppConfig.subsidyPercent,
+      contractDemandKva: AppConfig.contractDemandKva,
+      precedingDemandKva: AppConfig.precedingDemandKva,
     );
   }
 
@@ -384,6 +435,72 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ],
                 ),
                 const SizedBox(height: 16),
+                Text(
+                  'MD (contract demand) & ratchet',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _rateField(
+                        _mdCtrl,
+                        'MD (kVA)',
+                        'e.g. 201',
+                        mustBePositive: true,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: _md75PercentTile()),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Billing demand = max(recorded MD, 75% of MD, highest '
+                  'demand of the preceding 11 months, contract). Recorded '
+                  'monthly highs enter automatically and stay in the window '
+                  'for the next 11 months until a higher reading breaks them. '
+                  'Enter demands from your past bills only for months with no '
+                  'app data — empty fields are ignored.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                for (var i = 0; i < 11; i += 2) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _rateField(
+                          _precedingCtrls[i],
+                          'M-${11 - i} (${_precedingMonthLabels[i]})',
+                          'kVA if known',
+                          optional: true,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      if (i + 1 < 11)
+                        Expanded(
+                          child: _rateField(
+                            _precedingCtrls[i + 1],
+                            'M-${10 - i} (${_precedingMonthLabels[i + 1]})',
+                            'kVA if known',
+                            optional: true,
+                          ),
+                        )
+                      else
+                        const Expanded(child: SizedBox()),
+                    ],
+                  ),
+                  if (i + 2 < 11) const SizedBox(height: 12),
+                ],
+                const SizedBox(height: 16),
                 AppButton(
                   label: 'Save Tariff',
                   icon: Icons.save_outlined,
@@ -400,6 +517,43 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
         ),
       ],
+    );
+  }
+
+  /// Auto-computed 75% of MD — shown but intentionally non-editable.
+  Widget _md75PercentTile() {
+    final md = double.tryParse(_mdCtrl.text.trim()) ?? 0;
+    final floor = md * AppConstants.billingDemandFloorPercent;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '75% of MD (auto)',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${floor.toStringAsFixed(1)} kVA',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
