@@ -22,7 +22,7 @@ class BillCalculator {
     List<EnergyLogEntity>? ratchetLogs,
     double ratchetFloorPercent = AppConstants.billingDemandFloorPercent,
     int ratchetMonths = AppConstants.ratchetWindowMonths,
-    List<double> manualRatchetDemandKva = const [],
+    List<double>? manualRatchetDemandKva,
   }) {
     final effectiveContractDemand = contractDemand ?? AppConfig.contractDemandKva;
     final effectiveEnergyRate = energyRate ?? AppConfig.tariffPerUnit;
@@ -65,7 +65,8 @@ class BillCalculator {
       effectiveContractDemand,
       ratchetFloorPercent: ratchetFloorPercent,
       ratchetPeak: _ratchetPeak(logs, ratchetLogs, ratchetMonths,
-          manualRatchetDemandKva: manualRatchetDemandKva),
+          manualRatchetDemandKva:
+              manualRatchetDemandKva ?? AppConfig.precedingDemandKva),
     );
     final avgDemand = mdCount > 0 ? sumMd / mdCount.toDouble() : 0.0;
     final loadFactor = EnergyCalculator.calculateLoadFactor(avgDemand, peakMd);
@@ -281,9 +282,11 @@ class BillCalculator {
     List<EnergyLogEntity> logs,
     List<EnergyLogEntity>? ratchetLogs,
     int ratchetMonths, {
-    List<double> manualRatchetDemandKva = const [],
+    List<double>? manualRatchetDemandKva,
   }) {
-    final manualPeak = manualRatchetDemandKva.fold(
+    final effectiveManual =
+        manualRatchetDemandKva ?? AppConfig.precedingDemandKva;
+    final manualPeak = effectiveManual.fold(
       0.0,
       (peak, v) => v > peak ? v : peak,
     );
