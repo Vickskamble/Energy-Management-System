@@ -607,7 +607,11 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     );
   }
 
-  // ── Per-meter trend charts (multi-series when "All Meters" — Issue 4E) ──
+  // ── Per-meter trend charts ─────────────────────────────────────────────
+  // Monthly overview by default; when a month is selected the charts switch
+  // to a DAILY breakdown of that month (kWh = sum per day, kVA = max per
+  // day) so it is obvious which day was high or low. Multi-series when
+  // "All Meters" (Issue 4E).
   Widget _buildMeterTrends() {
     final target = _selectedMeter;
     final names = target != null
@@ -622,46 +626,95 @@ class _AnalysisContentState extends State<_AnalysisContent> {
       AppColors.kpiDemand,
     ];
 
+    final daily = _selection.month != null;
+
+    // Union axis: days of the selected month, or every (year, month) in
+    // history — every meter's series aligns to the same x positions.
+    final axisKeys = daily
+        ? (_siteEntities
+                .where((e) => _selection.matches(e.loggedAt))
+                .map((e) => e.loggedAt.day)
+                .toSet()
+                .toList()
+              ..sort())
+        : (_siteEntities
+                .map((e) => e.loggedAt.year * 12 + e.loggedAt.month - 1)
+                .toSet()
+                .toList()
+              ..sort());
+    if (axisKeys.isEmpty) return const SizedBox.shrink();
+
+    final xLabels = <String>[];
+    if (daily) {
+      final m = _selection.month!;
+      xLabels.addAll(
+        [
+          for (final d in axisKeys)
+            DateFormat('d MMM').format(DateTime(m.year, m.month, d)),
+        ],
+      );
+    } else {
+      xLabels.addAll(
+        [
+          for (final k in axisKeys)
+            DateFormat('MMM yy').format(DateTime(k ~/ 12, (k % 12) + 1)),
+        ],
+      );
+    }
+    final xLabelStep = daily
+        ? (axisKeys.length / 8).ceil().clamp(1, 99)
+        : (axisKeys.length / 10).ceil().clamp(1, 99);
+
     final kwhSeries = <_ChartSeries>[];
     final mdSeries = <_ChartSeries>[];
     for (var i = 0; i < names.length; i++) {
       final logs = _siteEntities
           .where((e) => e.meterName == names[i])
-          .toList()
-        ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
-      if (logs.length < 2) continue;
-      final recent = logs.length > 30
-          ? logs.sublist(logs.length - 30)
-          : logs;
+          .toList();
+      if (logs.isEmpty) continue;
+
+      final kwhMap = <int, double>{};
+      final mdMap = <int, double>{};
+      for (final e in logs) {
+        if (daily && !_selection.matches(e.loggedAt)) continue;
+        final k = daily
+            ? e.loggedAt.day
+            : e.loggedAt.year * 12 + e.loggedAt.month - 1;
+        final kw = e.kwh * e.multiplyingFactor;
+        kwhMap.update(k, (v) => v + kw, ifAbsent: () => kw);
+        final md = e.mdRecorded * e.multiplyingFactor;
+        mdMap.update(k, (v) => md > v ? md : v, ifAbsent: () => md);
+      }
+      if (kwhMap.isEmpty) continue;
+
       final color = palette[i % palette.length];
       kwhSeries.add(
         _ChartSeries(
           label: names[i],
           color: color,
-          values: recent
-              .map((e) => e.kwh * e.multiplyingFactor)
-              .toList(),
+          values: [for (final k in axisKeys) kwhMap[k] ?? 0],
         ),
       );
       mdSeries.add(
         _ChartSeries(
           label: names[i],
           color: color,
-          values: recent
-              .map((e) => e.mdRecorded * e.multiplyingFactor)
-              .toList(),
+          values: [for (final k in axisKeys) mdMap[k] ?? 0],
         ),
       );
     }
     if (kwhSeries.isEmpty) return const SizedBox.shrink();
+
+    final periodLabel = daily
+        ? 'Daily — ${_selection.label}'
+        : 'Monthly — all readings';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppSectionHeader(
           title: 'Trends',
-          subtitle:
-              'Last ${kwhSeries.first.values.length} readings — ${target ?? 'all meters'}',
+          subtitle: '$periodLabel — ${target ?? 'all meters'}',
         ),
         const SizedBox(height: 8),
         if (MediaQuery.of(context).size.width < 600)
@@ -672,6 +725,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   title: 'kWh Consumption',
                   series: kwhSeries,
                   unit: 'kWh',
+                  xLabels: xLabels,
+                  xLabelStep: xLabelStep,
                 ),
               ),
               const SizedBox(height: 12),
@@ -680,6 +735,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   title: 'Max Demand (kVA)',
                   series: mdSeries,
                   unit: 'kVA',
+                  xLabels: xLabels,
+                  xLabelStep: xLabelStep,
                 ),
               ),
             ],
@@ -694,6 +751,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     title: 'kWh Consumption',
                     series: kwhSeries,
                     unit: 'kWh',
+                    xLabels: xLabels,
+                    xLabelStep: xLabelStep,
                   ),
                 ),
               ),
@@ -704,6 +763,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     title: 'Max Demand (kVA)',
                     series: mdSeries,
                     unit: 'kVA',
+                    xLabels: xLabels,
+                    xLabelStep: xLabelStep,
                   ),
                 ),
               ),
@@ -933,6 +994,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     required String title,
     required List<_ChartSeries> series,
     required String unit,
+    List<String>? xLabels,
+    int xLabelStep = 1,
   }) {
     final maxY = series
         .expand((s) => s.values)
@@ -947,7 +1010,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 110,
+          height: 120,
           child: LineChart(
             LineChartData(
               minX: 0,
@@ -964,17 +1027,38 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                 getDrawingHorizontalLine: (value) =>
                     FlLine(color: AppColors.borderLight, strokeWidth: 1),
               ),
-              titlesData: const FlTitlesData(
-                leftTitles: AxisTitles(
+              titlesData: FlTitlesData(
+                leftTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
                 bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: xLabels != null && xLabels.isNotEmpty,
+                    getTitlesWidget: (value, meta) {
+                      final i = value.toInt();
+                      if (xLabels == null ||
+                          i < 0 ||
+                          i >= xLabels.length ||
+                          (xLabelStep > 1 && i % xLabelStep != 0)) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          xLabels[i],
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                topTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
-                topTitles: AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                rightTitles: AxisTitles(
+                rightTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
               ),
@@ -1002,14 +1086,21 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                 touchTooltipData: LineTouchTooltipData(
                   getTooltipItems: (touchedSpots) => touchedSpots
                       .map(
-                        (spot) => LineTooltipItem(
-                          '${spot.y.toStringAsFixed(1)} $unit',
-                          TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
+                        (spot) {
+                          final label = xLabels != null &&
+                                  spot.x >= 0 &&
+                                  spot.x < xLabels.length
+                              ? '${xLabels[spot.x.toInt()]}  '
+                              : '';
+                          return LineTooltipItem(
+                            '$label${spot.y.toStringAsFixed(1)} $unit',
+                            TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          );
+                        },
                       )
                       .toList(),
                 ),
