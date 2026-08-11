@@ -64,7 +64,7 @@ class EnergyLogRemoteDatasource {
         query = query.gte('logged_at', from.toUtc().toIso8601String());
       }
       if (to != null) {
-        query = query.lte('logged_at', to.toUtc().toIso8601String());
+        query = query.lt('logged_at', to.toUtc().toIso8601String());
       }
       if (meterName != null) {
         query = query.eq('meter_name', meterName);
