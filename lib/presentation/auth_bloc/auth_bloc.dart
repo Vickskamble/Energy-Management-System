@@ -100,9 +100,11 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
   }
 
   /// Single-device enforcement:
+  ///  - exempt accounts (e.g. the public demo) skip the guard entirely so
+  ///    multiple clients can use them at the same time;
   ///  - check() conflict on a *returning* device (its own leftover row) →
-  ///    force take over, never lock the user out of their own device.
-  ///  - check() conflict on a *fresh* login → sign out + show error.
+  ///    force take over, never lock the user out of their own device;
+  ///  - check() conflict on a *fresh* login → sign out + show error;
   ///  - otherwise → take over the session row, start heartbeat,
   ///                then emit authenticated.
   Future<void> _enforceAndEmitAuthenticated({
@@ -112,31 +114,34 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
     required Emitter<AppAuthState> emit,
   }) async {
     if (isClosed) return;
-    final status = await SessionGuard.instance.check(userId);
-    if (isClosed) return;
-    if (status == SessionStatus.conflict) {
-      if (isReturningDevice) {
-        // Same device re-launching after an app kill: the fresh row is this
-        // device's own leftover session, not another device — take it over.
-        await SessionGuard.instance.forceTakeOver(userId);
-      } else {
-        await _signOutQuietly();
-        if (!isClosed) {
-          emit(
-            const AppAuthError(
-              'This account is already signed in on another device. '
-              'Sign out there first, then try again.',
-            ),
-          );
+    final exempt = SessionGuard.isExempt(email);
+    if (!exempt) {
+      final status = await SessionGuard.instance.check(userId);
+      if (isClosed) return;
+      if (status == SessionStatus.conflict) {
+        if (isReturningDevice) {
+          // Same device re-launching after an app kill: the fresh row is this
+          // device's own leftover session, not another device — take it over.
+          await SessionGuard.instance.forceTakeOver(userId);
+        } else {
+          await _signOutQuietly();
+          if (!isClosed) {
+            emit(
+              const AppAuthError(
+                'This account is already signed in on another device. '
+                'Sign out there first, then try again.',
+              ),
+            );
+          }
+          return;
         }
-        return;
       }
+      await SessionGuard.instance.takeOver(userId);
+      SessionGuard.instance.startHeartbeat(
+        userId: userId,
+        onConflict: () => _onHeartbeatConflict(emit),
+      );
     }
-    await SessionGuard.instance.takeOver(userId);
-    SessionGuard.instance.startHeartbeat(
-      userId: userId,
-      onConflict: () => _onHeartbeatConflict(emit),
-    );
 
     // Tariff settings are per-user cloud data — load them before the UI
     // builds so bill calculations use this account's rates.
