@@ -245,6 +245,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$GITHUB_REF_NAME" ${{ matrix.zip_name }} --repo "$GITHUB_REPOSITORY" --clobber || true
 
+      - name: Upload Windows Installer to Release
+        if: success() && startsWith(github.ref, 'refs/tags/') && matrix.os == 'windows-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem "release/installer/EMS-Setup-*.exe" | Sort-Object Name | Select-Object -Last 1
+          if ($file) {
+            gh release upload "$env:GITHUB_REF_NAME" "$($file.FullName)" --repo "$env:GITHUB_REPOSITORY" --clobber || $true
+            gh release upload "$env:GITHUB_REF_NAME" "$($file.FullName)#ems-setup.exe" --repo "$env:GITHUB_REPOSITORY" --clobber || $true
+          } else {
+            Write-Host "No installer found in release/installer - skipping"
+          }
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         if: success()
