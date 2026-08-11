@@ -46,7 +46,7 @@ class SessionGuard {
 
   /// Accounts exempt from single-device enforcement — the public demo
   /// account must stay usable for every client at the same time.
-  static const List<String> _exemptEmails = ['demo@example.com'];
+  static const List<String> _exemptEmails = ['demo@powerems.com'];
 
   /// Whether [email] is exempt from single-device session enforcement.
   static bool isExempt(String email) =>

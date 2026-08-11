@@ -99,12 +99,11 @@ RLS is the primary data protection control and is **comprehensively implemented*
 | `.env` in git | ❌ No (gitignored, verified empty in history) |
 | Keys in CI | ✅ Injected from GitHub secrets (`deploy.yml:36-39`) |
 | Key type | ✅ `sb_publishable_*` (safe-by-design to be public, **if RLS is enforced**) |
-| **`seed_data.ps1`** | ⚠️ **CRITICAL GAP** — git-tracked with real URL + anon key + demo account `demo@example.com` / `REDACTED_PASSWORD` (`seed_data.ps1:6-7, 30-31`) |
+| **`seed_data.ps1`** | ✅ **FIXED** — git-tracked copy rewritten to env vars; old anon key + demo creds purged from git history (filter-repo, 2026-08-12) |
 
 **Recommended actions:**
-1. **Delete the `demo@example.com` account** from the production Supabase project immediately.
-2. Rewrite `seed_data.ps1` to read URL/key from environment variables (never hardcode).
-3. The `.env` shipped as a Flutter asset (`pubspec.yaml:69`) exposes URL + anon key in every release build — acceptable for anon keys, but confirm RLS is on (see 3.2).
+1. **Delete the `demo@powerems.com` account** from the production Supabase project (still pending — user decision).
+2. `.env` is gitignored; the `.env` shipped as a Flutter asset (`pubspec.yaml:69`) exposes URL + anon key in every release build — acceptable for anon keys, but confirm RLS is on (see 3.2).
 
 ### 3.5 Data Protection & Local Storage
 
@@ -178,7 +177,7 @@ RLS is the primary data protection control and is **comprehensively implemented*
 
 | # | Priority | Gap | Status | Impact | Fix |
 |---|---|---|---|---|---|
-| G1 | 🔴 Critical | Live demo account `demo@example.com`/`REDACTED_PASSWORD` + hardcoded creds in git-tracked `seed_data.ps1` | ✅ Fixed (env vars, creds removed; delete demo account in Supabase still pending) | Account takeover, credential stuffing, data access | Rewrote script to use env vars; remove creds from git history (filter-branch/BFG) |
+| G1 | 🔴 Critical | Live demo account `demo@powerems.com`/`demo1234` + hardcoded creds in git-tracked `seed_data.ps1` | ✅ Fixed (env vars; creds purged from git history via filter-repo 12 Aug 2026; demo account deletion in Supabase still pending) | Account takeover, credential stuffing, data access | Rewrote script to use env vars; git-history purge (filter-repo) + force push |
 | G2 | 🔴 Critical | CI security-header step overwrites web `index.html` → deployed site broken; HSTS-meta non-functional | ✅ Fixed (Python injects meta tags; bootstrap preserved; verification fails on corruption) | DoS of the web app; false sense of HTTPS security | Meta tags appended into `<head>`; HSTS claim dropped |
 | G3 | 🟠 High | No local encryption (sembast meta, session token, backups) | ✅ Fixed (session token via `flutter_secure_storage`; backups AES-256-GCM — G19) | Data exposure on device compromise | `flutter_secure_storage` for token; encrypted backups |
 | G4 | 🟠 High | RLS effectiveness depends on production schema drift | ✅ Fixed (verified live 11 Aug 2026: all 11 tables `rls_enabled=true`, 49 policies, via `supabase db query --linked`) | Data leak if policies disabled | Verified in production + `is_session_owner` migration confirmed |

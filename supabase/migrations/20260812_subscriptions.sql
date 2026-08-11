@@ -167,7 +167,7 @@ declare
   v_extra_meters int := 0;
 begin
   -- Demo account is always fully entitled (matches session-guard exemption).
-  if v_email = 'demo@example.com' then
+  if v_email = 'demo@powerems.com' then
     return jsonb_build_object(
       'is_demo', true,
       'trial_end', null, 'trial_active', true,

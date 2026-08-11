@@ -69,7 +69,7 @@ serve(async (req) => {
   );
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new Response("unauthorized", { status: 401 });
-  if (user.email === "demo@example.com") {
+  if (user.email === "demo@powerems.com") {
     return new Response(JSON.stringify({ error: "demo account is free" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },

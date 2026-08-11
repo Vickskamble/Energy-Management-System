@@ -136,7 +136,7 @@ Only what you enter: email, meter details, readings, tariff settings, and (optio
 ## 11. Contact & Demo
 
 - Web app (live): GitHub Pages — link available on request
-- Demo account: `demo@example.com` (ask for password)
+- Demo account: `demo@powerems.com` (ask for password)
 - Repository: github.com/Vickskamble/Energy-Management-System
 - Documents: Privacy Policy · Terms of Service · DPA · NDA · Security Overview (this package)
 
