@@ -67,7 +67,9 @@ class AppConfig {
   }
 
   /// Contract (MD) demand in kVA — the meter's sanctioned demand. The
-  /// billing demand is never below 75% of this value.
+  /// billing demand is the max of the recorded MD and the 11-month ratchet
+  /// peak; 75% of this value is only a reference line on charts/savings
+  /// logic and is never part of the bill.
   static double get contractDemandKva => _contractDemandKva;
   static set contractDemandKva(double value) {
     if (value > 0) _contractDemandKva = value;

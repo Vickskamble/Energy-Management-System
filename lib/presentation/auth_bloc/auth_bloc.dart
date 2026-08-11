@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/app_config.dart';
+import '../../core/config/auth_redirect.dart';
 import '../../core/network/session_guard.dart';
 import '../../core/network/supabase_client.dart';
 import '../../core/utils/app_logger.dart';
@@ -239,7 +240,11 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
         _trySetupAuthListener();
       }
       final res = await Supabase.instance.client.auth
-          .signUp(email: event.email.trim(), password: event.password)
+          .signUp(
+            email: event.email.trim(),
+            password: event.password,
+            emailRedirectTo: AppAuthRedirect.resolve(),
+          )
           .timeout(const Duration(seconds: 15));
       if (res.session != null) {
         final uid = res.session!.user.id;
@@ -296,7 +301,10 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
         _trySetupAuthListener();
       }
       await Supabase.instance.client.auth
-          .resetPasswordForEmail(event.email.trim())
+          .resetPasswordForEmail(
+            event.email.trim(),
+            redirectTo: AppAuthRedirect.resolve(),
+          )
           .timeout(const Duration(seconds: 15));
       emit(const AppAuthPasswordResetSent());
     } on TimeoutException {

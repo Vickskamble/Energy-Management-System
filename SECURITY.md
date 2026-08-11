@@ -1,7 +1,7 @@
 # PowerEMS — Security Documentation
 
 **App:** PowerEMS (Energy Management System)
-**Platforms:** Android, Web (GitHub Pages), Windows desktop (build pending)
+**Platforms:** Android, Web (GitHub Pages), Windows/macOS desktop (CI builds)
 **Backend:** Supabase (Auth + Postgres + PostgREST)
 **Local storage:** sembast (meta only — device token, last user, reminder flags)
 
@@ -15,14 +15,14 @@ This document is a living security audit: it covers the current security posture
 |---|---|---|
 | Authentication | Supabase Auth (email/password) | ✅ Implemented |
 | Authorization | Row-Level Security (RLS) on all data tables | ✅ Implemented |
-| Session management | Single-device enforcement + heartbeat | ⚠️ Partial (fail-open) |
+| Session management | Single-device enforcement + heartbeat | ⚠️ Partial (fail-open by design; server-side revocation deliverable ready) |
 | Transport | HTTPS end-to-end | ✅ Implemented |
-| Input validation | Client-side numeric/date validation | ⚠️ Partial (no length caps) |
-| Secrets | Supabase URL + anon key in `.env`, gitignored | ⚠️ Partial (seed script leaks) |
-| Local data encryption | — | ❌ Not implemented |
-| Multi-factor auth | — | ❌ Phase 2 |
-| Rate limiting / lockout | Supabase platform defaults only | ❌ Not enforced by app |
-| Dependency scanning | — | ❌ Not configured |
+| Input validation | Client-side numeric/date validation + length caps | ✅ Implemented |
+| Secrets | Supabase URL + anon key in `.env`, gitignored; CI from GitHub secrets | ✅ Implemented |
+| Local data encryption | Session token via secure storage; backups AES-256-GCM (passphrase) | ✅ Implemented |
+| Multi-factor auth | — | ⏳ Phase 2 (implementation guide ready) |
+| Rate limiting / lockout | Supabase platform defaults only | ⏳ Phase 2 (dashboard settings + Edge Function options) |
+| Dependency scanning | Dependabot + CI `pub outdated` | ✅ Implemented |
 
 ---
 
@@ -48,6 +48,8 @@ This document is a living security audit: it covers the current security posture
 ---
 
 ## 3. Layer-by-Layer Analysis
+
+> **⚠️ Historical narrative (pre-audit state).** Section 3 describes the code as it was *before* the security fixes (register G1–G15, see §4) and does NOT reflect the current posture — e.g. it claims there is no `flutter_secure_storage`, that CI "destroys" `index.html`, and that the password policy is 6 chars. All of those are fixed. **For the current state, trust §4 (register) and §5 (roadmap), not §3.**
 
 ### 3.1 Authentication & Identity
 
@@ -178,7 +180,7 @@ RLS is the primary data protection control and is **comprehensively implemented*
 |---|---|---|---|---|---|
 | G1 | 🔴 Critical | Live demo account `demo@example.com`/`REDACTED_PASSWORD` + hardcoded creds in git-tracked `seed_data.ps1` | ✅ Fixed (env vars, creds removed; delete demo account in Supabase still pending) | Account takeover, credential stuffing, data access | Rewrote script to use env vars; remove creds from git history (filter-branch/BFG) |
 | G2 | 🔴 Critical | CI security-header step overwrites web `index.html` → deployed site broken; HSTS-meta non-functional | ✅ Fixed (Python injects meta tags; bootstrap preserved; verification fails on corruption) | DoS of the web app; false sense of HTTPS security | Meta tags appended into `<head>`; HSTS claim dropped |
-| G3 | 🟠 High | No local encryption (sembast meta, session token, backups) | ✅ Fixed (session token via `flutter_secure_storage`; encrypted backups pending) | Data exposure on device compromise | `flutter_secure_storage` for token; encrypted backups |
+| G3 | 🟠 High | No local encryption (sembast meta, session token, backups) | ✅ Fixed (session token via `flutter_secure_storage`; backups AES-256-GCM — G19) | Data exposure on device compromise | `flutter_secure_storage` for token; encrypted backups |
 | G4 | 🟠 High | RLS effectiveness depends on production schema drift | ⏳ Open | Data leak if policies disabled | Verify policies in Supabase dashboard; add CI migration-check |
 | G5 | 🟠 High | Weak password policy (6 chars), weak email validation | ✅ Fixed (client: min 8 chars, letter+digit, RFC email regex; server policy pending) | Brute force / account takeover | Client validation added; server-side enforcement pending |
 | G6 | 🟠 High | No MFA, no lockout/rate-limiting control | ⏳ Open | Credential attacks | Enable Supabase MFA (Phase 2); platform-level rate limiting |
@@ -187,10 +189,14 @@ RLS is the primary data protection control and is **comprehensively implemented*
 | G9 | 🟡 Medium | No length caps on meter name/location/site strings | ✅ Fixed (60/100/100 chars) | DB bloat, malformed records | maxLength validators on inputs |
 | G10 | 🟡 Medium | Raw exceptions shown in UI; release-mode logging | ✅ Fixed | Information disclosure | User-friendly error messages; logging guarded by `kReleaseMode` |
 | G11 | 🟡 Medium | No certificate pinning | ⏳ Open | MITM on compromised CAs | Pin Supabase host cert (with rotation plan) |
-| G12 | 🟡 Medium | `SessionGuard` fail-open design | ⏳ Open | Enforcement silently disabled offline | Document as convenience-only; add server-side session revocation |
+| G12 | 🟡 Medium | `SessionGuard` fail-open design | ⏳ Open (Edge Function + RPC deliverable ready in `docs/gaps-fix-ops.md`; deploy to finish) | Enforcement silently disabled offline | Document as convenience-only; deploy server-side session revocation |
 | G13 | 🟢 Low | Dead dependency `connectivity_plus`; macOS release network entitlement missing | ✅ Fixed (dep removed; entitlement added; dead `core/security/` folder removed) | Attack surface + broken macOS build | Removed dependency; added entitlement |
 | G14 | 🟢 Low | No dependency vulnerability scanning (Dependabot/OSV) | ✅ Fixed (Dependabot config + CI `pub outdated` check) | Known-CVE exposure | Dependabot monthly + CI outdated check added |
 | G15 | 🟢 Low | False security claims in CI "Security Report" step | ✅ Fixed (honest verified/unimplemented list) | Trust erosion, misleading audit trail | Report rewritten with only verified claims |
+| G16 | 🟢 Low | Android 13+ `POST_NOTIFICATIONS` permission not declared/requested | ✅ Fixed | Alerts silently blocked on API 33+ | Manifest permission + runtime request in `notification_service.dart` |
+| G17 | 🟢 Low | Windows desktop notifications not supported (reminders/alerts desktop-only gap) | ✅ Fixed | No desktop alerts | Windows plugin init + AUMID on installer shortcuts |
+| G18 | 🟢 Low | Login page enforced 6-char minimum while registration enforces 8+ | ✅ Fixed (login now uses `ValidationRules.validatePassword`) | Policy inconsistency | Shared validator on both pages |
+| G19 | 🟢 Low | Backup export was plaintext JSON | ✅ Fixed (AES-256-GCM + PBKDF2 100k, passphrase-protected; legacy plaintext restore still supported) | Data exposure at rest / on device | `backup_service.dart` encryption; passphrase dialog in Settings |
 
 ---
 
@@ -208,14 +214,14 @@ RLS is the primary data protection control and is **comprehensively implemented*
 9. ✅ Dependabot config + CI outdated check (G14); honest Security Report (G15)
 
 ### Phase 2 — Short term (weeks) ⏳ Pending
-10. Enable Supabase MFA + login throttling (G6)
-11. Remove demo account + hardcoded creds from git history (G1 cleanup)
-12. Server-side password policy enforcement (G5)
+10. Enable Supabase MFA + login throttling (G6) — implementation guide in `docs/gaps-fix-ops.md`
+11. Remove demo account + hardcoded creds from git history (G1 cleanup) — **deferred by owner decision**
+12. Server-side password policy enforcement (G5) — Supabase dashboard setting + optional Edge Function (see `docs/gaps-fix-ops.md`)
 
 ### Phase 3 — Medium term (months) ⏳ Pending
 13. Certificate pinning with rotation plan (G11)
-14. Server-side session revocation / true device enforcement (G12)
-15. Encrypted backup export (G3)
+14. Server-side session revocation / true device enforcement (G12) — Edge Function + RPC code ready in `docs/gaps-fix-ops.md`, deploy pending
+15. ~~Encrypted backup export~~ ✅ **Done — G19** (AES-256-GCM, passphrase, PBKDF2 100k)
 16. Penetration testing + bug bounty-style review of auth flows
 
 ---

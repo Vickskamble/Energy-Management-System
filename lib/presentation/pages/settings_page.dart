@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/backup_service.dart';
 import '../../core/utils/data_reset_service.dart';
+import '../../core/utils/validation_rules.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_section.dart';
@@ -628,12 +629,22 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _exportBackup() async {
+    final passphrase = await _askPassphrase(
+      title: 'Encrypt backup?',
+      message:
+          'Backups are encrypted with a passphrase you choose. '
+          'If you lose it, the backup cannot be recovered.\n'
+          'Min ${ValidationRules.minPasswordLength} characters, '
+          'at least one letter and one number.',
+    );
+    if (passphrase == null) return;
+
     try {
-      await BackupService.exportBackup();
+      await BackupService.exportBackup(passphrase: passphrase);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Backup exported'),
+            content: Text('Encrypted backup exported'),
             backgroundColor: Colors.green,
           ),
         );
@@ -677,7 +688,19 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (confirmed != true) return;
 
     try {
-      final result = await BackupService.restoreBackup();
+      ({int recordCount, List<String> restoredDbs}) result;
+      try {
+        result = await BackupService.restoreBackup();
+      } on BackupEncryptionRequired {
+        final passphrase = await _askPassphrase(
+          title: 'Enter backup passphrase',
+          message:
+              'This backup is encrypted. Enter the passphrase that was used '
+              'when the backup was created.',
+        );
+        if (passphrase == null) return;
+        result = await BackupService.restoreBackup(passphrase: passphrase);
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -702,8 +725,75 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
   }
 
-  Future<void> _confirmResetAll() async {
-    final confirmed = await showDialog<bool>(
+  /// Prompts for a backup passphrase. Returns null when cancelled.
+  /// Validates the same password policy as account registration
+  /// (min length + letter + digit) — see ValidationRules.
+  Future<String?> _askPassphrase({
+    required String title,
+    required String message,
+  }) async {
+    final ctrl = TextEditingController();
+    var obscure = true;
+    final passphrase = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(message),
+              const SizedBox(height: 16),
+              TextField(
+                controller: ctrl,
+                obscureText: obscure,
+                decoration: InputDecoration(
+                  labelText: 'Passphrase',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscure
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                    onPressed: () =>
+                        setDialogState(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final error = ValidationRules.validatePassword(ctrl.text);
+                if (error != null) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(
+                      content: Text('Passphrase too weak — $error'),
+                      backgroundColor: Colors.red.shade700,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx, ctrl.text);
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
+    );
+    ctrl.dispose();
+    return passphrase;
+  }
+
+  Future<void> _confirmResetAll() async {    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Reset all data?'),

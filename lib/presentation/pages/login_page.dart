@@ -126,15 +126,7 @@ class _LoginPageState extends State<LoginPage>
                                     ),
                                   ),
                                 ),
-                                validator: (v) {
-                                  if (v == null || v.isEmpty) {
-                                    return 'Password is required';
-                                  }
-                                  if (v.length < 6) {
-                                    return 'Minimum 6 characters';
-                                  }
-                                  return null;
-                                },
+                                validator: ValidationRules.validatePassword,
                               ),
                               const SizedBox(height: 12),
                               Row(

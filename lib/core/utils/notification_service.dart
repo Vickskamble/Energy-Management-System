@@ -14,9 +14,27 @@ class NotificationService {
   static const String _channelName = 'EMS Alerts';
   static const String _channelDesc = 'Alerts for PF penalty, MD breach, etc.';
 
+  /// Must match the AppUserModelID set on the installer shortcuts
+  /// (release/ems_installer.iss) — Windows toast notifications need a
+  /// Start Menu shortcut with the same AUMID to be deliverable.
+  static const String _windowsAppId = 'PowerEMS.EMS';
+
   Future<void> initialize() async {
     if (_initialized) return;
-    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows) {
+    if (kIsWeb) {
+      _initialized = true;
+      return;
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      const windowsSettings = WindowsInitializationSettings(
+        appName: 'PowerEMS',
+        appUserModelId: _windowsAppId,
+        guid: '8F2C9E5A-4B3D-4A67-9C1E-1D6F0A7B8C2E',
+      );
+      await _plugin.initialize(
+        settings: const InitializationSettings(windows: windowsSettings),
+      );
       _initialized = true;
       return;
     }
@@ -41,6 +59,9 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
     if (androidPlatform != null) {
+      // Android 13+ (API 33) requires the runtime POST_NOTIFICATIONS
+      // permission — without it notifications are silently dropped.
+      await androidPlatform.requestNotificationsPermission();
       await androidPlatform.createNotificationChannel(
         const AndroidNotificationChannel(
           _channelId,
@@ -61,7 +82,19 @@ class NotificationService {
     required String body,
   }) async {
     if (_initialized) await initialize();
-    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows) return;
+    if (kIsWeb) return;
+
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      const windowsDetails = WindowsNotificationDetails();
+      const details = NotificationDetails(windows: windowsDetails);
+      await _plugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: details,
+      );
+      return;
+    }
 
     const androidDetails = AndroidNotificationDetails(
       _channelId,

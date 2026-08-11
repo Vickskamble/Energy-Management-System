@@ -169,9 +169,21 @@ Active tables (all RLS-scoped to the signed-in user):
      3. `supabase_single_device_migration.sql` — `user_sessions` (single-device login)
    - Enable Email auth provider in Supabase → Authentication → Providers
 
-4. **Run the app**
+4. **Configure email confirmation redirects**
+   - Open Supabase Dashboard → Authentication → URL Configuration
+   - **Site URL:** your app URL, e.g. `http://localhost:8080` (dev) or the
+     GitHub Pages URL (prod)
+   - **Redirect URLs:** add every URL below:
+     - Web (dev): `http://localhost:8080` — run with
+       `flutter run -d chrome --web-port=8080`
+     - Web (prod): `https://<user>.github.io/Energy-Management-System/`
+     - Android/iOS deep link: `com.powerms.ems://login`
+   - The app auto-detects its own web URL at runtime; you can also pin one
+     with `APP_REDIRECT_URL` in `.env`
+
+5. **Run the app**
    ```bash
-   flutter run -d chrome
+   flutter run -d chrome --web-port=8080
    ```
 
 ### Initial Login
