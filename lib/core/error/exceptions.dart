@@ -23,3 +23,17 @@ final class ValidationException extends AppException {
 final class NetworkException extends AppException {
   const NetworkException(super.message, {super.code});
 }
+
+final class SubscriptionException extends AppException {
+  const SubscriptionException(super.message, {super.code});
+}
+
+/// Thrown when the account's trial/subscription expired — writes are blocked.
+final class ReadOnlyAccountException extends AppException {
+  const ReadOnlyAccountException(super.message, {super.code});
+}
+
+/// Thrown when adding a meter would exceed the plan's meter allowance.
+final class MeterLimitException extends AppException {
+  const MeterLimitException(super.message, {super.code});
+}

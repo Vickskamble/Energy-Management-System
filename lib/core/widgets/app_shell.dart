@@ -102,6 +102,15 @@ class _AppShellState extends State<AppShell> {
               ),
             const Divider(),
             ListTile(
+              leading: const Icon(Icons.workspace_premium_outlined),
+              title: const Text('Plan & Billing'),
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onItemSelected(6);
+              },
+            ),
+            const Divider(),
+            ListTile(
               leading: const Icon(Icons.settings_outlined),
               title: const Text('Settings'),
               onTap: () {

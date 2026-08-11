@@ -12,6 +12,7 @@ import 'reading_entry_page.dart';
 import 'analysis_page.dart';
 import 'reports_page.dart';
 import 'meter_management_page.dart';
+import 'billing_page.dart';
 import '../pages/settings_page.dart';
 
 class MainNavigationHub extends StatefulWidget {
@@ -71,6 +72,13 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
             onToggleTheme: widget.onToggleTheme,
           ),
         ),
+      );
+      return;
+    }
+    if (index == 6) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const BillingPage()),
       );
       return;
     }

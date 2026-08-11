@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../core/config/subscription_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_button.dart';
@@ -10,6 +11,7 @@ import '../../core/widgets/app_states.dart';
 import '../../data/models/meter_model.dart';
 import '../../data/repositories/energy_repository.dart';
 import '../../data/repositories/meter_repository.dart';
+import 'billing_page.dart';
 
 class MeterManagementPage extends StatelessWidget {
   const MeterManagementPage({super.key});
@@ -504,13 +506,56 @@ class _MeterListState extends State<_MeterList> {
   Widget _addMeterFab(BuildContext context) {
     return FloatingActionButton.extended(
       onPressed: () async {
+        final repo = context.read<MeterRepository>();
+        final meters = await repo.getAllMeters();
+        final canAdd = await SubscriptionStore.canAddMeter(
+          currentMeterCount: meters.length,
+        );
+        if (!context.mounted) return;
+        if (!canAdd) {
+          _showMeterLimitDialog(context, meters.length);
+          return;
+        }
         await MeterManagementPage.showMeterDialog(context);
+        if (!context.mounted) return;
         _load();
       },
       backgroundColor: AppColors.primary,
       foregroundColor: Colors.white,
       icon: const Icon(Icons.add_rounded),
       label: const Text('Add Meter'),
+    );
+  }
+
+  void _showMeterLimitDialog(BuildContext context, int currentCount) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Meter limit reached'),
+        content: Text(
+          'Your plan covers $currentCount meter(s). '
+          'Subscribe for ₹${SubscriptionConfig.basePricePerMonth}/month '
+          '(includes 1 meter) and add extra meters at just '
+          '₹${SubscriptionConfig.meterPricePerMonth}/month each.',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Later'),
+          ),
+          AppButton(
+            label: 'View Plans',
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BillingPage()),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }

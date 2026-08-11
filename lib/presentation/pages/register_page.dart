@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../core/config/subscription_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/validation_rules.dart';
 import '../../core/widgets/app_button.dart';
@@ -17,6 +18,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  final _referralCtrl = TextEditingController();
   bool _obscurePass = true;
 
   @override
@@ -24,11 +26,17 @@ class _RegisterPageState extends State<RegisterPage> {
     _emailCtrl.dispose();
     _passCtrl.dispose();
     _confirmCtrl.dispose();
+    _referralCtrl.dispose();
     super.dispose();
   }
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    final referral = _referralCtrl.text.trim();
+    if (referral.isNotEmpty) {
+      // Remember it — claimed once the user signs in (idempotent server-side).
+      SubscriptionStore.setPendingReferral(referral);
+    }
     context.read<AuthBloc>().add(
       AppAuthRegisterRequested(
         email: _emailCtrl.text.trim(),
@@ -105,6 +113,23 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     validator: (v) {
                       if (v != _passCtrl.text) return 'Passwords do not match';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _referralCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Referral code (optional)',
+                      hintText: 'Got a friend code? You both save.',
+                      prefixIcon: Icon(Icons.card_giftcard_outlined),
+                    ),
+                    textCapitalization: TextCapitalization.characters,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      if (v.trim().length < 4) {
+                        return 'Referral codes are at least 4 characters';
+                      }
                       return null;
                     },
                   ),

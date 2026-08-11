@@ -82,6 +82,12 @@ class _AppSidebarState extends State<AppSidebar> {
         index: 4,
       ),
       SidebarItem(
+        icon: Icons.workspace_premium_outlined,
+        activeIcon: Icons.workspace_premium_rounded,
+        label: 'Plan & Billing',
+        index: 6,
+      ),
+      SidebarItem(
         icon: Icons.settings_outlined,
         activeIcon: Icons.settings_rounded,
         label: 'Settings',

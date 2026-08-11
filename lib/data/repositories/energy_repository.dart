@@ -1,4 +1,5 @@
 import '../../core/config/app_config.dart';
+import '../../core/config/subscription_config.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/network/supabase_client.dart';
 import '../../domain/entities/energy_log_entity.dart';
@@ -15,6 +16,25 @@ class EnergyRepository {
 
   static const int _defaultFetchLimit = 2000;
 
+  /// Throws [ReadOnlyAccountException] when the account's trial/subscription
+  /// has expired (client-side mirror — the DB trigger is the hard gate).
+  static Future<void> _ensureWritable() async {
+    try {
+      final ent = await SubscriptionStore.getEntitlement();
+      if (ent.readOnly) {
+        throw const ReadOnlyAccountException(
+          'Your free trial has ended. Subscribe in Plan & Billing to '
+          'continue recording readings.',
+          code: 'ACCOUNT_READ_ONLY',
+        );
+      }
+    } on ReadOnlyAccountException {
+      rethrow;
+    } catch (_) {
+      // Entitlement unreachable → let the server decide (trigger blocks).
+    }
+  }
+
   /// Get all logs from the cloud (most recent first), with actual readings
   /// hydrated for legacy rows that predate the current_kwh/current_kvah
   /// columns.
@@ -27,6 +47,7 @@ class EnergyRepository {
   /// Save a reading directly to Supabase.
   Future<EnergyLogEntity> saveReading(EnergyLogModel model) async {
     _ensureOnline();
+    await _ensureWritable();
     await _remote.pushLog(model);
     return model.toEntity();
   }
@@ -34,12 +55,14 @@ class EnergyRepository {
   /// Update an existing reading (remote upsert).
   Future<void> updateReading(EnergyLogModel model) async {
     _ensureOnline();
+    await _ensureWritable();
     await _remote.updateLog(model);
   }
 
   /// Delete a reading from the cloud.
   Future<void> deleteReading(String id, {bool synced = false}) async {
     _ensureOnline();
+    await _ensureWritable();
     await _remote.deleteLog(id);
   }
 
@@ -71,6 +94,7 @@ class EnergyRepository {
   Future<int> bulkSaveReadings(List<EnergyLogModel> models) async {
     if (models.isEmpty) return 0;
     _ensureOnline();
+    await _ensureWritable();
 
     final toInsert = <EnergyLogModel>[];
     for (final model in models) {

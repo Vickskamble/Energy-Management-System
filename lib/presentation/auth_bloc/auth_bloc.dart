@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/auth_redirect.dart';
+import '../../core/config/subscription_config.dart';
 import '../../core/network/session_guard.dart';
 import '../../core/network/supabase_client.dart';
 import '../../core/utils/app_logger.dart';
@@ -151,6 +152,10 @@ class AuthBloc extends Bloc<AppAuthEvent, AppAuthState> {
     } catch (e) {
       AppLogger.w('Tariff load failed, using defaults: $e');
     }
+
+    // Claim a referral code entered at registration (idempotent, fire-and-
+    // forget — must run AFTER the session is usable).
+    unawaited(SubscriptionStore.claimPendingReferral());
 
     if (!isClosed) {
       emit(AppAuthAuthenticated(userId: userId, email: email));

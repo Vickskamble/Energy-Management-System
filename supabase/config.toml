@@ -385,6 +385,13 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# SaaS billing functions: webhook must be callable without JWT (Razorpay signs it).
+[functions.subscription-checkout]
+verify_jwt = true
+
+[functions.razorpay-webhook]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
