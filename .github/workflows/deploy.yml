@@ -207,10 +207,14 @@ jobs:
             build_cmd: flutter build windows --release
             artifact_name: windows
             artifact_path: build/windows/x64/runner/Release/
+            zip_name: ems-windows-x64.zip
+            zip_cmd: Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath ems-windows-x64.zip -Force
           - os: macos-latest
             build_cmd: flutter build macos --release
             artifact_name: macos
             artifact_path: build/macos/Build/Products/Release/
+            zip_name: ems-macos.zip
+            zip_cmd: ditto -c -k --keepParent build/macos/Build/Products/Release/*.app ems-macos.zip
     steps:
       - uses: actions/checkout@v4
 
@@ -230,6 +234,16 @@ jobs:
 
       - name: Build
         run: ${{ matrix.build_cmd }}
+
+      - name: Package
+        run: ${{ matrix.zip_cmd }}
+        if: success()
+
+      - name: Upload to GitHub Release
+        if: success() && startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" ${{ matrix.zip_name }} --repo "$GITHUB_REPOSITORY" --clobber || true
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

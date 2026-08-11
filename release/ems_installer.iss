@@ -2,7 +2,7 @@
 ; Compiled with Inno Setup 6
 
 #define MyAppName "EMS Energy System"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.3"
 #define MyAppExeName "ems.exe"
 #define MyAppPublisher "Vick Skamble"
 #define MyAppId "8F2C9E5A-4B3D-4A67-9C1E-1D6F0A7B8C2E"
