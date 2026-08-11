@@ -40,7 +40,7 @@ dependencies:
   sembast_web: ^2.4.4+1
   google_fonts: ^8.1.0
   flutter_bloc: ^9.1.1
-  decimal: ^3.2.4
+  decimal: ^3.2.6
   web: ^1.1.0
   pdf: ^3.11.3
   file_picker: 8.3.3
