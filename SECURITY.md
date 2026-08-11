@@ -181,15 +181,15 @@ RLS is the primary data protection control and is **comprehensively implemented*
 | G1 | 🔴 Critical | Live demo account `demo@example.com`/`REDACTED_PASSWORD` + hardcoded creds in git-tracked `seed_data.ps1` | ✅ Fixed (env vars, creds removed; delete demo account in Supabase still pending) | Account takeover, credential stuffing, data access | Rewrote script to use env vars; remove creds from git history (filter-branch/BFG) |
 | G2 | 🔴 Critical | CI security-header step overwrites web `index.html` → deployed site broken; HSTS-meta non-functional | ✅ Fixed (Python injects meta tags; bootstrap preserved; verification fails on corruption) | DoS of the web app; false sense of HTTPS security | Meta tags appended into `<head>`; HSTS claim dropped |
 | G3 | 🟠 High | No local encryption (sembast meta, session token, backups) | ✅ Fixed (session token via `flutter_secure_storage`; backups AES-256-GCM — G19) | Data exposure on device compromise | `flutter_secure_storage` for token; encrypted backups |
-| G4 | 🟠 High | RLS effectiveness depends on production schema drift | ⏳ Open | Data leak if policies disabled | Verify policies in Supabase dashboard; add CI migration-check |
-| G5 | 🟠 High | Weak password policy (6 chars), weak email validation | ✅ Fixed (client: min 8 chars, letter+digit, RFC email regex; server policy pending) | Brute force / account takeover | Client validation added; server-side enforcement pending |
+| G4 | 🟠 High | RLS effectiveness depends on production schema drift | ✅ Fixed (verified live 11 Aug 2026: all 11 tables `rls_enabled=true`, 49 policies, via `supabase db query --linked`) | Data leak if policies disabled | Verified in production + `is_session_owner` migration confirmed |
+| G5 | 🟠 High | Weak password policy (6 chars), weak email validation | ✅ Fixed (client: min 8 chars, letter+digit, RFC email regex; server-side min-length 8 set in Supabase Auth settings 11 Aug 2026) | Brute force / account takeover | Client validation added; server-side enforcement enabled |
 | G6 | 🟠 High | No MFA, no lockout/rate-limiting control | ⏳ Open | Credential attacks | Enable Supabase MFA (Phase 2); platform-level rate limiting |
 | G7 | 🟡 Medium | TOCTOU duplicate readings — no unique index, bulk import bypasses duplicate guard | ✅ Fixed (unique index `(user_id, meter_name, logged_at)`; import dedupe) | Data integrity corruption | Unique index in `migrate_schema.sql`; duplicate check in import path |
 | G8 | 🟡 Medium | No size/row limits on Excel import & backup restore | ✅ Fixed (10 MB / 5000 rows import; 20 MB restore) | Memory exhaustion | Size/row limits enforced with user-facing errors |
 | G9 | 🟡 Medium | No length caps on meter name/location/site strings | ✅ Fixed (60/100/100 chars) | DB bloat, malformed records | maxLength validators on inputs |
 | G10 | 🟡 Medium | Raw exceptions shown in UI; release-mode logging | ✅ Fixed | Information disclosure | User-friendly error messages; logging guarded by `kReleaseMode` |
 | G11 | 🟡 Medium | No certificate pinning | ⏳ Open | MITM on compromised CAs | Pin Supabase host cert (with rotation plan) |
-| G12 | 🟡 Medium | `SessionGuard` fail-open design | ⏳ Open (Edge Function + RPC deliverable ready in `docs/gaps-fix-ops.md`; deploy to finish) | Enforcement silently disabled offline | Document as convenience-only; deploy server-side session revocation |
+| G12 | 🟡 Medium | `SessionGuard` fail-open design | ✅ Fixed (server-side `session-gate` Edge Function + `is_session_owner` RPC deployed 11 Aug 2026; app-side header wiring = Phase 3) | Enforcement silently disabled offline | Edge Function deployed; wire `x-device-token` header in datasources |
 | G13 | 🟢 Low | Dead dependency `connectivity_plus`; macOS release network entitlement missing | ✅ Fixed (dep removed; entitlement added; dead `core/security/` folder removed) | Attack surface + broken macOS build | Removed dependency; added entitlement |
 | G14 | 🟢 Low | No dependency vulnerability scanning (Dependabot/OSV) | ✅ Fixed (Dependabot config + CI `pub outdated` check) | Known-CVE exposure | Dependabot monthly + CI outdated check added |
 | G15 | 🟢 Low | False security claims in CI "Security Report" step | ✅ Fixed (honest verified/unimplemented list) | Trust erosion, misleading audit trail | Report rewritten with only verified claims |
@@ -205,7 +205,7 @@ RLS is the primary data protection control and is **comprehensively implemented*
 ### Phase 1 — Immediate (days) ✅ Done
 1. ✅ Remove hardcoded creds from `seed_data.ps1` (G1)
 2. ✅ Fix CI web header step to append (not overwrite) meta tags; remove HSTS-meta (G2)
-3. ⏳ Verify all RLS policies live in production Supabase (G4) — **still to do**
+3. ✅ Verify all RLS policies live in production Supabase (G4) — **verified 11 Aug 2026** (11 tables enabled, 49 policies)
 4. ✅ Tighten client password policy to 8+ chars with complexity (G5)
 5. ✅ Strip release-mode logging; sanitize UI error messages (G10)
 6. ✅ Add `flutter_secure_storage` for session token (G3)
@@ -216,11 +216,11 @@ RLS is the primary data protection control and is **comprehensively implemented*
 ### Phase 2 — Short term (weeks) ⏳ Pending
 10. Enable Supabase MFA + login throttling (G6) — implementation guide in `docs/gaps-fix-ops.md`
 11. Remove demo account + hardcoded creds from git history (G1 cleanup) — **deferred by owner decision**
-12. Server-side password policy enforcement (G5) — Supabase dashboard setting + optional Edge Function (see `docs/gaps-fix-ops.md`)
+12. ~~Server-side password policy~~ ✅ **Done** (Supabase Auth min length 8, 11 Aug 2026)
 
 ### Phase 3 — Medium term (months) ⏳ Pending
 13. Certificate pinning with rotation plan (G11)
-14. Server-side session revocation / true device enforcement (G12) — Edge Function + RPC code ready in `docs/gaps-fix-ops.md`, deploy pending
+14. Server-side session revocation / true device enforcement (G12) — **deployed 11 Aug 2026** (`session-gate` + `is_session_owner`); app-side `x-device-token` header wiring pending
 15. ~~Encrypted backup export~~ ✅ **Done — G19** (AES-256-GCM, passphrase, PBKDF2 100k)
 16. Penetration testing + bug bounty-style review of auth flows
 
