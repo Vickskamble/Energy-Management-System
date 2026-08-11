@@ -177,7 +177,7 @@ RLS is the primary data protection control and is **comprehensively implemented*
 
 | # | Priority | Gap | Status | Impact | Fix |
 |---|---|---|---|---|---|
-| G1 | 🔴 Critical | Live demo account `demo@powerems.com`/`demo1234` + hardcoded creds in git-tracked `seed_data.ps1` | ✅ Fixed (env vars; creds purged from git history via filter-repo 12 Aug 2026; demo account deletion in Supabase still pending) | Account takeover, credential stuffing, data access | Rewrote script to use env vars; git-history purge (filter-repo) + force push |
+| G1 | 🔴 Critical | Live demo account + hardcoded creds in git-tracked `seed_data.ps1` | ✅ Fixed (env vars; creds purged from git history via filter-repo 12 Aug 2026; demo account deletion in Supabase still pending) | Account takeover, credential stuffing, data access | Rewrote script to use env vars; git-history purge (filter-repo) + force push |
 | G2 | 🔴 Critical | CI security-header step overwrites web `index.html` → deployed site broken; HSTS-meta non-functional | ✅ Fixed (Python injects meta tags; bootstrap preserved; verification fails on corruption) | DoS of the web app; false sense of HTTPS security | Meta tags appended into `<head>`; HSTS claim dropped |
 | G3 | 🟠 High | No local encryption (sembast meta, session token, backups) | ✅ Fixed (session token via `flutter_secure_storage`; backups AES-256-GCM — G19) | Data exposure on device compromise | `flutter_secure_storage` for token; encrypted backups |
 | G4 | 🟠 High | RLS effectiveness depends on production schema drift | ✅ Fixed (verified live 11 Aug 2026: all 11 tables `rls_enabled=true`, 49 policies, via `supabase db query --linked`) | Data leak if policies disabled | Verified in production + `is_session_owner` migration confirmed |
