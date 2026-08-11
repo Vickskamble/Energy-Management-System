@@ -31,6 +31,9 @@ enum SessionStatus {
 ///    ever takes over the row, the next heartbeat detects the conflict and the
 ///    app force-signs-out this device.
 ///
+/// [isExempt] accounts (the public demo account) are NOT restricted — anyone
+/// can log in anytime, because multiple clients try the demo simultaneously.
+///
 /// Requires the `supabase_single_device_migration.sql` migration to be applied.
 class SessionGuard {
   SessionGuard._();
@@ -40,6 +43,14 @@ class SessionGuard {
   static const String _table = 'user_sessions';
   static const Duration _staleAfter = Duration(minutes: 3);
   static const Duration _heartbeatInterval = Duration(seconds: 60);
+
+  /// Accounts exempt from single-device enforcement — the public demo
+  /// account must stay usable for every client at the same time.
+  static const List<String> _exemptEmails = ['demo@example.com'];
+
+  /// Whether [email] is exempt from single-device session enforcement.
+  static bool isExempt(String email) =>
+      _exemptEmails.contains(email.toLowerCase().trim());
 
   Timer? _heartbeat;
   String? _activeUserId;
