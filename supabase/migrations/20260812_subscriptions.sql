@@ -83,6 +83,20 @@ drop policy if exists "subscriptions_select_own" on public.subscriptions;
 create policy "subscriptions_select_own" on public.subscriptions
   for select using (auth.uid() = user_id);
 
+-- the checkout Edge Function upserts the subscription row as the signed-in
+-- user (anon key + user JWT), so authenticated users need insert/update
+-- scoped to their own rows; the webhook writes via service role.
+drop policy if exists "subscriptions_insert_own" on public.subscriptions;
+create policy "subscriptions_insert_own" on public.subscriptions
+  for insert to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "subscriptions_update_own" on public.subscriptions;
+create policy "subscriptions_update_own" on public.subscriptions
+  for update to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
 -- ============================================================
 -- 3. referrals (each referred user appears once)
 -- ============================================================
