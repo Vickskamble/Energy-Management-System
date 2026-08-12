@@ -117,6 +117,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
               successPrefix: result.isAddon
                   ? '${SubscriptionConfig.paymentDoneUrl}?'
                   : null,
+              fallbackUrl: result.paymentUrl,
               amountLabel: 'Monthly subscription',
             ),
           ),

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 /// Razorpay checkout rendered inside the app via WebView, so the user lands
@@ -20,6 +21,7 @@ class RazorpayCheckoutPage extends StatefulWidget {
     this.amountLabel,
     this.initialUrl,
     this.successPrefix,
+    this.fallbackUrl,
   });
 
   final String subscriptionId;
@@ -30,6 +32,9 @@ class RazorpayCheckoutPage extends StatefulWidget {
 
   /// Payment-link mode: URL to treat as "payment done" (its callback_url).
   final String? successPrefix;
+
+  /// External payment page URL used if the in-app WebView fails to start.
+  final String? fallbackUrl;
 
   /// Whether this device/OS can render the in-app checkout.
   /// Falls back to the external hosted page otherwise.
@@ -46,6 +51,7 @@ class RazorpayCheckoutPage extends StatefulWidget {
 class _RazorpayCheckoutPageState extends State<RazorpayCheckoutPage> {
   late final WebViewController _controller;
   bool _completed = false;
+  bool _initFailed = false;
 
   String get _keyId => dotenv.env['RAZORPAY_KEY_ID'] ?? '';
 
@@ -130,9 +136,40 @@ class _RazorpayCheckoutPageState extends State<RazorpayCheckoutPage> {
       ..setBackgroundColor(const Color(0xFF0e1420));
     final initialUrl = widget.initialUrl;
     if (initialUrl != null && initialUrl.isNotEmpty) {
-      _controller.loadRequest(Uri.parse(initialUrl));
+      _controller
+          .loadRequest(Uri.parse(initialUrl))
+          .catchError((Object _) => _markInitFailed());
     } else {
-      _controller.loadHtmlString(_buildHtml());
+      _controller
+          .loadHtmlString(_buildHtml())
+          .catchError((Object _) => _markInitFailed());
+    }
+  }
+
+  void _markInitFailed() {
+    if (mounted) setState(() => _initFailed = true);
+  }
+
+  Future<void> _openExternally() async {
+    final url =
+        widget.fallbackUrl ??
+        widget.initialUrl ??
+        '';
+    if (url.isEmpty) {
+      _finish(false);
+      return;
+    }
+    final opened = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open the payment page. Try again.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 
@@ -164,7 +201,42 @@ class _RazorpayCheckoutPageState extends State<RazorpayCheckoutPage> {
                 ],
               ),
             )
-          : WebViewWidget(controller: _controller),
+          : _initFailed
+              ? _buildFallback()
+              : WebViewWidget(controller: _controller),
+    );
+  }
+
+  Widget _buildFallback() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.public_rounded,
+                color: Color(0xFF94a3b8), size: 56),
+            const SizedBox(height: 12),
+            const Text(
+              'In-app payment page could not open.',
+              style: TextStyle(color: Colors.white, fontSize: 15),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Continue in your browser instead — your plan updates '
+              'automatically after payment.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF94a3b8), fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _openExternally,
+              icon: const Icon(Icons.open_in_browser),
+              label: const Text('Open payment in browser'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

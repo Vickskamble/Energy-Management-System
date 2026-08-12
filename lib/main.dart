@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -13,11 +15,26 @@ import 'presentation/bloc/energy_bloc.dart';
 import 'presentation/pages/login_page.dart';
 import 'presentation/pages/main_navigation_hub.dart';
 
+void _logRenderError(FlutterErrorDetails details) {
+  try {
+    final dir =
+        '${Platform.environment['APPDATA'] ?? Directory.current.path}\\PowerEMS';
+    Directory(dir).createSync(recursive: true);
+    File('$dir\\ems_error.log').writeAsStringSync(
+      '${DateTime.now().toIso8601String()}\n'
+      '${details.exception}\n${details.stack}\n'
+      '----------------------------------------\n',
+      mode: FileMode.append,
+    );
+  } catch (_) {}
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   ErrorWidget.builder = (details) {
     debugPrint('=== RENDER ERROR === ${details.exception}');
+    _logRenderError(details);
     return Material(
       color: Colors.white,
       child: Padding(
@@ -42,6 +59,17 @@ void main() async {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                details.exception.toString(),
+                textAlign: TextAlign.center,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
                   color: AppColors.textSecondary,
                 ),
               ),
