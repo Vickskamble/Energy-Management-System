@@ -17,6 +17,8 @@ const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET") ?? "";
 const BASE_AMOUNT = 799; // INR / month
 const METER_RATE = 99; // INR / month per extra meter
 const TOTAL_COUNT = 24; // rolling 2-year mandate
+const PAYMENT_DONE_URL =
+  "https://Vickskamble.github.io/Energy-Management-System/payment-done.html";
 
 const rzp = (path: string, init?: RequestInit) =>
   fetch(`https://api.razorpay.com/v1${path}`, {
@@ -57,6 +59,30 @@ async function cancelOpenSubscription(subscriptionId: string) {
   }
 }
 
+async function createExtraMeterLink(user: { id: string; email: string }, delta: number) {
+  const res = await rzp("/payment_links", {
+    method: "POST",
+    body: JSON.stringify({
+      amount: delta * METER_RATE * 100,
+      currency: "INR",
+      accept_partial: false,
+      description: `PowerEMS extra meter${delta > 1 ? "s" : ""} (x${delta}) add-on`,
+      customer: { email: user.email },
+      notes: {
+        user_id: user.id,
+        delta_meters: delta,
+        action: "extra_meter_addon",
+      },
+      callback_url: PAYMENT_DONE_URL,
+      callback_method: "get",
+      reminder_enable: false,
+    }),
+  });
+  const link = await res.json();
+  if (!link.id) throw new Error(`payment link create failed: ${JSON.stringify(link)}`);
+  return link;
+}
+
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("method not allowed", { status: 405 });
@@ -88,14 +114,47 @@ serve(async (req) => {
 
   const { data: existing } = await supabase
     .from("subscriptions")
-    .select("razorpay_subscription_id")
+    .select("razorpay_subscription_id, status, extra_meters")
     .eq("user_id", user.id)
     .single();
 
-  const openStatuses = ["created", "authenticated"];
+  const existingStatus = existing?.status ?? "none";
+  const isPaidBase = ["authenticated", "active"].includes(existingStatus);
+
+  // Base plan active: never re-charge ₹799 — extra meters are a one-time
+  // ₹99/meter top-up payment link; the webhook applies the delta on payment.
+  if (isPaidBase) {
+    const currentExtras = existing?.extra_meters ?? 0;
+    const delta = extraMeters - currentExtras;
+    if (delta <= 0) {
+      return new Response(
+        JSON.stringify({
+          mode: "noop",
+          extra_meters: currentExtras,
+          status: existingStatus,
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    }
+    const link = await createExtraMeterLink(user, delta);
+    return new Response(
+      JSON.stringify({
+        mode: "addon",
+        payment_link_id: link.id,
+        payment_url: link.short_url,
+        delta_meters: delta,
+        amount: delta * METER_RATE,
+        extra_meters: currentExtras + delta,
+        status: existingStatus,
+      }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // No active base plan: full checkout (₹799 base + ₹99 × extra meters).
   if (
     existing?.razorpay_subscription_id &&
-    openStatuses.includes(existing.status ?? "")
+    existingStatus === "created"
   ) {
     await cancelOpenSubscription(existing.razorpay_subscription_id);
   }
@@ -147,6 +206,7 @@ serve(async (req) => {
 
   return new Response(
     JSON.stringify({
+      mode: "full",
       subscription_id: sub.id,
       short_url: sub.short_url,
       status: sub.status,

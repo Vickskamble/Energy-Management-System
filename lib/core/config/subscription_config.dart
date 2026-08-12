@@ -17,6 +17,11 @@ class SubscriptionConfig {
 
   /// Free-tier trial length.
   static const int trialDays = 60;
+
+  /// Callback landing after addon (extra-meter) payment — the Razorpay
+  /// payment-link redirects here, and the in-app WebView treats it as done.
+  static const String paymentDoneUrl =
+      'https://Vickskamble.github.io/Energy-Management-System/payment-done.html';
 }
 
 /// Server-computed entitlement for the signed-in user
@@ -88,12 +93,39 @@ class Entitlement {
   }
 }
 
-/// Result of starting a Razorpay checkout.
+/// Result of starting a checkout: either a full Razorpay subscription
+/// (₹799 base + ₹99 × meters) or a one-time extra-meter top-up payment link
+/// (₹99 × delta) for users with an active base plan.
 class CheckoutResult {
+  final String mode;
+
+  /// 'full' — new subscription; 'addon' — extra-meter payment link;
+  /// 'noop' — no change needed (already at the requested meter count).
   final String subscriptionId;
   final String paymentUrl;
+  final int deltaMeters;
+  final int amount;
 
-  const CheckoutResult({required this.subscriptionId, required this.paymentUrl});
+  const CheckoutResult({
+    this.mode = 'full',
+    this.subscriptionId = '',
+    this.paymentUrl = '',
+    this.deltaMeters = 0,
+    this.amount = 0,
+  });
+
+  factory CheckoutResult.fromJson(Map<String, dynamic> json) {
+    return CheckoutResult(
+      mode: (json['mode'] as String?) ?? 'full',
+      subscriptionId: (json['subscription_id'] ?? '') as String,
+      paymentUrl: ((json['payment_url'] ?? json['short_url']) as String?) ?? '',
+      deltaMeters: (json['delta_meters'] as num?)?.toInt() ?? 0,
+      amount: (json['amount'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  bool get isAddon => mode == 'addon';
+  bool get isNoop => mode == 'noop';
 }
 
 /// Per-user subscription + referral store. Client reads entitlement from the
@@ -143,17 +175,15 @@ class SubscriptionStore {
           )
           .timeout(const Duration(seconds: 30));
       final data = (res.data as Map?)?.cast<String, dynamic>() ?? {};
-      final url = data['short_url'] as String?;
-      if (url == null || url.isEmpty) {
+      final result = CheckoutResult.fromJson(data);
+      if (result.isNoop) return result;
+      if (result.paymentUrl.isEmpty) {
         final detail = data['error'] ?? 'no payment URL returned';
         throw SubscriptionException(
           'Could not start payment — $detail.',
         );
       }
-      return CheckoutResult(
-        subscriptionId: (data['subscription_id'] ?? '') as String,
-        paymentUrl: url,
-      );
+      return result;
     } on SubscriptionException {
       rethrow;
     } on TimeoutException {

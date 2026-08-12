@@ -11,6 +11,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../data/repositories/meter_repository.dart';
+import 'razorpay_checkout_page.dart';
 
 /// Plan & Billing: current entitlement, meter add-ons, Razorpay checkout,
 /// and the referral program (referrer gets +1 month per referred client).
@@ -84,6 +85,10 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       SubscriptionConfig.basePricePerMonth +
       _extraMeters * SubscriptionConfig.meterPricePerMonth;
 
+  /// Extra meters to add for active subscribers (top-up, ₹99 each).
+  int get _deltaMeters =>
+      _entitlement == null ? 0 : _extraMeters - _entitlement!.extraMeters;
+
   Future<void> _subscribe() async {
     setState(() => _busy = true);
     try {
@@ -91,17 +96,65 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
         extraMeters: _extraMeters,
       );
       if (!mounted) return;
-      final opened = await launchUrl(
-        Uri.parse(result.paymentUrl),
-        mode: LaunchMode.externalApplication,
-      );
-      if (!opened && mounted) {
+
+      if (result.isNoop) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Could not open the payment page. Try again.'),
-            backgroundColor: Colors.orange,
+            content: Text('Your plan is already up to date.'),
+            backgroundColor: Colors.green,
           ),
         );
+        return;
+      }
+
+      bool paidInApp = false;
+      if (RazorpayCheckoutPage.supported) {
+        paidInApp = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => RazorpayCheckoutPage(
+              subscriptionId: result.isAddon ? '' : result.subscriptionId,
+              initialUrl: result.isAddon ? result.paymentUrl : null,
+              successPrefix: result.isAddon
+                  ? '${SubscriptionConfig.paymentDoneUrl}?'
+                  : null,
+              amountLabel: 'Monthly subscription',
+            ),
+          ),
+        ) ==
+            true;
+      } else {
+        final opened = await launchUrl(
+          Uri.parse(result.paymentUrl),
+          mode: LaunchMode.externalApplication,
+        );
+        if (!opened && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open the payment page. Try again.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
+      }
+
+      SubscriptionStore.invalidateCache();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              paidInApp
+                  ? 'Payment successful! Updating your plan…'
+                  : result.isAddon
+                      ? 'Payment page opened — your plan updates automatically '
+                          'after payment.'
+                      : 'Payment page opened — your plan updates automatically '
+                          'after payment.',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _load();
       }
     } catch (e) {
       if (!mounted) return;
@@ -402,15 +455,37 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
             style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
+          if (ent.subActive && _extraMeters > ent.extraMeters) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'You are subscribed — extra meters cost ₹99/meter as a '
+                'one-time top-up. Your ₹799 base plan is NOT charged again.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           AppButton(
             label: ent.subActive
                 ? _extraMeters == ent.extraMeters
-                    ? 'Manage via payment page'
-                    : 'Update meters — pay'
+                    ? 'No changes — you already pay for $_extraMeters'
+                        ' extra meter(s)'
+                    : 'Add $_deltaMeters extra meter'
+                        '${_deltaMeters == 1 ? '' : 's'} — '
+                        'pay ₹${_deltaMeters * SubscriptionConfig.meterPricePerMonth}'
+                        ' one-time'
                 : _extraMeters == 0
                     ? 'Subscribe — ₹${SubscriptionConfig.basePricePerMonth}/mo'
                     : 'Subscribe — ₹$_totalMonthly/mo',
-            onPressed: _busy ? null : _subscribe,
+            onPressed:
+                _busy || (ent.subActive && _extraMeters == ent.extraMeters)
+                    ? null
+                    : _subscribe,
             loading: _busy,
             expanded: true,
           ),

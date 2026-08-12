@@ -75,8 +75,40 @@ serve(async (req) => {
 
   const eventType: string = event.event ?? "";
   const entity = event.payload?.subscription?.entity ?? {};
-  const userId: string | undefined = entity.notes?.user_id;
+  // payment links carry the user in notes; subscription events carry it in notes too.
+  const userId: string | undefined =
+    entity.notes?.user_id ??
+    (event.payload?.payment_link?.entity?.notes?.user_id as string | undefined);
   const subscriptionId: string | undefined = entity.id;
+
+  // Extra-meter add-on top-ups: payment_link.paid applies the delta to the
+  // existing (active) subscription — the base ₹799 is never re-charged.
+  const linkEntity = event.payload?.payment_link?.entity as
+    | { notes?: { user_id?: string; delta_meters?: number; action?: string } }
+    | undefined;
+  if (eventType === "payment_link.paid" &&
+      linkEntity?.notes?.action === "extra_meter_addon") {
+    const addonUserId = linkEntity.notes.user_id ?? null;
+    const delta = Math.max(1, Math.min(50, Number(linkEntity.notes.delta_meters) || 0));
+    if (addonUserId && delta > 0) {
+      const { data: cur } = await supabase
+        .from("subscriptions")
+        .select("extra_meters")
+        .eq("user_id", addonUserId)
+        .single();
+      const { error: linkError } = await supabase
+        .from("subscriptions")
+        .update({ extra_meters: Math.min(50, (cur?.extra_meters ?? 0) + delta) })
+        .eq("user_id", addonUserId);
+      if (linkError) {
+        console.error("payment link addon update failed:", linkError.message);
+      } else {
+        console.log(
+          `extra_meter_addon applied: +${delta} for user ${addonUserId}`,
+        );
+      }
+    }
+  }
 
   const { error: logError } = await supabase.from("billing_events").upsert(
     {
