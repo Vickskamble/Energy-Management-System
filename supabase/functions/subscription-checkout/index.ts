@@ -20,6 +20,16 @@ const TOTAL_COUNT = 24; // rolling 2-year mandate
 const PAYMENT_DONE_URL =
   "https://Vickskamble.github.io/Energy-Management-System/payment-done.html";
 
+// Browser (GitHub Pages web build) calls this edge function directly, so it
+// must answer CORS preflights and attach the permissive CORS header on every
+// response — otherwise the browser blocks the fetch and checkout fails.
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
 const rzp = (path: string, init?: RequestInit) =>
   fetch(`https://api.razorpay.com/v1${path}`, {
     ...init,
@@ -94,9 +104,20 @@ async function getSubscriptionShortUrl(subscriptionId: string): Promise<string> 
 }
 
 serve(async (req) => {
-  if (req.method !== "POST") {
-    return new Response("method not allowed", { status: 405 });
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
+  if (req.method !== "POST") {
+    return new Response("method not allowed", {
+      status: 405,
+      headers: CORS_HEADERS,
+    });
+  }
+  const json = (data: unknown, status = 200) =>
+    new Response(JSON.stringify(data), {
+      status,
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+    });
   const authHeader = req.headers.get("Authorization") ?? "";
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -104,12 +125,9 @@ serve(async (req) => {
     { global: { headers: { Authorization: authHeader } } },
   );
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return new Response("unauthorized", { status: 401 });
+  if (!user) return json({ error: "unauthorized" }, 401);
   if (user.email === "demo@powerems.com") {
-    return new Response(JSON.stringify({ error: "demo account is free" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ error: "demo account is free" }, 400);
   }
 
   let extraMeters = 0;
@@ -142,33 +160,27 @@ serve(async (req) => {
       const shortUrl = existing?.razorpay_subscription_id
         ? await getSubscriptionShortUrl(existing.razorpay_subscription_id)
         : "";
-      return new Response(
-        JSON.stringify({
-          mode: "noop",
-          subscription_id: existing?.razorpay_subscription_id ?? "",
-          short_url: shortUrl,
-          payment_url: shortUrl,
-          extra_meters: currentExtras,
-          status: existingStatus,
-        }),
-        { headers: { "Content-Type": "application/json" } },
-      );
+      return json({
+        mode: "noop",
+        subscription_id: existing?.razorpay_subscription_id ?? "",
+        short_url: shortUrl,
+        payment_url: shortUrl,
+        extra_meters: currentExtras,
+        status: existingStatus,
+      });
     }
     const link = await createExtraMeterLink(user, delta);
-    return new Response(
-      JSON.stringify({
-        mode: "addon",
-        payment_link_id: link.id,
-        payment_url: link.short_url,
-        short_url: link.short_url,
-        subscription_id: "",
-        delta_meters: delta,
-        amount: delta * METER_RATE,
-        extra_meters: currentExtras + delta,
-        status: existingStatus,
-      }),
-      { headers: { "Content-Type": "application/json" } },
-    );
+    return json({
+      mode: "addon",
+      payment_link_id: link.id,
+      payment_url: link.short_url,
+      short_url: link.short_url,
+      subscription_id: "",
+      delta_meters: delta,
+      amount: delta * METER_RATE,
+      extra_meters: currentExtras + delta,
+      status: existingStatus,
+    });
   }
 
   // No active base plan: full checkout (₹799 base + ₹99 × extra meters).
@@ -202,10 +214,7 @@ serve(async (req) => {
   });
   const sub = await created.json();
   if (!sub.id) {
-    return new Response(JSON.stringify({ error: `razorpay: ${JSON.stringify(sub)}` }), {
-      status: 502,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ error: `razorpay: ${JSON.stringify(sub)}` }, 502);
   }
 
   const { error: upsertError } = await supabase.from("subscriptions").upsert({
@@ -218,22 +227,16 @@ serve(async (req) => {
   });
 
   if (upsertError) {
-    return new Response(JSON.stringify({ error: upsertError.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ error: upsertError.message }, 500);
   }
 
-  return new Response(
-    JSON.stringify({
-      mode: "full",
-      subscription_id: sub.id,
-      short_url: sub.short_url,
-      status: sub.status,
-      extra_meters: extraMeters,
-      base_amount: BASE_AMOUNT,
-      meter_rate: METER_RATE,
-    }),
-    { headers: { "Content-Type": "application/json" } },
-  );
+  return json({
+    mode: "full",
+    subscription_id: sub.id,
+    short_url: sub.short_url,
+    status: sub.status,
+    extra_meters: extraMeters,
+    base_amount: BASE_AMOUNT,
+    meter_rate: METER_RATE,
+  });
 });
