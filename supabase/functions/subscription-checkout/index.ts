@@ -83,6 +83,16 @@ async function createExtraMeterLink(user: { id: string; email: string }, delta: 
   return link;
 }
 
+async function getSubscriptionShortUrl(subscriptionId: string): Promise<string> {
+  try {
+    const res = await rzp(`/subscriptions/${subscriptionId}`);
+    const sub = await res.json();
+    return (sub.short_url as string) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("method not allowed", { status: 405 });
@@ -127,9 +137,17 @@ serve(async (req) => {
     const currentExtras = existing?.extra_meters ?? 0;
     const delta = extraMeters - currentExtras;
     if (delta <= 0) {
+      // Backward-compatible noop: include the existing subscription's hosted
+      // page URL so older app versions still open a payment page.
+      const shortUrl = existing?.razorpay_subscription_id
+        ? await getSubscriptionShortUrl(existing.razorpay_subscription_id)
+        : "";
       return new Response(
         JSON.stringify({
           mode: "noop",
+          subscription_id: existing?.razorpay_subscription_id ?? "",
+          short_url: shortUrl,
+          payment_url: shortUrl,
           extra_meters: currentExtras,
           status: existingStatus,
         }),
@@ -142,6 +160,8 @@ serve(async (req) => {
         mode: "addon",
         payment_link_id: link.id,
         payment_url: link.short_url,
+        short_url: link.short_url,
+        subscription_id: "",
         delta_meters: delta,
         amount: delta * METER_RATE,
         extra_meters: currentExtras + delta,
