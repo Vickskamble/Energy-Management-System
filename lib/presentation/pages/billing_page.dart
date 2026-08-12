@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -20,18 +21,33 @@ class BillingPage extends StatefulWidget {
   State<BillingPage> createState() => _BillingPageState();
 }
 
-class _BillingPageState extends State<BillingPage> {
+class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   Entitlement? _entitlement;
   int _meterCount = 0;
   int _extraMeters = 0;
   bool _loading = true;
   bool _busy = false;
   String? _error;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _load();
   }
 
   Future<void> _load() async {
