@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -28,8 +29,11 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   int _extraMeters = 0;
   bool _loading = true;
   bool _busy = false;
+  bool _paymentPending = false;
+  int _expectedExtraMeters = 0;
   String? _error;
   Timer? _pollTimer;
+  Timer? _paymentPollTimer;
 
   @override
   void initState() {
@@ -43,6 +47,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
+    _paymentPollTimer?.cancel();
     super.dispose();
   }
 
@@ -124,8 +129,11 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
         ) ==
             true;
       } else {
+        final paymentUri = result.isAddon
+            ? Uri.parse(result.paymentUrl)
+            : _webCheckoutUri(result);
         final opened = await launchUrl(
-          Uri.parse(result.paymentUrl),
+          paymentUri,
           mode: LaunchMode.externalApplication,
         );
         if (!opened && mounted) {
@@ -137,6 +145,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
           );
           return;
         }
+        _startPaymentPolling(result);
       }
 
       SubscriptionStore.invalidateCache();
@@ -182,6 +191,73 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
     );
   }
 
+  /// In-app checkout page for web subscriptions: Razorpay Checkout JS hosted
+  /// on our domain renders the desktop layout and redirects back to
+  /// [SubscriptionConfig.paymentDoneUrl] after payment.
+  Uri _webCheckoutUri(CheckoutResult result) {
+    final page = Uri.base.resolve('checkout.html');
+    return page.replace(
+      queryParameters: {
+        'key': dotenv.env['RAZORPAY_KEY_ID'] ?? '',
+        'subscription_id': result.subscriptionId,
+        'description': 'Monthly subscription — ₹${result.amount}/mo',
+        'done_url': SubscriptionConfig.paymentDoneUrl,
+        'cancel_url': SubscriptionConfig.paymentDoneUrl,
+      },
+    );
+  }
+
+  /// Watch for the webhook to flip the subscription after the user pays in
+  /// the payment tab — refreshes the plan the moment it lands (4s cadence,
+  /// up to 5 minutes) instead of waiting for the next page reload.
+  void _startPaymentPolling(CheckoutResult result) {
+    _paymentPollTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _paymentPending = true;
+        _expectedExtraMeters = result.extraMeters;
+      });
+    }
+    var ticks = 0;
+    _paymentPollTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+      ticks++;
+      Entitlement? ent;
+      try {
+        ent = await SubscriptionStore.getEntitlement(force: true);
+      } catch (_) {
+        ent = null;
+      }
+      if (!mounted) return;
+      final done = ent != null &&
+          (result.isAddon
+              ? ent.extraMeters >= _expectedExtraMeters
+              : ent.subActive || ent.creditActive);
+      if (done) {
+        _paymentPollTimer?.cancel();
+        setState(() => _paymentPending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Payment received — your plan has been updated!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _load();
+      } else if (ticks >= 75) {
+        _paymentPollTimer?.cancel();
+        setState(() => _paymentPending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Payment confirmation pending — your plan updates automatically '
+              'once the payment is received.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    });
+  }
+
   Future<void> _shareReferral() async {
     final code = _entitlement?.referralCode ?? '';
     if (code.isEmpty) return;
@@ -198,11 +274,39 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Plan & Billing')),
-      body: _loading
+body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _buildError()
-              : _buildContent(),
+              : Column(
+                  children: [
+                    if (_paymentPending) _buildPaymentPendingBanner(),
+                    Expanded(child: _buildContent()),
+                  ],
+                ),
+  );
+  }
+
+  Widget _buildPaymentPendingBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page, vertical: 10),
+      color: AppColors.kpiSavings.withValues(alpha: 0.12),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Payment window me payment complete karo — plan yahan automatically update ho jayega',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

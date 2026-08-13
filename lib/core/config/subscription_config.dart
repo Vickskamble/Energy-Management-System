@@ -104,6 +104,7 @@ class CheckoutResult {
   final String subscriptionId;
   final String paymentUrl;
   final int deltaMeters;
+  final int extraMeters;
   final int amount;
 
   const CheckoutResult({
@@ -111,6 +112,7 @@ class CheckoutResult {
     this.subscriptionId = '',
     this.paymentUrl = '',
     this.deltaMeters = 0,
+    this.extraMeters = 0,
     this.amount = 0,
   });
 
@@ -120,6 +122,7 @@ class CheckoutResult {
       subscriptionId: (json['subscription_id'] ?? '') as String,
       paymentUrl: ((json['payment_url'] ?? json['short_url']) as String?) ?? '',
       deltaMeters: (json['delta_meters'] as num?)?.toInt() ?? 0,
+      extraMeters: (json['extra_meters'] as num?)?.toInt() ?? 0,
       amount: (json['amount'] as num?)?.toInt() ?? 0,
     );
   }

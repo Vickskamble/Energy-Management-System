@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../core/config/app_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
@@ -139,6 +140,7 @@ class _DashboardContent extends StatefulWidget {
 
 class _DashboardContentState extends State<_DashboardContent> {
   String? _site;
+  DateTime? _selectedDate;
   Map<String, String> _meterSites = {};
 
   MonthFilterValue get _selection => widget.monthFilter.value;
@@ -204,8 +206,68 @@ class _DashboardContentState extends State<_DashboardContent> {
   List<EnergyLogEntity> get _selectedMonthLogs =>
       _siteLogs.where((l) => _selection.matches(l.loggedAt)).toList();
 
-  /// "July 2026 — " prefix on KPI cards when a non-current month is viewed.
+  bool get _isDayMode => _selectedDate != null;
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  /// Logs for the selected day when Daily mode is on, otherwise the selected
+  /// month — every KPI card reads from here, so the whole dashboard follows
+  /// the date-wise selection.
+  List<EnergyLogEntity> get _selectedLogs {
+    final d = _selectedDate;
+    if (d != null) {
+      return _siteLogs.where((l) => _isSameDay(l.loggedAt, d)).toList();
+    }
+    return _selectedMonthLogs;
+  }
+
+  DateTime? get _earliestLogDate {
+    if (_siteLogs.isEmpty) return null;
+    final sorted = _siteLogs.map((l) => l.loggedAt).toList()..sort();
+    return sorted.first;
+  }
+
+  DateTime? get _latestLogDate {
+    if (_siteLogs.isEmpty) return null;
+    final sorted = _siteLogs.map((l) => l.loggedAt).toList()
+      ..sort((a, b) => b.compareTo(a));
+    return sorted.first;
+  }
+
+  void _enableDayMode() {
+    if (_selectedDate != null) {
+      setState(() {});
+      return;
+    }
+    final now = DateTime.now();
+    final hasToday = _siteLogs.any((l) => _isSameDay(l.loggedAt, now));
+    setState(() {
+      _selectedDate = hasToday
+          ? now
+          : (_latestLogDate ?? now);
+    });
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final first = _earliestLogDate ?? now;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? (first.isAfter(now) ? now : first),
+      firstDate: first.isAfter(now) ? now : first,
+      lastDate: now,
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  /// "July 2026 — " or "12 Aug 2026 — " prefix on KPI cards when a
+  /// non-current period is viewed.
   String get _kpiMonthLabel {
+    final d = _selectedDate;
+    if (d != null) return '${DateFormat('d MMM yyyy').format(d)} — ';
     if (_selection.isCurrent) return '';
     return '${_selection.label} — ';
   }
@@ -228,20 +290,20 @@ class _DashboardContentState extends State<_DashboardContent> {
     // Full estimated bill (energy + demand + charges + taxes), not just the
     // energy-charge figure stored per reading.
     return BillCalculator.calculate(
-      logs: _selectedMonthLogs,
+      logs: _selectedLogs,
       ratchetLogs: _siteLogs,
     ).netBill;
   }
 
   double get _siteTotalConsumption {
-    return _selectedMonthLogs.fold(
+    return _selectedLogs.fold(
       0.0,
       (s, e) => s + e.kwh * e.multiplyingFactor,
     );
   }
 
   double get _siteMaxDemandPeak {
-    return _selectedMonthLogs.fold(
+    return _selectedLogs.fold(
       0.0,
       (s, e) => e.mdRecorded * e.multiplyingFactor > s
           ? e.mdRecorded * e.multiplyingFactor
@@ -251,13 +313,20 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   double get _sitePowerFactor {
     return BillCalculator.calculate(
-      logs: _selectedMonthLogs,
+      logs: _selectedLogs,
       ratchetLogs: _siteLogs,
     ).powerFactor;
   }
 
-  /// Today's usage (current month) or the selected month's daily average.
+  /// Today's usage (current month), the selected month's daily average, or
+  /// the selected day's total in Daily mode.
   double get _todayUnits {
+    if (_isDayMode) {
+      return _selectedLogs.fold(
+        0.0,
+        (s, l) => s + l.kwh * l.multiplyingFactor,
+      );
+    }
     if (_selection.isCurrent) {
       final now = DateTime.now();
       final todays = _siteLogs
@@ -287,6 +356,35 @@ class _DashboardContentState extends State<_DashboardContent> {
       0,
     ).day;
     return (total / days * 100).roundToDouble() / 100;
+  }
+
+  Widget _modeChip(
+    String label, {
+    required bool selected,
+    required VoidCallback onTap,
+    IconData? icon,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        avatar: icon == null
+            ? null
+            : Icon(icon, size: 16, color: AppColors.primary),
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        selectedColor: AppColors.primary.withValues(alpha: 0.12),
+        labelStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          color: selected ? AppColors.primary : AppColors.textSecondary,
+        ),
+        side: BorderSide(
+          color: selected ? AppColors.primary : AppColors.borderLight,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+    );
   }
 
   Widget _buildSiteSelector() {
@@ -326,9 +424,9 @@ class _DashboardContentState extends State<_DashboardContent> {
   @override
   Widget build(BuildContext context) {
     final entityLogs = _siteLogs;
-    final monthLogs = _selectedMonthLogs;
+    final periodLogs = _selectedLogs;
     final breakdown = BillCalculator.calculate(
-      logs: monthLogs,
+      logs: periodLogs,
       ratchetLogs: entityLogs,
     );
     final kpis = BillCalculator.calculateKpis(breakdown);
@@ -340,29 +438,38 @@ class _DashboardContentState extends State<_DashboardContent> {
     final previousMonth = refMonth == null
         ? DateTime(now.year, now.month - 1, 1)
         : DateTime(refMonth.year, refMonth.month - 1, 1);
-    final previousMonthLogs = entityLogs
-        .where(
-          (l) =>
-              l.loggedAt.year == previousMonth.year &&
-              l.loggedAt.month == previousMonth.month,
-        )
-        .toList();
-    final currentMonthBreakdown = monthLogs.isEmpty
+    final previousLogs = _isDayMode
+        ? entityLogs
+              .where(
+                (l) => _isSameDay(
+                  l.loggedAt,
+                  _selectedDate!.subtract(const Duration(days: 1)),
+                ),
+              )
+              .toList()
+        : entityLogs
+              .where(
+                (l) =>
+                    l.loggedAt.year == previousMonth.year &&
+                    l.loggedAt.month == previousMonth.month,
+              )
+              .toList();
+    final currentBreakdown = periodLogs.isEmpty
         ? null
-        : BillCalculator.calculate(logs: monthLogs, ratchetLogs: entityLogs);
-    final previousBreakdown = previousMonthLogs.isEmpty
+        : BillCalculator.calculate(logs: periodLogs, ratchetLogs: entityLogs);
+    final previousBreakdown = previousLogs.isEmpty
         ? null
         : BillCalculator.calculate(
-            logs: previousMonthLogs,
+            logs: previousLogs,
             ratchetLogs: entityLogs,
           );
-    final comparison = currentMonthBreakdown == null
+    final comparison = currentBreakdown == null
         ? null
-        : BillCalculator.compare(currentMonthBreakdown, previousBreakdown);
+        : BillCalculator.compare(currentBreakdown, previousBreakdown);
     // Forecast is meaningful only for the live (current) month.
-    final forecast = isCurrentMonth
+    final forecast = !_isDayMode && isCurrentMonth
         ? BillForecastCalculator.calculate(
-            monthLogs: monthLogs,
+            monthLogs: periodLogs,
             referenceDate: now,
             ratchetLogs: entityLogs,
           )
@@ -383,12 +490,12 @@ class _DashboardContentState extends State<_DashboardContent> {
       breakdown: breakdown,
       comparison: comparison,
       kpis: kpis,
-      logs: monthLogs,
+      logs: periodLogs,
     );
     final recommendations = RecommendationEngine.generate(
       breakdown: breakdown,
       comparison: null,
-      logs: monthLogs,
+      logs: periodLogs,
     );
 
     return RefreshIndicator(
@@ -406,6 +513,24 @@ class _DashboardContentState extends State<_DashboardContent> {
             controller: widget.monthFilter,
             availableMonths: _availableMonths,
           ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              _modeChip(
+                'Monthly',
+                selected: !_isDayMode,
+                onTap: () => setState(() => _selectedDate = null),
+              ),
+              _modeChip('Daily', selected: _isDayMode, onTap: _enableDayMode),
+              if (_isDayMode)
+                _modeChip(
+                  DateFormat('d MMM yyyy').format(_selectedDate!),
+                  selected: true,
+                  icon: Icons.calendar_month,
+                  onTap: _pickDate,
+                ),
+            ],
+          ),
           const SizedBox(height: AppSpacing.lg),
           _buildAlertBanner(context),
           Row(
@@ -416,8 +541,8 @@ class _DashboardContentState extends State<_DashboardContent> {
                 child: AppSectionHeader(
                   title: 'Energy Overview',
                   subtitle: _kpiMonthLabel.isEmpty
-                      ? 'Bill analysis and monitoring dashboard'
-                      : '${_selection.label} — bill analysis & monitoring',
+                    ? 'Bill analysis and monitoring dashboard'
+                    : '$_kpiMonthLabel bill analysis & monitoring',
                 ),
               ),
               Tooltip(
@@ -432,7 +557,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             ],
           ),
 
-          if (monthLogs.isEmpty) ...[
+          if (periodLogs.isEmpty) ...[
             AppCard(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 32),
@@ -446,7 +571,9 @@ class _DashboardContentState extends State<_DashboardContent> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        isCurrentMonth
+                        _isDayMode
+                            ? 'No readings on ${DateFormat('d MMM yyyy').format(_selectedDate!)}'
+                            : isCurrentMonth
                             ? 'No readings yet this month'
                             : 'No readings in ${_selection.label}',
                         style: const TextStyle(
@@ -456,7 +583,9 @@ class _DashboardContentState extends State<_DashboardContent> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Select another month above or add readings in Reading Entry',
+                        _isDayMode
+                            ? 'Pick another date or add readings in Reading Entry'
+                            : 'Select another month above or add readings in Reading Entry',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
@@ -474,7 +603,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           _kpiGrid(
             cards: [
               AppKpiCard(
-                title: 'Est. Monthly Bill',
+                title: _isDayMode ? 'Day Bill (est.)' : 'Est. Monthly Bill',
                 value: _siteEstimatedBill,
                 suffix: '₹',
                 icon: Icons.account_balance_wallet_rounded,
@@ -484,7 +613,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     '${_kpiMonthLabel}Avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
               ),
               AppKpiCard(
-                title: 'Total Consumption',
+                title: _isDayMode ? 'Day Consumption' : 'Total Consumption',
                 value: _siteTotalConsumption,
                 suffix: 'kWh',
                 icon: Icons.bolt_rounded,
@@ -557,12 +686,16 @@ class _DashboardContentState extends State<_DashboardContent> {
                     : 'Improve load smoothing',
               ),
               AppKpiCard(
-                title: _selection.isCurrent ? "Today's Usage" : 'Daily Avg',
-                value: _todayUnits,
-                suffix: 'units',
+                title: _isDayMode ? 'Readings' : (_selection.isCurrent ? "Today's Usage" : 'Daily Avg'),
+                value: _isDayMode
+                    ? _selectedLogs.length.toDouble()
+                    : _todayUnits,
+                suffix: _isDayMode ? 'entries' : 'units',
                 icon: Icons.today_rounded,
                 color: AppColors.kpiSavings,
-                description: _selection.isCurrent
+                description: _isDayMode
+                    ? 'Readings logged on ${DateFormat('d MMM yyyy').format(_selectedDate!)}'
+                    : _selection.isCurrent
                     ? 'Last reading — consumption in units (kWh × MF)'
                     : '${_selection.label} average per day (kWh × MF)',
               ),
@@ -570,7 +703,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           ),
           const SizedBox(height: AppSpacing.lg),
 
-          _buildMdBreachCard(monthLogs),
+          _buildMdBreachCard(periodLogs),
           const SizedBox(height: AppSpacing.lg),
 
           _buildAlertsSection(context),
@@ -942,7 +1075,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
-                  'Month Comparison',
+                  'Comparison',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -984,7 +1117,9 @@ class _DashboardContentState extends State<_DashboardContent> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
-                  'Is month abhi tak koi reading nahi',
+                  _isDayMode
+                      ? 'Is day abhi tak koi reading nahi'
+                      : 'Is month abhi tak koi reading nahi',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -997,7 +1132,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               label: 'Est. Bill',
               value: '₹${comparison.current.netBill.toStringAsFixed(0)}',
               chipText: comparison.previous == null
-                  ? 'first month'
+                  ? 'first ${_isDayMode ? 'day' : 'month'}'
                   : '${comparison.billDifference >= 0 ? '↑' : '↓'} ${comparison.billPercentChange.abs().toStringAsFixed(1)}%',
               isGood: comparison.billDifference <= 0,
               chipNeutral: comparison.previous == null,
@@ -1007,7 +1142,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               label: 'Consumption',
               value: '${comparison.current.totalUnits.toStringAsFixed(0)} kWh',
               chipText: comparison.previous == null
-                  ? 'first month'
+                  ? 'first ${_isDayMode ? 'day' : 'month'}'
                   : '${comparison.unitDifference >= 0 ? '↑' : '↓'} ${comparison.unitPercentChange.abs().toStringAsFixed(1)}%',
               isGood: comparison.unitDifference <= 0,
               chipNeutral: comparison.previous == null,
@@ -1018,7 +1153,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               value:
                   '${comparison.current.billingDemand.toStringAsFixed(1)} kVA',
               chipText: comparison.previous == null
-                  ? 'first month'
+                  ? 'first ${_isDayMode ? 'day' : 'month'}'
                   : '${comparison.demandDifference >= 0 ? '↑' : '↓'} ${comparison.demandPercentChange.abs().toStringAsFixed(1)}%',
               isGood: comparison.demandDifference <= 0,
               chipNeutral: comparison.previous == null,
@@ -1028,7 +1163,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               label: 'Power Factor',
               value: comparison.current.powerFactor.toStringAsFixed(3),
               chipText: comparison.previous == null
-                  ? 'first month'
+                  ? 'first ${_isDayMode ? 'day' : 'month'}'
                   : 'vs ${comparison.previous!.powerFactor.toStringAsFixed(3)}',
               isGood: comparison.pfDifference >= 0,
               chipNeutral: comparison.previous == null,
@@ -1112,7 +1247,21 @@ class _DashboardContentState extends State<_DashboardContent> {
             ],
           ),
           const SizedBox(height: 16),
-          if (forecast == null)
+          if (_isDayMode)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'Bill forecast sirf Monthly mode me available hai — "Monthly" select karo',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            )
+          else if (forecast == null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(

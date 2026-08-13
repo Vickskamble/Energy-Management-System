@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pay securely — PowerEMS</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0e1420;
+               font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  #checkout-host { min-height: 100vh; }
+  #checkout-host > div { margin: 0 auto; }
+  #loading { color: #aab4c5; text-align: center; padding-top: 10vh; font-size: 15px; }
+  #error { color: #fca5a5; text-align: center; padding: 10vh 24px; font-size: 15px; line-height: 1.6; }
+  a { color: #4ade80; }
+</style>
+</head>
+<body>
+  <div id="loading">Loading secure payment…</div>
+  <div id="checkout-host" style="display:none;"></div>
+  <div id="error" style="display:none;">
+    Payment page could not start. <a href="#" id="back-link">Back to app</a>
+  </div>
+
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    var params = new URLSearchParams(window.location.search);
+    var key = params.get('key') || '';
+    var subscriptionId = params.get('subscription_id') || '';
+    var description = params.get('description') || 'Monthly subscription';
+    var doneUrl = params.get('done_url') ||
+      'https://Vickskamble.github.io/Energy-Management-System/payment-done.html';
+    var cancelUrl = params.get('cancel_url') || doneUrl;
+    var backLink = document.getElementById('back-link');
+    backLink.href = doneUrl;
+
+    function finish(status, paymentId) {
+      var url = doneUrl;
+      url += (url.indexOf('?') === -1 ? '?' : '&') + 'status=' + status;
+      if (paymentId) url += '&payment_id=' + encodeURIComponent(paymentId);
+      window.location.href = url;
+    }
+
+    function bootCheckout() {
+      try {
+        var rzp = new Razorpay({
+          "key": key,
+          "subscription_id": subscriptionId,
+          "name": "PowerEMS",
+          "description": description,
+          "currency": "INR",
+          "redirect": false,
+          "theme": {"color": "#16a34a"},
+          "handler": function (r) {
+            finish('success', r.razorpay_payment_id);
+          },
+          "modal": {
+            "ondismiss": function () { finish('cancelled'); }
+          }
+        });
+        rzp.open();
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('checkout-host').style.display = 'block';
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'block';
+      }
+    }
+
+    if (!key || !subscriptionId) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'block';
+    } else {
+      bootCheckout();
+    }
+  </script>
+</body>
+</html>

@@ -3,28 +3,58 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Payment complete — PowerEMS</title>
+<title>Payment — PowerEMS</title>
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
          background: #0e1420; color: #e8edf5; display: flex; align-items: center;
          justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
   .card { background: #1a2332; padding: 40px 32px; border-radius: 16px; max-width: 420px; }
   .check { font-size: 56px; color: #4ade80; }
+  .cross { font-size: 56px; color: #fca5a5; }
   h1 { font-size: 22px; margin: 12px 0 8px; }
   p { color: #aab4c5; font-size: 15px; line-height: 1.5; margin: 0; }
 </style>
 </head>
 <body>
-  <div class="card">
-    <div class="check">&#10004;</div>
-    <h1>Payment complete!</h1>
-    <p>Your PowerEMS plan has been updated and this window will close
-       automatically. If it does not, you can close it and check the app.</p>
+  <div class="card" id="card">
+    <div class="check" id="icon">&#10004;</div>
+    <h1 id="title">Payment complete!</h1>
+    <p id="message">Your PowerEMS plan has been updated. This window will
+       close automatically.</p>
   </div>
   <script>
-    setTimeout(function () {
-      try { window.close(); } catch (e) { /* fall back to manual close */ }
-    }, 1200);
+    var params = new URLSearchParams(window.location.search);
+    var status = params.get('status') || 'success';
+    var title = document.getElementById('title');
+    var message = document.getElementById('message');
+    var icon = document.getElementById('icon');
+
+    if (status === 'success') {
+      title.textContent = 'Payment complete!';
+      message.textContent = 'Your PowerEMS plan has been updated. This window will close automatically.';
+    } else if (status === 'cancelled') {
+      icon.className = 'cross';
+      icon.textContent = '\u2716';
+      title.textContent = 'Payment cancelled';
+      message.textContent = 'No charge was made. You can close this window and retry from the app.';
+    } else {
+      icon.className = 'cross';
+      icon.textContent = '!';
+      title.textContent = 'Payment pending';
+      message.textContent = 'We could not confirm the payment yet. If you completed it, your plan updates automatically within a minute.';
+    }
+
+    // Tell the app tab (opened from) that the payment window closed, so it can
+    // refresh the plan instantly instead of waiting for the next manual reload.
+    if (window.opener) {
+      try { window.opener.postMessage({ source: 'ems-payment-done', status: status }, '*'); } catch (e) {}
+    }
+
+    if (status === 'success') {
+      setTimeout(function () {
+        try { window.close(); } catch (e) { /* manual close fallback */ }
+      }, 1500);
+    }
   </script>
 </body>
 </html>
