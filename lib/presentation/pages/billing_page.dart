@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/config/subscription_config.dart';
+import '../../core/network/supabase_client.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_button.dart';
@@ -207,9 +208,12 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
     );
   }
 
-  /// Watch for the webhook to flip the subscription after the user pays in
-  /// the payment tab — refreshes the plan the moment it lands (4s cadence,
-  /// up to 5 minutes) instead of waiting for the next page reload.
+  /// Watch for the payment to complete. Two sources:
+  ///  1. Razorpay direct (via the payment-status Edge Function) — confirms
+  ///     the payment the moment it happens, no webhook wait.
+  ///  2. The entitlement flip — the webhook updates the plan; once
+  ///     [SubscriptionStore.getEntitlement] reflects it the UI refreshes.
+  /// Runs every 3s for up to 12 minutes; the banner stays visible meanwhile.
   void _startPaymentPolling(CheckoutResult result) {
     _paymentPollTimer?.cancel();
     if (mounted) {
@@ -218,9 +222,13 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
         _expectedExtraMeters = result.extraMeters;
       });
     }
+    final subscriptionId = result.subscriptionId;
+    final paymentLinkId = result.paymentLinkId;
     var ticks = 0;
-    _paymentPollTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+    var confirmed = false;
+    _paymentPollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       ticks++;
+      if (!mounted) return;
       Entitlement? ent;
       try {
         ent = await SubscriptionStore.getEntitlement(force: true);
@@ -228,11 +236,11 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
         ent = null;
       }
       if (!mounted) return;
-      final done = ent != null &&
+      final paid = ent != null &&
           (result.isAddon
               ? ent.extraMeters >= _expectedExtraMeters
               : ent.subActive || ent.creditActive);
-      if (done) {
+      if (paid) {
         _paymentPollTimer?.cancel();
         setState(() => _paymentPending = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -242,8 +250,42 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
           ),
         );
         _load();
-      } else if (ticks >= 75) {
+        return;
+      }
+      if (!confirmed) {
+        var rzpPaid = false;
+        try {
+          final res = await SupabaseClientManager.client.functions.invoke(
+            'payment-status',
+            body: subscriptionId.isNotEmpty
+                ? {'subscription_id': subscriptionId}
+                : {'payment_link_id': paymentLinkId},
+          );
+          rzpPaid = (res.data as Map?)?['paid'] == true;
+        } catch (_) {
+          rzpPaid = false;
+        }
+        if (rzpPaid) {
+          confirmed = true;
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Payment confirmed — plan activate ho raha hai (thoda wait karo)…',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _load();
+        }
+      } else if (ticks % 6 == 0) {
+        // Confirmed already — keep nudging the entitlement until the
+        // webhook flips the subscription.
+        _load();
+      }
+      if (ticks >= 240) {
         _paymentPollTimer?.cancel();
+        if (!mounted) return;
         setState(() => _paymentPending = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

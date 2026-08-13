@@ -286,12 +286,13 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   /// Site-aware KPI values — full-data values when "All Sites".
+  /// In Daily mode the estimated bill excludes the monthly demand charge,
+  /// so the card reflects the day's actual usage cost.
   double get _siteEstimatedBill {
-    // Full estimated bill (energy + demand + charges + taxes), not just the
-    // energy-charge figure stored per reading.
     return BillCalculator.calculate(
       logs: _selectedLogs,
       ratchetLogs: _siteLogs,
+      demandRate: _isDayMode ? 0 : null,
     ).netBill;
   }
 
@@ -425,9 +426,11 @@ class _DashboardContentState extends State<_DashboardContent> {
   Widget build(BuildContext context) {
     final entityLogs = _siteLogs;
     final periodLogs = _selectedLogs;
+    final dayMode = _isDayMode;
     final breakdown = BillCalculator.calculate(
       logs: periodLogs,
       ratchetLogs: entityLogs,
+      demandRate: dayMode ? 0 : null,
     );
     final kpis = BillCalculator.calculateKpis(breakdown);
     final now = DateTime.now();
@@ -456,12 +459,17 @@ class _DashboardContentState extends State<_DashboardContent> {
               .toList();
     final currentBreakdown = periodLogs.isEmpty
         ? null
-        : BillCalculator.calculate(logs: periodLogs, ratchetLogs: entityLogs);
+        : BillCalculator.calculate(
+            logs: periodLogs,
+            ratchetLogs: entityLogs,
+            demandRate: dayMode ? 0 : null,
+          );
     final previousBreakdown = previousLogs.isEmpty
         ? null
         : BillCalculator.calculate(
             logs: previousLogs,
             ratchetLogs: entityLogs,
+            demandRate: dayMode ? 0 : null,
           );
     final comparison = currentBreakdown == null
         ? null
@@ -474,7 +482,17 @@ class _DashboardContentState extends State<_DashboardContent> {
             ratchetLogs: entityLogs,
           )
         : null;
-    final opportunities = SavingOpportunityGenerator.generate(breakdown);
+    // Saving opportunities are ₹/month figures — always computed from the
+    // month's data, even in Daily mode (a day's zero demand rate would
+    // otherwise zero out demand-reduction savings).
+    final opportunities = SavingOpportunityGenerator.generate(
+      dayMode
+          ? BillCalculator.calculate(
+              logs: _selectedMonthLogs,
+              ratchetLogs: entityLogs,
+            )
+          : breakdown,
+    );
     final contractOptimizer =
         SavingOpportunityGenerator.generateContractDemandOptimizer(
           logs: entityLogs,
@@ -609,8 +627,9 @@ class _DashboardContentState extends State<_DashboardContent> {
                 icon: Icons.account_balance_wallet_rounded,
                 color: AppColors.kpiCost,
                 decimals: 0,
-                description:
-                    '${_kpiMonthLabel}Avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
+                description: _isDayMode
+                    ? '${_kpiMonthLabel}Demand charge excluded — avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}'
+                    : '${_kpiMonthLabel}Avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
               ),
               AppKpiCard(
                 title: _isDayMode ? 'Day Consumption' : 'Total Consumption',
@@ -638,15 +657,19 @@ class _DashboardContentState extends State<_DashboardContent> {
                 value: _sitePowerFactor,
                 suffix: 'PF',
                 icon: Icons.waves_rounded,
-                color: _sitePowerFactor < AppConstants.pfPenaltyThreshold
-                    ? AppColors.danger
-                    : AppColors.kpiPower,
+                color: _sitePowerFactor <= 0
+                    ? AppColors.textSecondary
+                    : (_sitePowerFactor < AppConstants.pfPenaltyThreshold
+                          ? AppColors.danger
+                          : AppColors.kpiPower),
                 decimals: 3,
-                description: _sitePowerFactor >= AppConstants.pfRebateThreshold
-                    ? 'Rebate earned'
-                    : (_sitePowerFactor >= AppConstants.pfSurchargeThreshold
-                          ? 'Near rebate'
-                          : 'Penalty applies'),
+                description: _sitePowerFactor <= 0
+                    ? 'No kVAh data — readings me kVAh enter karo'
+                    : (_sitePowerFactor >= AppConstants.pfRebateThreshold
+                          ? 'Rebate earned'
+                          : (_sitePowerFactor >= AppConstants.pfSurchargeThreshold
+                                ? 'Near rebate'
+                                : 'Penalty applies')),
               ),
             ],
           ),
@@ -1355,8 +1378,10 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   Widget _buildAlertBanner(BuildContext context) {
-    final hasPfIssue = _sitePowerFactor < AppConstants.pfPenaltyThreshold;
+    final pf = _sitePowerFactor;
+    final hasPfIssue = pf > 0 && pf < AppConstants.pfPenaltyThreshold;
     final hasMdIssue = _siteMaxDemandPeak >= AppConstants.mdWarningThresholdKva;
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = hasPfIssue || hasMdIssue
         ? AppColors.warning
@@ -1402,7 +1427,8 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   Widget _buildAlertsSection(BuildContext context) {
-    final hasPfIssue = _sitePowerFactor < AppConstants.pfPenaltyThreshold;
+    final pf = _sitePowerFactor;
+    final hasPfIssue = pf > 0 && pf < AppConstants.pfPenaltyThreshold;
     final hasMdIssue = _siteMaxDemandPeak >= AppConstants.mdWarningThresholdKva;
 
     return Column(
@@ -1414,7 +1440,39 @@ class _DashboardContentState extends State<_DashboardContent> {
               ? 'Action required'
               : 'All systems normal',
         ),
-        if (!hasPfIssue && !hasMdIssue)
+        if (pf == 0)
+          AppCard(
+            color: AppColors.warning.withValues(alpha: 0.05),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.info_outline_rounded,
+                    color: AppColors.warning,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Text(
+                    'Power Factor data missing — readings me kVAh value add karo',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (!hasPfIssue && !hasMdIssue)
           AppCard(
             color: AppColors.success.withValues(alpha: 0.05),
             child: Row(

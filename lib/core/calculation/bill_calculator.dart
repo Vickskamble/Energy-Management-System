@@ -67,17 +67,37 @@ class BillCalculator {
     int mdCount = 0;
 
     for (final log in logs) {
-      totalKwh += log.kwh;
-      totalKvah += log.kvah;
+      // Applying each meter's CT/PT ratio keeps the combined PF correct when
+      // multiple meters with different multipliers are billed together.
+      totalKwh += log.kwh * log.multiplyingFactor;
+      totalKvah += log.kvah * log.multiplyingFactor;
       final actualMd = log.mdRecorded * log.multiplyingFactor;
       if (actualMd > peakMd) peakMd = actualMd;
       sumMd += actualMd;
       mdCount++;
     }
 
-    final powerFactor = totalKvah > 0
-        ? EnergyCalculator.calculatePowerFactor(totalKwh, totalKvah)
-        : 0.0;
+    // PF = billed kWh ÷ billed kVAh. When no kVAh data exists (e.g. Excel
+    // imports without that column), fall back to the kWh-weighted average of
+    // the per-reading power factors stored by the user — never report a
+    // false 0.000 penalty.
+    double powerFactor = 0;
+    if (totalKvah > 0) {
+      powerFactor = EnergyCalculator.calculatePowerFactor(
+        totalKwh,
+        totalKvah,
+      );
+    } else {
+      double pfSum = 0;
+      double energySum = 0;
+      for (final log in logs) {
+        if (log.powerFactor > 0) {
+          pfSum += log.powerFactor * log.kwh * log.multiplyingFactor;
+          energySum += log.kwh * log.multiplyingFactor;
+        }
+      }
+      if (energySum > 0) powerFactor = pfSum / energySum;
+    }
     // Billing units: official kVAh (apparent energy, PF-adjusted) or kWh
     // when the user switches the toggle off. Each reading's own multiplying
     // factor (CT × PT ratio) is applied so meters with different MF never

@@ -148,7 +148,9 @@ void main() {
   });
 
   group('Rebates & adjustments', () {
-    EnergyLogEntity log(double kwh, double kvah, double md) => EnergyLogEntity(
+    EnergyLogEntity log(double kwh, double kvah, double md,
+            {double mf = 1}) =>
+        EnergyLogEntity(
           id: 'm1',
           meterName: 'Meter-01',
           kwh: kwh,
@@ -160,6 +162,7 @@ void main() {
           contractDemand: 201,
           estimatedBill: 0,
           loggedAt: DateTime(2026, 7, 15),
+          multiplyingFactor: mf,
         );
 
     setUp(() {
@@ -223,6 +226,53 @@ void main() {
         facRate: 0.55,
       );
       expect(b.facCharges, closeTo(1100 * 0.55, 0.01));
+    });
+
+    test('combined PF uses multiplying factors (multi-meter)', () {
+      // Meter A: PF 0.9, MF 1; Meter B: PF 0.8, MF 10 — weighted correctly.
+      final a = log(900, 1000, 150, mf: 1);
+      final b = log(800, 1000, 120, mf: 10);
+      final calc = BillCalculator.calculate(logs: [a, b]);
+      final expected = (900 * 1 + 800 * 10) / (1000 * 1 + 1000 * 10);
+      expect(calc.powerFactor, closeTo(expected, 0.001));
+      expect(calc.powerFactor, isNot(closeTo(1700 / 2000, 0.001)));
+    });
+
+    test('PF falls back to kWh-weighted stored PF when kVAh is missing', () {
+      final noKvah = EnergyLogEntity(
+        id: 'c',
+        meterName: 'Meter C',
+        kwh: 400,
+        kvah: 0,
+        rkvarhLag: 0,
+        rkvarhLead: 0,
+        powerFactor: 0.91,
+        mdRecorded: 60,
+        contractDemand: 201,
+        estimatedBill: 0,
+        loggedAt: DateTime(2026, 7, 20),
+      );
+      final calc = BillCalculator.calculate(logs: [noKvah]);
+      expect(calc.powerFactor, closeTo(0.91, 0.001));
+      expect(calc.pfSurcharge, 0);
+    });
+
+    test('PF is 0 only when no PF data at all', () {
+      final bare = EnergyLogEntity(
+        id: 'd',
+        meterName: 'Meter D',
+        kwh: 300,
+        kvah: 0,
+        rkvarhLag: 0,
+        rkvarhLead: 0,
+        powerFactor: 0,
+        mdRecorded: 50,
+        contractDemand: 201,
+        estimatedBill: 0,
+        loggedAt: DateTime(2026, 7, 21),
+      );
+      final calc = BillCalculator.calculate(logs: [bare]);
+      expect(calc.powerFactor, 0);
     });
   });
 }

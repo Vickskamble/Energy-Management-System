@@ -103,6 +103,7 @@ class CheckoutResult {
   /// 'noop' — no change needed (already at the requested meter count).
   final String subscriptionId;
   final String paymentUrl;
+  final String paymentLinkId;
   final int deltaMeters;
   final int extraMeters;
   final int amount;
@@ -111,6 +112,7 @@ class CheckoutResult {
     this.mode = 'full',
     this.subscriptionId = '',
     this.paymentUrl = '',
+    this.paymentLinkId = '',
     this.deltaMeters = 0,
     this.extraMeters = 0,
     this.amount = 0,
@@ -121,6 +123,7 @@ class CheckoutResult {
       mode: (json['mode'] as String?) ?? 'full',
       subscriptionId: (json['subscription_id'] ?? '') as String,
       paymentUrl: ((json['payment_url'] ?? json['short_url']) as String?) ?? '',
+      paymentLinkId: (json['payment_link_id'] ?? '') as String,
       deltaMeters: (json['delta_meters'] as num?)?.toInt() ?? 0,
       extraMeters: (json['extra_meters'] as num?)?.toInt() ?? 0,
       amount: (json['amount'] as num?)?.toInt() ?? 0,
