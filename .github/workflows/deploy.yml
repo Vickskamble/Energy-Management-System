@@ -173,6 +173,10 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+      # GitHub windows runners force this ON by default: any native command
+      # writing to stderr (Nuget/CMake warnings) kills the pwsh step. Flutter
+      # tooling is noisy on windows — keep stderr as success-stream output.
+      PSNativeCommandUseErrorActionPreference: 'false'
     steps:
       - uses: actions/checkout@v4
 
@@ -191,9 +195,11 @@ jobs:
           "RAZORPAY_KEY_ID=$env:RAZORPAY_KEY_ID" | Out-File -FilePath .env -Append -Encoding utf8
 
       - name: Install dependencies
+        shell: cmd
         run: flutter pub get
 
       - name: Build Windows (release)
+        shell: cmd
         run: flutter build windows --release
 
       - name: Package Windows bundle
