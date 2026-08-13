@@ -149,7 +149,7 @@ void main() {
 
   group('Rebates & adjustments', () {
     EnergyLogEntity log(double kwh, double kvah, double md,
-            {double mf = 1}) =>
+            {double mf = 1, double pf = 0.95}) =>
         EnergyLogEntity(
           id: 'm1',
           meterName: 'Meter-01',
@@ -157,7 +157,7 @@ void main() {
           kvah: kvah,
           rkvarhLag: 0,
           rkvarhLead: 0,
-          powerFactor: 0.95,
+          powerFactor: pf,
           mdRecorded: md,
           contractDemand: 201,
           estimatedBill: 0,
@@ -228,14 +228,25 @@ void main() {
       expect(b.facCharges, closeTo(1100 * 0.55, 0.01));
     });
 
-    test('combined PF uses multiplying factors (multi-meter)', () {
-      // Meter A: PF 0.9, MF 1; Meter B: PF 0.8, MF 10 — weighted correctly.
-      final a = log(900, 1000, 150, mf: 1);
-      final b = log(800, 1000, 120, mf: 10);
+    test('combined PF uses client-recorded PFs (kWh-weighted, multi-meter)',
+        () {
+      // Meter A: PF recorded 0.9, MF 1; Meter B: PF recorded 0.8, MF 10 —
+      // the recorded values win; kWh×MF weights combine them.
+      final a = log(900, 1000, 150, mf: 1, pf: 0.9);
+      final b = log(800, 1000, 120, mf: 10, pf: 0.8);
+      final calc = BillCalculator.calculate(logs: [a, b]);
+      final expected = (0.9 * 900 * 1 + 0.8 * 800 * 10) /
+          (900 * 1 + 800 * 10);
+      expect(calc.powerFactor, closeTo(expected, 0.001));
+      expect(calc.powerFactor, isNot(closeTo(1700 / 2000, 0.001)));
+    });
+
+    test('combined PF falls back to kWh ÷ kVAh when no PF was recorded', () {
+      final a = log(900, 1000, 150, mf: 1, pf: 0);
+      final b = log(800, 1000, 120, mf: 10, pf: 0);
       final calc = BillCalculator.calculate(logs: [a, b]);
       final expected = (900 * 1 + 800 * 10) / (1000 * 1 + 1000 * 10);
       expect(calc.powerFactor, closeTo(expected, 0.001));
-      expect(calc.powerFactor, isNot(closeTo(1700 / 2000, 0.001)));
     });
 
     test('PF falls back to kWh-weighted stored PF when kVAh is missing', () {

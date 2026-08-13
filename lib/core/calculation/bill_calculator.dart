@@ -77,26 +77,26 @@ class BillCalculator {
       mdCount++;
     }
 
-    // PF = billed kWh ÷ billed kVAh. When no kVAh data exists (e.g. Excel
-    // imports without that column), fall back to the kWh-weighted average of
-    // the per-reading power factors stored by the user — never report a
-    // false 0.000 penalty.
+    // PF = the values the client recorded (meter display / Excel import) —
+    // NEVER recalculated. Multiple readings are kWh-weighted. Only when no
+    // reading carries a stored PF is the kWh ÷ kVAh ratio used, so legacy
+    // rows without PF data still bill/penalize correctly.
     double powerFactor = 0;
-    if (totalKvah > 0) {
+    double pfSum = 0;
+    double energySum = 0;
+    for (final log in logs) {
+      if (log.powerFactor > 0) {
+        pfSum += log.powerFactor * log.kwh * log.multiplyingFactor;
+        energySum += log.kwh * log.multiplyingFactor;
+      }
+    }
+    if (energySum > 0) {
+      powerFactor = pfSum / energySum;
+    } else if (totalKvah > 0) {
       powerFactor = EnergyCalculator.calculatePowerFactor(
         totalKwh,
         totalKvah,
       );
-    } else {
-      double pfSum = 0;
-      double energySum = 0;
-      for (final log in logs) {
-        if (log.powerFactor > 0) {
-          pfSum += log.powerFactor * log.kwh * log.multiplyingFactor;
-          energySum += log.kwh * log.multiplyingFactor;
-        }
-      }
-      if (energySum > 0) powerFactor = pfSum / energySum;
     }
     // Billing units: official kVAh (apparent energy, PF-adjusted) or kWh
     // when the user switches the toggle off. Each reading's own multiplying

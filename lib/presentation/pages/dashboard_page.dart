@@ -140,6 +140,7 @@ class _DashboardContent extends StatefulWidget {
 
 class _DashboardContentState extends State<_DashboardContent> {
   String? _site;
+  String? _meter;
   DateTime? _selectedDate;
   Map<String, String> _meterSites = {};
 
@@ -188,18 +189,33 @@ class _DashboardContentState extends State<_DashboardContent> {
     return names;
   }
 
-  /// Logs filtered by the selected site (Issue 7E).
+  /// Logs filtered by the selected site (Issue 7E), then by the selected
+  /// meter when one is chosen — every KPI, chart and comparison downstream
+  /// reads per-meter data instead of a combined total.
   List<EnergyLogEntity> get _siteLogs {
-    if (_site == null) return widget.logs.cast<EnergyLogEntity>();
-    final meterNames = <String>{
-      for (final e in _meterSites.entries)
-        if (e.value == _site) e.key,
-    };
-    if (meterNames.isEmpty) return const [];
-    return widget.logs
-        .cast<EnergyLogEntity>()
-        .where((e) => meterNames.contains(e.meterName))
-        .toList();
+    var logs = widget.logs.cast<EnergyLogEntity>();
+    if (_site != null) {
+      final meterNames = <String>{
+        for (final e in _meterSites.entries)
+          if (e.value == _site) e.key,
+      };
+      if (meterNames.isEmpty) return const [];
+      logs = logs.where((e) => meterNames.contains(e.meterName)).toList();
+    }
+    final meter = _meter;
+    if (meter != null) {
+      logs = logs.where((e) => e.meterName == meter).toList();
+    }
+    return logs;
+  }
+
+  /// Distinct meters present in the (site-filtered) data, for the chips row.
+  List<String> get _meterNames {
+    final names = <String>{
+      for (final l in widget.logs.cast<EnergyLogEntity>()) l.meterName,
+    }.toList()
+      ..sort();
+    return names;
   }
 
   /// Logs belonging to the selected month (or current month by default).
@@ -319,6 +335,50 @@ class _DashboardContentState extends State<_DashboardContent> {
     ).powerFactor;
   }
 
+  /// Visible formula for the Power Factor card: per-meter PF as recorded
+  /// by the client (meter display / Excel) — never recomputed. Lets the
+  /// user see exactly which meter drives the combined value.
+  String get _powerFactorBreakdown {
+    if (_selectedLogs.isEmpty) return 'No readings — kVAh data add karo';
+    final perMeter = <String, ({double kwh, double kvah, double pfSum})>{};
+    var sumKwh = 0.0;
+    var sumKvah = 0.0;
+    var sumPf = 0.0;
+    for (final l in _selectedLogs) {
+      final kwh = l.kwh * l.multiplyingFactor;
+      final kvah = l.kvah * l.multiplyingFactor;
+      final rec = perMeter.putIfAbsent(
+        l.meterName,
+        () => (kwh: 0, kvah: 0, pfSum: 0),
+      );
+      perMeter[l.meterName] = (
+        kwh: rec.kwh + kwh,
+        kvah: rec.kvah + kvah,
+        pfSum: rec.pfSum + l.powerFactor * kwh,
+      );
+      sumKwh += kwh;
+      sumKvah += kvah;
+      sumPf += l.powerFactor * kwh;
+    }
+    final nf = NumberFormat.decimalPattern('en_IN');
+    final lines = <String>[
+      sumPf > 0
+          ? 'As recorded (weighted): ${(sumPf / sumKwh).toStringAsFixed(3)}'
+          : 'Auto: ${nf.format(sumKwh)} kWh \u00f7 ${nf.format(sumKvah)} kVAh'
+              '${sumKvah > 0 ? ' = ${(sumKwh / sumKvah).toStringAsFixed(3)}' : ''}',
+    ];
+    for (final e in perMeter.entries) {
+      final d = e.value;
+      final pf = d.pfSum > 0
+          ? 'PF ${(d.pfSum / d.kwh).toStringAsFixed(3)}'
+          : (d.kvah > 0
+                ? 'PF ${(d.kwh / d.kvah).toStringAsFixed(3)} (auto)'
+                : 'PF —');
+      lines.add('${e.key}: ${nf.format(d.kwh)} kWh · $pf');
+    }
+    return lines.join('\n');
+  }
+
   /// Today's usage (current month), the selected month's daily average, or
   /// the selected day's total in Daily mode.
   double get _todayUnits {
@@ -396,6 +456,45 @@ class _DashboardContentState extends State<_DashboardContent> {
           _siteChip('All Sites', null),
           for (final site in _siteNames) _siteChip(site, site),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMeterSelector() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _meterChip('All Meters', null),
+          for (final meter in _meterNames) _meterChip(meter, meter),
+        ],
+      ),
+    );
+  }
+
+  Widget _meterChip(String label, String? value) {
+    final selected = _meter == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        avatar: Icon(
+          Icons.speed_rounded,
+          size: 16,
+          color: selected ? AppColors.primary : AppColors.textSecondary,
+        ),
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => setState(() => _meter = value),
+        selectedColor: AppColors.primary.withValues(alpha: 0.12),
+        labelStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          color: selected ? AppColors.primary : AppColors.textSecondary,
+        ),
+        side: BorderSide(
+          color: selected ? AppColors.primary : AppColors.borderLight,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }
@@ -525,6 +624,10 @@ class _DashboardContentState extends State<_DashboardContent> {
         children: [
           if (_siteNames.isNotEmpty) ...[
             _buildSiteSelector(),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+          if (_meterNames.length > 1) ...[
+            _buildMeterSelector(),
             const SizedBox(height: AppSpacing.sm),
           ],
           MonthFilterBar(
@@ -665,11 +768,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                 decimals: 3,
                 description: _sitePowerFactor <= 0
                     ? 'No kVAh data — readings me kVAh enter karo'
-                    : (_sitePowerFactor >= AppConstants.pfRebateThreshold
-                          ? 'Rebate earned'
-                          : (_sitePowerFactor >= AppConstants.pfSurchargeThreshold
-                                ? 'Near rebate'
-                                : 'Penalty applies')),
+                    : _powerFactorBreakdown,
               ),
             ],
           ),

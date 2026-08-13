@@ -114,10 +114,14 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
       }
 
       // ── Step 4: Compute derived metrics ─────────────────────────────────
-      final powerFactor = CalculationEngine.calculatePowerFactor(
-        consumedKwh,
-        consumedKvah,
-      );
+      // The PF recorded by the client (meter display / Excel) is stored
+      // as-is and NEVER recalculated; the kWh ÷ kVAh ratio is only a
+      // fallback when the client supplied no PF.
+      final powerFactor = event.powerFactor ??
+          CalculationEngine.calculatePowerFactor(
+            consumedKwh,
+            consumedKvah,
+          );
 
       // ── Step 5: Build domain model ───────────────────────────────────────
       // Multiplying factor comes from the meter's CT/PT ratio (default

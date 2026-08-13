@@ -115,7 +115,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
 
       bool paidInApp = false;
       if (RazorpayCheckoutPage.supported) {
-        paidInApp = await Navigator.of(context).push<bool>(
+        final attempt = await Navigator.of(context).push<PaymentAttemptResult>(
           MaterialPageRoute(
             builder: (_) => RazorpayCheckoutPage(
               subscriptionId: result.isAddon ? '' : result.subscriptionId,
@@ -127,8 +127,20 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
               amountLabel: 'Monthly subscription',
             ),
           ),
-        ) ==
-            true;
+        );
+        paidInApp = attempt?.status == PaymentAttemptStatus.completed;
+        if (paidInApp && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Payment received — confirming with the bank…'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        // In-app checkout starts the same instant-confirmation polling as
+        // the browser path: the direct Razorpay status check + webhook
+        // update flip the plan within seconds — no manual refresh needed.
+        _startPaymentPolling(result);
       } else {
         final paymentUri = result.isAddon
             ? Uri.parse(result.paymentUrl)
@@ -155,12 +167,9 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
           SnackBar(
             content: Text(
               paidInApp
-                  ? 'Payment successful! Updating your plan…'
-                  : result.isAddon
-                      ? 'Payment page opened — your plan updates automatically '
-                          'after payment.'
-                      : 'Payment page opened — your plan updates automatically '
-                          'after payment.',
+                  ? 'Payment received — your plan updates automatically.'
+                  : 'Payment page opened — your plan updates automatically '
+                      'after payment.',
             ),
             backgroundColor: Colors.green,
           ),

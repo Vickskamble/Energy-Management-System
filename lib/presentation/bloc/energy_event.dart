@@ -20,6 +20,9 @@ sealed class EnergyEvent with _$EnergyEvent {
   /// - [rkvarhLead] : Reactive capacitive component reading
   /// - [mdRecorded] : Maximum demand recorded since last reading (kW)
   /// - [loggedAt] : Timestamp of when the meter was read on-site
+  /// - [powerFactor] : PF shown on the meter display / client's own record.
+  ///   When provided it is stored as-is (never recalculated); when null the
+  ///   app computes it from kWh ÷ kVAh as a fallback.
   const factory EnergyEvent.submitManualReadingForm({
     required String meterName,
     required double currentKwh,
@@ -30,5 +33,6 @@ sealed class EnergyEvent with _$EnergyEvent {
     required double rkvarhLead,
     required double mdRecorded,
     required DateTime loggedAt,
+    double? powerFactor,
   }) = SubmitManualReadingForm;
 }

@@ -14,6 +14,38 @@ import 'package:webview_flutter/webview_flutter.dart';
 ///    JS with `redirect: false`; the payment handler fires in-app and pops.
 ///  - addon (extra meters): loads the Razorpay payment link directly; when the
 ///    link redirects to [successPrefix] (its callback_url) the page pops.
+///
+/// IMPORTANT: This widget only reports that the user *attempted/completed*
+/// checkout on the client side (Razorpay JS handler or a redirect match).
+/// Neither of those is a verified payment — verification happens server-side
+/// via Razorpay's webhook (signature-checked). The caller must NOT treat
+/// [PaymentAttemptResult.completed] as "paid". Instead, show a "confirming"
+/// state and rely on a Supabase Realtime subscription (or a status poll) on
+/// the payments/subscriptions row to flip the UI to "active" once the
+/// webhook has actually updated the database.
+enum PaymentAttemptStatus {
+  /// Client-side handler fired / redirect matched — payment *likely* went
+  /// through, but this is NOT verified. Wait for backend confirmation.
+  completed,
+
+  /// User closed the checkout modal or backed out before finishing.
+  cancelled,
+
+  /// The in-app WebView/JS threw an error before payment could complete.
+  failed,
+}
+
+class PaymentAttemptResult {
+  const PaymentAttemptResult(this.status, {this.paymentId});
+
+  final PaymentAttemptStatus status;
+
+  /// Razorpay payment id, when the client-side handler or redirect exposed
+  /// one. Pass this to your backend status-check / use it to filter your
+  /// Realtime subscription — never trust it as proof of payment by itself.
+  final String? paymentId;
+}
+
 class RazorpayCheckoutPage extends StatefulWidget {
   const RazorpayCheckoutPage({
     super.key,
@@ -30,7 +62,7 @@ class RazorpayCheckoutPage extends StatefulWidget {
   /// Payment-link mode: load this URL directly instead of Checkout JS.
   final String? initialUrl;
 
-  /// Payment-link mode: URL to treat as "payment done" (its callback_url).
+  /// Payment-link mode: URL to treat as "checkout finished" (its callback_url).
   final String? successPrefix;
 
   /// External payment page URL used if the in-app WebView fails to start.
@@ -52,6 +84,7 @@ class _RazorpayCheckoutPageState extends State<RazorpayCheckoutPage> {
   late final WebViewController _controller;
   bool _completed = false;
   bool _initFailed = false;
+  PaymentAttemptStatus? _resultStatus;
 
   String get _keyId => dotenv.env['RAZORPAY_KEY_ID'] ?? '';
 
@@ -94,10 +127,16 @@ class _RazorpayCheckoutPageState extends State<RazorpayCheckoutPage> {
 </html>''';
   }
 
-  void _finish(bool ok) {
+  /// Pops the page with a [PaymentAttemptResult]. This is deliberately NOT
+  /// called "success" — see the class doc comment. The caller is responsible
+  /// for verifying the payment server-side before updating any UI/state.
+  void _finish(PaymentAttemptStatus status, {String? paymentId}) {
     if (!mounted || _completed) return;
     _completed = true;
-    Navigator.of(context).pop(ok);
+    setState(() => _resultStatus = status);
+    Navigator.of(context).pop(
+      PaymentAttemptResult(status, paymentId: paymentId),
+    );
   }
 
   @override
@@ -112,7 +151,13 @@ class _RazorpayCheckoutPageState extends State<RazorpayCheckoutPage> {
             if (prefix != null &&
                 request.url.startsWith(prefix) &&
                 !_completed) {
-              _finish(true);
+              // Extract payment id from the redirect query params if present
+              // (e.g. razorpay_payment_id=pay_xxx) so the caller can key its
+              // status check / Realtime filter off it. This is still just a
+              // client-side signal, not verification.
+              final uri = Uri.tryParse(request.url);
+              final paymentId = uri?.queryParameters['razorpay_payment_id'];
+              _finish(PaymentAttemptStatus.completed, paymentId: paymentId);
               return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
@@ -122,15 +167,19 @@ class _RazorpayCheckoutPageState extends State<RazorpayCheckoutPage> {
       ..addJavaScriptChannel(
         'razorpay_cb',
         onMessageReceived: (JavaScriptMessage message) {
-          var ok = false;
           try {
             final data =
                 jsonDecode(message.message) as Map<String, dynamic>;
-            ok = data['ok'] == true;
+            final ok = data['ok'] == true;
+            final paymentId = data['payment_id'] as String?;
+            _finish(
+              ok ? PaymentAttemptStatus.completed
+                 : PaymentAttemptStatus.cancelled,
+              paymentId: paymentId,
+            );
           } catch (_) {
-            ok = false;
+            _finish(PaymentAttemptStatus.failed);
           }
-          _finish(ok);
         },
       )
       ..setBackgroundColor(const Color(0xFF0e1420));
@@ -156,7 +205,7 @@ class _RazorpayCheckoutPageState extends State<RazorpayCheckoutPage> {
         widget.initialUrl ??
         '';
     if (url.isEmpty) {
-      _finish(false);
+      _finish(PaymentAttemptStatus.failed);
       return;
     }
     final opened = await launchUrl(
@@ -171,6 +220,10 @@ class _RazorpayCheckoutPageState extends State<RazorpayCheckoutPage> {
         ),
       );
     }
+    // Note: if the user pays in the external browser, this widget never
+    // gets a client-side signal at all. The calling screen must rely
+    // entirely on the Realtime/webhook confirmation in that path — don't
+    // gate anything on this widget's return value when the fallback is used.
   }
 
   @override
@@ -182,28 +235,41 @@ class _RazorpayCheckoutPageState extends State<RazorpayCheckoutPage> {
         backgroundColor: const Color(0xFF0e1420),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => _finish(false),
+          onPressed: () => _finish(PaymentAttemptStatus.cancelled),
         ),
       ),
       body: _completed
-          ? const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(height: 32),
-                  Icon(Icons.check_circle_rounded,
-                      color: Color(0xFF4ade80), size: 56),
-                  SizedBox(height: 12),
-                  Text(
-                    'Payment successful — updating your plan…',
-                    style: TextStyle(color: Colors.white, fontSize: 15),
-                  ),
-                ],
-              ),
-            )
+          ? _buildCompletedState()
           : _initFailed
               ? _buildFallback()
               : WebViewWidget(controller: _controller),
+    );
+  }
+
+  Widget _buildCompletedState() {
+    // Deliberately does NOT say "Payment successful" — the payment is not
+    // verified yet. The caller shows its own confirming/active UI once the
+    // backend webhook has updated the database.
+    final isOk = _resultStatus == PaymentAttemptStatus.completed;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 32),
+          Icon(
+            isOk ? Icons.hourglass_top_rounded : Icons.info_outline_rounded,
+            color: isOk ? const Color(0xFF4ade80) : const Color(0xFF94a3b8),
+            size: 56,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            isOk
+                ? 'Payment received — confirming with the bank…'
+                : 'Checkout closed.',
+            style: const TextStyle(color: Colors.white, fontSize: 15),
+          ),
+        ],
+      ),
     );
   }
 

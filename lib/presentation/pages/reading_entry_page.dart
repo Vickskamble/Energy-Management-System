@@ -40,6 +40,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
   final _rkvarhLagCtrl = TextEditingController();
   final _rkvarhLeadCtrl = TextEditingController();
   final _mdRecordedCtrl = TextEditingController();
+  final _powerFactorCtrl = TextEditingController();
 
   /// Previous cumulative readings fetched from the DB for the selected
   /// date/meter — read-only, never editable by the client.
@@ -80,6 +81,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     _rkvarhLagCtrl.dispose();
     _rkvarhLeadCtrl.dispose();
     _mdRecordedCtrl.dispose();
+    _powerFactorCtrl.dispose();
     super.dispose();
   }
 
@@ -160,6 +162,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     _rkvarhLagCtrl.clear();
     _rkvarhLeadCtrl.clear();
     _mdRecordedCtrl.clear();
+    _powerFactorCtrl.clear();
     setState(() {
       _loggedAt = DateTime.now();
       _prevCumulativeKwh = 0;
@@ -229,6 +232,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
         rkvarhLag: double.tryParse(_rkvarhLagCtrl.text.trim()) ?? 0,
         rkvarhLead: double.tryParse(_rkvarhLeadCtrl.text.trim()) ?? 0,
         mdRecorded: double.parse(_mdRecordedCtrl.text.trim()),
+        powerFactor: double.tryParse(_powerFactorCtrl.text.trim()),
         loggedAt: _loggedAt,
       ),
     );
@@ -554,6 +558,25 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
+                            ),
+                            const SizedBox(height: 12),
+                            AppTextField(
+                              controller: _powerFactorCtrl,
+                              label: 'Power Factor (meter display)',
+                              hint: 'e.g. 0.98 — leave blank to auto-calc',
+                              prefixIcon: Icons.waves_rounded,
+                              keyboardType: TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) return null;
+                                final pf = double.tryParse(v.trim());
+                                if (pf == null) return 'Enter a valid number';
+                                if (pf <= 0 || pf > 1) {
+                                  return 'Power Factor must be between 0 and 1';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 12),
                             Row(
