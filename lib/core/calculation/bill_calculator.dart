@@ -1,5 +1,6 @@
 import '../../domain/entities/energy_log_entity.dart';
 import '../config/app_config.dart';
+import '../config/tariff_presets.dart';
 import '../constants/app_constants.dart';
 import 'bill_breakdown.dart';
 import 'energy_calculator.dart';
@@ -16,6 +17,9 @@ class BillCalculator {
     double? wheelingRate,
     double? electricityDutyPerUnit,
     double? taxPerUnit,
+    double? dutyPercent,
+    List<EnergySlab>? slabs,
+    double fixedCharge = 0,
     List<double>? todMultipliers,
     double regionSubsidy = 0,
     double rebateSection106 = 0,
@@ -30,6 +34,10 @@ class BillCalculator {
     final effectiveWheelingRate = wheelingRate ?? AppConfig.wheelingChargePerUnit;
     final effectiveEdRate = electricityDutyPerUnit ?? AppConfig.electricityDutyPerUnit;
     final effectiveTaxRate = taxPerUnit ?? AppConfig.taxPerUnit;
+    final effectiveDutyPercent = dutyPercent ?? AppConfig.dutyPercent;
+    final effectiveSlabs = slabs ?? AppConfig.energySlabs;
+    final effectiveFixedCharge =
+        fixedCharge > 0 ? fixedCharge : AppConfig.fixedCharge;
     final effectiveTod = todMultipliers ?? AppConfig.todMultipliers;
     if (logs.isEmpty) return _emptyBreakdown(effectiveContractDemand);
 
@@ -69,10 +77,12 @@ class BillCalculator {
     final avgDemand = mdCount > 0 ? sumMd / mdCount.toDouble() : 0.0;
     final loadFactor = EnergyCalculator.calculateLoadFactor(avgDemand, peakMd);
 
-    final energyCharges = EnergyCalculator.calculateEnergyCharges(
-      totalUnits,
-      effectiveEnergyRate,
-    );
+    final energyCharges = effectiveSlabs.isNotEmpty
+        ? EnergyCalculator.calculateSlabEnergy(totalUnits, effectiveSlabs)
+        : EnergyCalculator.calculateEnergyCharges(
+            totalUnits,
+            effectiveEnergyRate,
+          );
     final demandCharges = EnergyCalculator.calculateDemandCharges(
       billingDemand,
       effectiveDemandRate,
@@ -92,11 +102,14 @@ class BillCalculator {
       effectiveTod,
     );
 
-    // Electricity duty = per-unit × total units (NOT percentage)
-    final electricityDuty = EnergyCalculator.calculateElectricityDuty(
-      totalUnits,
-      effectiveEdRate,
-    );
+    // Electricity duty = % of energy charges (official model, HT exempt);
+    // flat per-unit × units only as legacy fallback.
+    final electricityDuty = effectiveDutyPercent > 0
+        ? energyCharges * effectiveDutyPercent / 100
+        : EnergyCalculator.calculateElectricityDuty(
+            totalUnits,
+            effectiveEdRate,
+          );
 
     // Taxes = per-unit × total units (NOT percentage)
     final taxes = EnergyCalculator.calculateTaxes(
@@ -133,6 +146,7 @@ class BillCalculator {
       todCharges: todCharges,
       regionSubsidy: regionSubsidy,
       rebateSection106: rebateSection106,
+      fixedCharge: effectiveFixedCharge,
     );
 
     final averageUnitCost = EnergyCalculator.calculateAverageUnitCost(
@@ -154,6 +168,7 @@ class BillCalculator {
       todCharges: (todCharges * 100).roundToDouble() / 100,
       regionSubsidy: (regionSubsidy * 100).roundToDouble() / 100,
       rebateSection106: (rebateSection106 * 100).roundToDouble() / 100,
+      fixedCharge: (effectiveFixedCharge * 100).roundToDouble() / 100,
       netBill: (netBill * 100).roundToDouble() / 100,
       billingDemand: (billingDemand * 100).roundToDouble() / 100,
       contractDemand: effectiveContractDemand,
@@ -340,6 +355,7 @@ class BillCalculator {
       todCharges: 0,
       regionSubsidy: 0,
       rebateSection106: 0,
+      fixedCharge: 0,
       netBill: 0,
       billingDemand: 0,
       contractDemand: contractDemand,

@@ -12,6 +12,7 @@ class BillBreakdown {
   final double todCharges;
   final double regionSubsidy;
   final double rebateSection106;
+  final double fixedCharge;
   final double netBill;
   final double billingDemand;
   final double contractDemand;
@@ -33,6 +34,7 @@ class BillBreakdown {
     this.todCharges = 0,
     this.regionSubsidy = 0,
     this.rebateSection106 = 0,
+    this.fixedCharge = 0,
     required this.netBill,
     required this.billingDemand,
     required this.contractDemand,
@@ -60,6 +62,7 @@ class BillBreakdown {
     'Electricity Duty': electricityDuty,
     'Taxes': taxes,
     if (todCharges != 0) 'TOD Charges': todCharges,
+    if (fixedCharge != 0) 'Fixed Charge': fixedCharge,
   };
 
   Map<String, double> toPercentMap() => {

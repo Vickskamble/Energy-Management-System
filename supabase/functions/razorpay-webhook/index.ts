@@ -4,9 +4,10 @@
 // Configure in Razorpay Dashboard -> Settings -> Webhooks:
 //   URL: https://onfovsadlqeebguuswzg.functions.supabase.co/razorpay-webhook
 //   Events: subscription.authenticated, subscription.activated,
-//           subscription.charged, subscription.halted, subscription.cancelled,
-//           subscription.completed, subscription.paused, subscription.resumed,
-//           subscription.expired, payment.failed
+//           subscription.paid, subscription.charged, subscription.halted,
+//           subscription.cancelled, subscription.completed,
+//           subscription.paused, subscription.resumed, subscription.expired,
+//           payment.failed, payment_link.paid
 //   Secret: RAZORPAY_WEBHOOK_SECRET
 //
 // Deploy: supabase functions deploy razorpay-webhook --no-verify-jwt
@@ -24,6 +25,7 @@ const supabase = createClient(
 const STATUS_MAP: Record<string, string> = {
   "subscription.authenticated": "authenticated",
   "subscription.activated": "active",
+  "subscription.paid": "active",
   "subscription.charged": "active",
   "subscription.halted": "halted",
   "subscription.cancelled": "cancelled",

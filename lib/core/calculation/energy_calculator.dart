@@ -1,4 +1,5 @@
 import 'dart:math';
+import '../config/tariff_presets.dart';
 import '../constants/app_constants.dart';
 
 class EnergyCalculator {
@@ -18,6 +19,27 @@ class EnergyCalculator {
     double ratchetPeak = 0,
   }) {
     return max(mdRecorded, ratchetPeak);
+  }
+
+  /// Energy charges with slab-wise official rates. [slabs] is a list of
+  /// (upTo, rate) cumulative limits; when empty a flat rate applies.
+  static double calculateSlabEnergy(
+    double totalUnits,
+    List<EnergySlab> slabs,
+  ) {
+    if (slabs.isEmpty) return 0;
+    double remaining = totalUnits;
+    double prevLimit = 0;
+    double total = 0;
+    for (final slab in slabs) {
+      if (remaining <= 0) break;
+      final width = slab.upTo - prevLimit;
+      final take = min(remaining, width);
+      total += take * slab.rate;
+      remaining -= take;
+      prevLimit = slab.upTo;
+    }
+    return total;
   }
 
   static double calculateEnergyCharges(double totalUnits, double rate) {
@@ -113,9 +135,14 @@ class EnergyCalculator {
     double todCharges = 0,
     double regionSubsidy = 0,
     double rebateSection106 = 0,
+    double fixedCharge = 0,
   }) {
-    final subtotal =
-        energyCharges + demandCharges + facCharges + wheelingCharges + todCharges;
+    final subtotal = energyCharges +
+        demandCharges +
+        facCharges +
+        wheelingCharges +
+        todCharges +
+        fixedCharge;
     return (subtotal + electricityDuty + taxes + pfSurcharge) -
         pfRebate -
         subsidy -

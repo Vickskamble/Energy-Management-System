@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../core/config/app_config.dart';
+import '../../core/config/tariff_presets.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/network/supabase_client.dart';
 import '../../core/theme/app_colors.dart';
@@ -55,11 +56,13 @@ class _SettingsScreenState extends State<SettingsScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 4, vsync: this);
+    _category = AppConfig.tariffCategory;
+    _version = AppConfig.tariffVersion;
     _tariffCtrl.text = AppConfig.tariffPerUnit.toStringAsFixed(2);
     _demandCtrl.text = AppConfig.demandChargePerKva.toStringAsFixed(2);
     _facCtrl.text = AppConfig.facRatePerUnit.toStringAsFixed(2);
     _wheelingCtrl.text = AppConfig.wheelingChargePerUnit.toStringAsFixed(2);
-    _dutyCtrl.text = AppConfig.electricityDutyPerUnit.toStringAsFixed(2);
+    _dutyCtrl.text = AppConfig.dutyPercent.toStringAsFixed(0);
     _taxCtrl.text = AppConfig.taxPerUnit.toStringAsFixed(2);
     _subsidyCtrl.text = AppConfig.subsidyPercent.toStringAsFixed(2);
     _mdCtrl.text = AppConfig.contractDemandKva.toStringAsFixed(0);
@@ -74,6 +77,35 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   void _onMdChanged() {
     if (mounted) setState(() {});
+  }
+
+  late TariffCategory _category;
+  late TariffVersion _version;
+
+  /// Applies the official preset for [category] × [version] into every
+  /// tariff field. Individual fields remain editable afterwards.
+  void _applyPreset(TariffCategory category, TariffVersion version) {
+    final preset = AppConfig.applyTariffPreset(category, version);
+    setState(() {
+      _category = category;
+      _version = version;
+      _tariffCtrl.text = preset.energyRate.toStringAsFixed(2);
+      _demandCtrl.text = preset.demandRate.toStringAsFixed(0);
+      _wheelingCtrl.text = preset.wheelingRate.toStringAsFixed(2);
+      _dutyCtrl.text = preset.dutyPercent.toStringAsFixed(0);
+      _mdCtrl.text = preset.defaultContractDemand.toStringAsFixed(0);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          preset.isSlabBased
+              ? '${preset.category.label} ${preset.version.label} applied — '
+                  'slab-wise energy charges (auto)'
+              : '${preset.category.label} ${preset.version.label} applied',
+        ),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
   @override
@@ -277,12 +309,13 @@ class _SettingsScreenState extends State<SettingsScreen>
       if (v.isNotEmpty && double.tryParse(v) == null) return;
     }
     try {
+      AppConfig.dutyPercent = double.parse(_dutyCtrl.text.trim());
       await TariffStore.saveAll(
         tariffPerUnit: double.parse(_tariffCtrl.text.trim()),
         demandChargePerKva: double.parse(_demandCtrl.text.trim()),
         facRatePerUnit: double.parse(_facCtrl.text.trim()),
         wheelingChargePerUnit: double.parse(_wheelingCtrl.text.trim()),
-        electricityDutyPerUnit: double.parse(_dutyCtrl.text.trim()),
+        electricityDutyPerUnit: AppConfig.electricityDutyPerUnit,
         taxPerUnit: double.parse(_taxCtrl.text.trim()),
         subsidyPercent: double.parse(_subsidyCtrl.text.trim()),
         contractDemandKva: double.parse(_mdCtrl.text.trim()),
@@ -312,15 +345,10 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _resetTariff() async {
-    AppConfig.reset();
-    _tariffCtrl.text = AppConfig.tariffPerUnit.toStringAsFixed(2);
-    _demandCtrl.text = AppConfig.demandChargePerKva.toStringAsFixed(2);
+    _applyPreset(TariffCategory.htIndustrial, TariffVersion.fy2627);
     _facCtrl.text = AppConfig.facRatePerUnit.toStringAsFixed(2);
-    _wheelingCtrl.text = AppConfig.wheelingChargePerUnit.toStringAsFixed(2);
-    _dutyCtrl.text = AppConfig.electricityDutyPerUnit.toStringAsFixed(2);
     _taxCtrl.text = AppConfig.taxPerUnit.toStringAsFixed(2);
     _subsidyCtrl.text = AppConfig.subsidyPercent.toStringAsFixed(2);
-    _mdCtrl.text = AppConfig.contractDemandKva.toStringAsFixed(0);
     for (final c in _precedingCtrls) {
       c.clear();
     }
@@ -351,6 +379,53 @@ class _SettingsScreenState extends State<SettingsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  'Tariff category & year',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<TariffCategory>(
+                  initialValue: _category,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Category (MERC)',
+                    isDense: true,
+                  ),
+                  items: [
+                    for (final c in TariffCategory.values)
+                      DropdownMenuItem(
+                        value: c,
+                        child: Text(c.label),
+                      ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) _applyPreset(v, _version);
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<TariffVersion>(
+                  initialValue: _version,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Tariff Year',
+                    isDense: true,
+                  ),
+                  items: [
+                    for (final v in TariffVersion.values)
+                      DropdownMenuItem(
+                        value: v,
+                        child: Text(v.label),
+                      ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) _applyPreset(_category, v);
+                  },
+                ),
+                const SizedBox(height: 16),
                 Text(
                   'Energy charges',
                   style: TextStyle(
@@ -409,8 +484,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     Expanded(
                       child: _rateField(
                         _dutyCtrl,
-                        'Elec. Duty (₹ per unit)',
-                        'e.g. 0.275',
+                        'Elec. Duty (% of EC)',
+                        '0 = exempt (HT)',
                       ),
                     ),
                   ],

@@ -2,6 +2,7 @@ import '../constants/app_constants.dart';
 import '../error/exceptions.dart';
 import '../network/supabase_client.dart';
 import '../utils/app_logger.dart';
+import 'tariff_presets.dart';
 
 /// Runtime-configurable tariff settings (persisted locally).
 /// Falls back to [AppConstants] defaults when nothing is stored.
@@ -19,6 +20,23 @@ class AppConfig {
   static List<double> _precedingDemandKva = List.filled(11, 0);
   static double _regionSubsidyAmount = 0.0;
   static double _rebateSection106 = 0.0;
+
+  /// Selected MERC tariff category (HT-I Industry by default).
+  static TariffCategory _tariffCategory = TariffCategory.htIndustrial;
+
+  /// Selected tariff year (FY 2026-27 by default).
+  static TariffVersion _tariffVersion = TariffVersion.fy2627;
+
+  /// Electricity duty as % of energy charges (0 = exempt — HT categories).
+  /// When > 0 the flat [electricityDutyPerUnit] charge is ignored.
+  static double _dutyPercent = 0.0;
+
+  /// Fixed monthly charge in ₹ (LT categories; 0 for HT).
+  static double _fixedCharge = 0.0;
+
+  /// Official energy-consumption slabs for LT categories (empty for HT —
+  /// flat rate). Applied automatically when a slab-based preset is active.
+  static List<EnergySlab> _energySlabs = const [];
 
   /// TOD multipliers: index 0 = Zone A (00-06), 1 = Zone B (06-18),
   /// 2 = Zone C (09-18), 3 = Zone D (17-24).  Multiplier 1.0 = no change.
@@ -112,6 +130,53 @@ class AppConfig {
     if (value.length == 4) _todMultipliers = value;
   }
 
+  /// Selected tariff category.
+  static TariffCategory get tariffCategory => _tariffCategory;
+  static set tariffCategory(TariffCategory value) => _tariffCategory = value;
+
+  /// Selected tariff year.
+  static TariffVersion get tariffVersion => _tariffVersion;
+  static set tariffVersion(TariffVersion value) => _tariffVersion = value;
+
+  /// Electricity duty as % of energy charges (0 = exempt).
+  static double get dutyPercent => _dutyPercent;
+  static set dutyPercent(double value) {
+    if (value >= 0) _dutyPercent = value;
+  }
+
+  /// Fixed monthly charge in ₹ (0 = none).
+  static double get fixedCharge => _fixedCharge;
+  static set fixedCharge(double value) {
+    if (value >= 0) _fixedCharge = value;
+  }
+
+  /// Active energy-consumption slabs (empty = flat rate).
+  static List<EnergySlab> get energySlabs => List.unmodifiable(_energySlabs);
+  static set energySlabs(List<EnergySlab> value) => _energySlabs = value;
+
+  /// Loads the official MERC rates for [category] × [version] into every
+  /// tariff field (energy, demand, wheeling, duty, TOD, fixed charge,
+  /// contract demand). Returns the applied preset so the caller can sync
+  /// its UI. Individual fields remain editable after the preset is applied.
+  static TariffPreset applyTariffPreset(
+    TariffCategory category,
+    TariffVersion version,
+  ) {
+    final preset = TariffPresets.presetFor(category, version);
+    _tariffCategory = category;
+    _tariffVersion = version;
+    _tariffPerUnit = preset.energyRate;
+    _demandChargePerKva = preset.demandRate;
+    _wheelingChargePerUnit = preset.wheelingRate;
+    _dutyPercent = preset.dutyPercent;
+    if (_dutyPercent > 0) _electricityDutyPerUnit = 0.0;
+    _fixedCharge = preset.fixedCharge;
+    _energySlabs = List.of(preset.slabs);
+    _todMultipliers = List.of(preset.todMultipliers);
+    _contractDemandKva = preset.defaultContractDemand;
+    return preset;
+  }
+
   static void reset() {
     _tariffPerUnit = AppConstants.tariffPerUnit;
     _demandChargePerKva = AppConstants.demandChargePerKva;
@@ -125,6 +190,9 @@ class AppConfig {
     _regionSubsidyAmount = 0.0;
     _rebateSection106 = 0.0;
     _todMultipliers = [1.0, 1.0, 1.0, 1.0];
+    _dutyPercent = 0.0;
+    _fixedCharge = 0.0;
+    _energySlabs = const [];
   }
 }
 
@@ -170,22 +238,33 @@ class TariffStore {
       if (v is num) setter(v.toDouble());
     }
 
+    // Category + tariff year first — they pull in the official preset,
+    // then individual rate keys below override anything customized.
+    if (map['tariff_category'] is String || map['tariff_version'] is String) {
+      AppConfig.applyTariffPreset(
+        TariffCategory.fromId(map['tariff_category'] as String?),
+        TariffVersion.fromId(map['tariff_version'] as String?),
+      );
+    }
+
     setDouble('tariff_per_unit', (v) => AppConfig.tariffPerUnit = v);
     setDouble('demand_charge_per_kva', (v) => AppConfig.demandChargePerKva = v);
     setDouble('fac_rate_per_unit', (v) => AppConfig.facRatePerUnit = v);
     setDouble('wheeling_charge_per_unit', (v) => AppConfig.wheelingChargePerUnit = v);
 
-    // Support legacy percentage keys → convert to per-unit fallback
-    if (map.containsKey('electricity_duty_per_unit')) {
+    // Duty: percentage of energy charges (official model). A flat per-unit
+    // rate is only used as fallback for legacy data without a percent.
+    if (map.containsKey('electricity_duty_percent')) {
+      setDouble('electricity_duty_percent', (v) => AppConfig.dutyPercent = v);
+    } else if (map.containsKey('electricity_duty_per_unit')) {
       setDouble('electricity_duty_per_unit', (v) => AppConfig.electricityDutyPerUnit = v);
-    } else if (map.containsKey('electricity_duty_percent')) {
-      // Legacy: ignore old percentage, keep default per-unit
     }
     if (map.containsKey('tax_per_unit')) {
       setDouble('tax_per_unit', (v) => AppConfig.taxPerUnit = v);
     } else if (map.containsKey('tax_percent')) {
       // Legacy: ignore old percentage, keep default per-unit
     }
+    setDouble('fixed_charge', (v) => AppConfig.fixedCharge = v);
 
     setDouble('subsidy_percent', (v) => AppConfig.subsidyPercent = v);
     setDouble('contract_demand_kva', (v) => AppConfig.contractDemandKva = v);
@@ -229,10 +308,13 @@ class TariffStore {
         'demand_charge_per_kva': demandChargePerKva,
         'fac_rate_per_unit': facRatePerUnit,
         'wheeling_charge_per_unit': wheelingChargePerUnit,
-        'electricity_duty_per_unit': electricityDutyPerUnit,
+        'electricity_duty_percent': AppConfig.dutyPercent,
         'tax_per_unit': taxPerUnit,
         'subsidy_percent': subsidyPercent,
         'contract_demand_kva': contractDemandKva,
+        'tariff_category': AppConfig.tariffCategory.id,
+        'tariff_version': AppConfig.tariffVersion.id,
+        'fixed_charge': AppConfig.fixedCharge,
         'preceding_months_demand_kva':
             precedingDemandKva ?? AppConfig.precedingDemandKva,
         'region_subsidy_amount': regionSubsidyAmount,
