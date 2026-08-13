@@ -55,11 +55,13 @@ class BillForecastCalculator {
             projectedUnits,
             AppConfig.electricityDutyPerUnit,
           );
-    // Taxes = per-unit × projected units (NOT percentage)
-    final taxes = EnergyCalculator.calculateTaxes(
-      projectedUnits,
-      AppConfig.taxPerUnit,
-    );
+    // Taxes = % of energy charges (official ~1.25%); per-unit fallback.
+    final taxes = AppConfig.taxPercent > 0
+        ? energyCharges * AppConfig.taxPercent / 100
+        : EnergyCalculator.calculateTaxes(
+            projectedUnits,
+            AppConfig.taxPerUnit,
+          );
 
     final rebate = EnergyCalculator.calculatePfRebate(
       energyCharges,
@@ -76,7 +78,38 @@ class BillForecastCalculator {
             AppConfig.subsidyPercent /
             100
         : 0.0;
-    final projectedBill =
+
+    // Incremental Consumption Rebate — on the projected growth ≥ 10%.
+    final icr = AppConfig.icrRatePerUnit > 0 &&
+            AppConfig.icrLastYearUnits > 0 &&
+            projectedUnits >= AppConfig.icrLastYearUnits * 1.10
+        ? (projectedUnits - AppConfig.icrLastYearUnits) *
+            AppConfig.icrRatePerUnit
+        : 0.0;
+    final lfIncentive = AppConfig.lfIncentivePercent > 0
+        ? (energyCharges + demandCharges) *
+            AppConfig.lfIncentivePercent /
+            100
+        : 0.0;
+    final bulkRebate = AppConfig.bulkRebatePercent > 0
+        ? energyCharges * AppConfig.bulkRebatePercent / 100
+        : 0.0;
+    final ppdBase = energyCharges +
+        demandCharges +
+        facCharges +
+        wheelingCharges +
+        duty +
+        taxes -
+        rebate -
+        icr -
+        lfIncentive -
+        bulkRebate -
+        subsidy;
+    final ppd = AppConfig.ppdPercent > 0
+        ? ppdBase * AppConfig.ppdPercent / 100
+        : 0.0;
+
+    final rawBill =
         energyCharges +
         demandCharges +
         facCharges +
@@ -84,9 +117,17 @@ class BillForecastCalculator {
         duty +
         taxes +
         surcharge +
-        AppConfig.fixedCharge -
+        AppConfig.fixedCharge +
+        AppConfig.arrearsDpcAmount -
         rebate -
-        subsidy;
+        subsidy -
+        icr -
+        lfIncentive -
+        bulkRebate -
+        ppd;
+    final projectedBill = AppConfig.roundToTen
+        ? (rawBill / 10).roundToDouble() * 10
+        : rawBill;
 
     return BillForecast(
       projectedBill: projectedBill,

@@ -18,6 +18,15 @@ class BillCalculator {
     double? electricityDutyPerUnit,
     double? taxPerUnit,
     double? dutyPercent,
+    double? taxPercent,
+    double? icrRate,
+    double? icrLastYearUnits,
+    double? lfIncentivePercent,
+    double? ppdPercent,
+    double? bulkRebatePercent,
+    double? arrearsDpcAmount,
+    bool? roundToTen,
+    bool? billOnKvah,
     List<EnergySlab>? slabs,
     double fixedCharge = 0,
     List<double>? todMultipliers,
@@ -35,6 +44,16 @@ class BillCalculator {
     final effectiveEdRate = electricityDutyPerUnit ?? AppConfig.electricityDutyPerUnit;
     final effectiveTaxRate = taxPerUnit ?? AppConfig.taxPerUnit;
     final effectiveDutyPercent = dutyPercent ?? AppConfig.dutyPercent;
+    final effectiveTaxPercent = taxPercent ?? AppConfig.taxPercent;
+    final effectiveIcrRate = icrRate ?? AppConfig.icrRatePerUnit;
+    final effectiveIcrLastYear = icrLastYearUnits ?? AppConfig.icrLastYearUnits;
+    final effectiveLfPercent = lfIncentivePercent ?? AppConfig.lfIncentivePercent;
+    final effectivePpdPercent = ppdPercent ?? AppConfig.ppdPercent;
+    final effectiveBulkPercent =
+        bulkRebatePercent ?? AppConfig.bulkRebatePercent;
+    final effectiveArrears = arrearsDpcAmount ?? AppConfig.arrearsDpcAmount;
+    final effectiveRoundToTen = roundToTen ?? AppConfig.roundToTen;
+    final effectiveBillOnKvah = billOnKvah ?? AppConfig.billOnKvah;
     final effectiveSlabs = slabs ?? AppConfig.energySlabs;
     final effectiveFixedCharge =
         fixedCharge > 0 ? fixedCharge : AppConfig.fixedCharge;
@@ -59,13 +78,14 @@ class BillCalculator {
     final powerFactor = totalKvah > 0
         ? EnergyCalculator.calculatePowerFactor(totalKwh, totalKvah)
         : 0.0;
-    // Billing units are measured from the kVAh (apparent) energy — the
-    // meter reads cumulative kWh/kVAh, each reading's own multiplying factor
-    // (CT × PT ratio) is applied so meters with different MF never distort
-    // the bill. Always billed on kVAh.
+    // Billing units: official kVAh (apparent energy, PF-adjusted) or kWh
+    // when the user switches the toggle off. Each reading's own multiplying
+    // factor (CT × PT ratio) is applied so meters with different MF never
+    // distort the bill.
     double totalUnits = 0;
     for (final log in logs) {
-      totalUnits += log.kvah * log.multiplyingFactor;
+      totalUnits +=
+          (effectiveBillOnKvah ? log.kvah : log.kwh) * log.multiplyingFactor;
     }
     final billingDemand = EnergyCalculator.calculateBillingDemand(
       peakMd,
@@ -111,11 +131,32 @@ class BillCalculator {
             effectiveEdRate,
           );
 
-    // Taxes = per-unit × total units (NOT percentage)
-    final taxes = EnergyCalculator.calculateTaxes(
-      totalUnits,
-      effectiveTaxRate,
-    );
+    // Taxes = % of energy charges (official ~1.25%); flat per-unit × units
+    // only as legacy fallback.
+    final taxes = effectiveTaxPercent > 0
+        ? energyCharges * effectiveTaxPercent / 100
+        : EnergyCalculator.calculateTaxes(
+            totalUnits,
+            effectiveTaxRate,
+          );
+
+    // Incremental Consumption Rebate — ₹ per unit on the incremental
+    // consumption when it grows ≥ 10% vs the same month last year.
+    final icrRebate = effectiveIcrRate > 0 &&
+            effectiveIcrLastYear > 0 &&
+            totalUnits >= effectiveIcrLastYear * 1.10
+        ? (totalUnits - effectiveIcrLastYear) * effectiveIcrRate
+        : 0.0;
+
+    // Load Factor incentive — % of (energy + demand) charges.
+    final lfIncentive = effectiveLfPercent > 0
+        ? (energyCharges + demandCharges) * effectiveLfPercent / 100
+        : 0.0;
+
+    // Bulk consumption rebate — % of energy charges.
+    final bulkRebate = effectiveBulkPercent > 0
+        ? energyCharges * effectiveBulkPercent / 100
+        : 0.0;
 
     final pfRebate = EnergyCalculator.calculatePfRebate(
       energyCharges,
@@ -133,7 +174,28 @@ class BillCalculator {
             100
         : 0.0;
 
-    final netBill = EnergyCalculator.calculateTotalBill(
+    // Prompt Payment Discount — % of the bill after other rebates.
+    final ppdRebate = effectivePpdPercent > 0
+        ? (energyCharges +
+              demandCharges +
+              facCharges +
+              wheelingCharges +
+              todCharges +
+              effectiveFixedCharge +
+              electricityDuty +
+              taxes -
+              pfRebate -
+              icrRebate -
+              lfIncentive -
+              bulkRebate -
+              subsidy -
+              regionSubsidy -
+              rebateSection106) *
+            effectivePpdPercent /
+            100
+        : 0.0;
+
+    final rawNet = EnergyCalculator.calculateTotalBill(
       energyCharges: energyCharges,
       demandCharges: demandCharges,
       facCharges: facCharges,
@@ -147,7 +209,18 @@ class BillCalculator {
       regionSubsidy: regionSubsidy,
       rebateSection106: rebateSection106,
       fixedCharge: effectiveFixedCharge,
+      icrRebate: icrRebate,
+      lfIncentive: lfIncentive,
+      ppdRebate: ppdRebate,
+      bulkRebate: bulkRebate,
+      arrearsDpc: effectiveArrears,
     );
+
+    // Round the final bill to the nearest ₹10 (MSEDCL practice).
+    final roundingAdjustment = effectiveRoundToTen
+        ? (rawNet / 10).roundToDouble() * 10 - rawNet
+        : 0.0;
+    final netBill = rawNet + roundingAdjustment;
 
     final averageUnitCost = EnergyCalculator.calculateAverageUnitCost(
       netBill,
@@ -169,6 +242,13 @@ class BillCalculator {
       regionSubsidy: (regionSubsidy * 100).roundToDouble() / 100,
       rebateSection106: (rebateSection106 * 100).roundToDouble() / 100,
       fixedCharge: (effectiveFixedCharge * 100).roundToDouble() / 100,
+      icrRebate: (icrRebate * 100).roundToDouble() / 100,
+      lfIncentive: (lfIncentive * 100).roundToDouble() / 100,
+      ppdRebate: (ppdRebate * 100).roundToDouble() / 100,
+      bulkRebate: (bulkRebate * 100).roundToDouble() / 100,
+      arrearsDpc: (effectiveArrears * 100).roundToDouble() / 100,
+      roundingAdjustment:
+          (roundingAdjustment * 100).roundToDouble() / 100,
       netBill: (netBill * 100).roundToDouble() / 100,
       billingDemand: (billingDemand * 100).roundToDouble() / 100,
       contractDemand: effectiveContractDemand,
@@ -356,6 +436,12 @@ class BillCalculator {
       regionSubsidy: 0,
       rebateSection106: 0,
       fixedCharge: 0,
+      icrRebate: 0,
+      lfIncentive: 0,
+      ppdRebate: 0,
+      bulkRebate: 0,
+      arrearsDpc: 0,
+      roundingAdjustment: 0,
       netBill: 0,
       billingDemand: 0,
       contractDemand: contractDemand,

@@ -136,18 +136,30 @@ class EnergyCalculator {
     double regionSubsidy = 0,
     double rebateSection106 = 0,
     double fixedCharge = 0,
+    double icrRebate = 0,
+    double lfIncentive = 0,
+    double ppdRebate = 0,
+    double bulkRebate = 0,
+    double arrearsDpc = 0,
   }) {
     final subtotal = energyCharges +
         demandCharges +
         facCharges +
         wheelingCharges +
         todCharges +
-        fixedCharge;
-    return (subtotal + electricityDuty + taxes + pfSurcharge) -
+        fixedCharge +
+        arrearsDpc;
+    final bill =
+        subtotal + electricityDuty + taxes + pfSurcharge;
+    return bill -
         pfRebate -
         subsidy -
         regionSubsidy -
-        rebateSection106;
+        rebateSection106 -
+        icrRebate -
+        lfIncentive -
+        ppdRebate -
+        bulkRebate;
   }
 
   static double calculateBillHealthScore({

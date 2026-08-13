@@ -22,10 +22,10 @@ class AppConfig {
   static double _rebateSection106 = 0.0;
 
   /// Selected MERC tariff category (HT-I Industry by default).
-  static TariffCategory _tariffCategory = TariffCategory.htIndustrial;
+  static TariffCategory tariffCategory = TariffCategory.htIndustrial;
 
   /// Selected tariff year (FY 2026-27 by default).
-  static TariffVersion _tariffVersion = TariffVersion.fy2627;
+  static TariffVersion tariffVersion = TariffVersion.fy2627;
 
   /// Electricity duty as % of energy charges (0 = exempt — HT categories).
   /// When > 0 the flat [electricityDutyPerUnit] charge is ignored.
@@ -130,14 +130,6 @@ class AppConfig {
     if (value.length == 4) _todMultipliers = value;
   }
 
-  /// Selected tariff category.
-  static TariffCategory get tariffCategory => _tariffCategory;
-  static set tariffCategory(TariffCategory value) => _tariffCategory = value;
-
-  /// Selected tariff year.
-  static TariffVersion get tariffVersion => _tariffVersion;
-  static set tariffVersion(TariffVersion value) => _tariffVersion = value;
-
   /// Electricity duty as % of energy charges (0 = exempt).
   static double get dutyPercent => _dutyPercent;
   static set dutyPercent(double value) {
@@ -154,6 +146,73 @@ class AppConfig {
   static List<EnergySlab> get energySlabs => List.unmodifiable(_energySlabs);
   static set energySlabs(List<EnergySlab> value) => _energySlabs = value;
 
+  /// Tax as % of energy charges (0 = use legacy flat per-unit [taxPerUnit]).
+  static double _taxPercent = AppConstants.taxPercent;
+  static double get taxPercent => _taxPercent;
+  static set taxPercent(double value) {
+    if (value >= 0) _taxPercent = value;
+  }
+
+  /// ICR rebate — ₹ per unit on incremental consumption (≥10% growth vs
+  /// same month last year). 0 = off.
+  static double _icrRatePerUnit = AppConstants.icrRatePerUnit;
+  static double get icrRatePerUnit => _icrRatePerUnit;
+  static set icrRatePerUnit(double value) {
+    if (value >= 0) _icrRatePerUnit = value;
+  }
+
+  /// Same month last year's consumption (kVAh) — ICR growth baseline.
+  static double _icrLastYearUnits = 0.0;
+  static double get icrLastYearUnits => _icrLastYearUnits;
+  static set icrLastYearUnits(double value) {
+    if (value >= 0) _icrLastYearUnits = value;
+  }
+
+  /// Load Factor incentive — % of (energy + demand) charges. 0 = off.
+  static double _lfIncentivePercent = AppConstants.lfIncentivePercent;
+  static double get lfIncentivePercent => _lfIncentivePercent;
+  static set lfIncentivePercent(double value) {
+    if (value >= 0) _lfIncentivePercent = value;
+  }
+
+  /// Prompt Payment Discount — % of the bill. 0 = off.
+  static double _ppdPercent = AppConstants.ppdPercent;
+  static double get ppdPercent => _ppdPercent;
+  static set ppdPercent(double value) {
+    if (value >= 0) _ppdPercent = value;
+  }
+
+  /// Bulk consumption rebate — % of energy charges. 0 = off.
+  static double _bulkRebatePercent = AppConstants.bulkRebatePercent;
+  static double get bulkRebatePercent => _bulkRebatePercent;
+  static set bulkRebatePercent(double value) {
+    if (value >= 0) _bulkRebatePercent = value;
+  }
+
+  /// Arrears / DPC flat amount in ₹ added to the bill.
+  static double _arrearsDpcAmount = AppConstants.arrearsDpcAmount;
+  static double get arrearsDpcAmount => _arrearsDpcAmount;
+  static set arrearsDpcAmount(double value) {
+    if (value >= 0) _arrearsDpcAmount = value;
+  }
+
+  /// Round the final bill to the nearest ₹10.
+  static bool roundToTen = AppConstants.roundToTen;
+
+  /// Bill on kVAh (official) or kWh when off.
+  static bool billOnKvah = AppConstants.billOnKvah;
+
+  /// Per-month FAC rates (₹/unit) — keyed "YYYY-MM". Falls back to
+  /// [facRatePerUnit] for months without an explicit rate.
+  static Map<String, double> _facRatesByMonth = {};
+  static Map<String, double> get facRatesByMonth =>
+      Map.unmodifiable(_facRatesByMonth);
+  static set facRatesByMonth(Map<String, double> value) => _facRatesByMonth = value;
+
+  /// FAC rate for a "YYYY-MM" [monthKey], or the default when not set.
+  static double facRateForMonth(String monthKey) =>
+      _facRatesByMonth[monthKey] ?? _facRatePerUnit;
+
   /// Loads the official MERC rates for [category] × [version] into every
   /// tariff field (energy, demand, wheeling, duty, TOD, fixed charge,
   /// contract demand). Returns the applied preset so the caller can sync
@@ -163,13 +222,15 @@ class AppConfig {
     TariffVersion version,
   ) {
     final preset = TariffPresets.presetFor(category, version);
-    _tariffCategory = category;
-    _tariffVersion = version;
+    tariffCategory = category;
+    tariffVersion = version;
     _tariffPerUnit = preset.energyRate;
     _demandChargePerKva = preset.demandRate;
     _wheelingChargePerUnit = preset.wheelingRate;
     _dutyPercent = preset.dutyPercent;
-    if (_dutyPercent > 0) _electricityDutyPerUnit = 0.0;
+    // HT categories are exempt (0%); LT use the % model — either way the
+    // legacy flat per-unit duty must not leak into preset-driven bills.
+    _electricityDutyPerUnit = 0.0;
     _fixedCharge = preset.fixedCharge;
     _energySlabs = List.of(preset.slabs);
     _todMultipliers = List.of(preset.todMultipliers);
@@ -193,6 +254,16 @@ class AppConfig {
     _dutyPercent = 0.0;
     _fixedCharge = 0.0;
     _energySlabs = const [];
+    _taxPercent = AppConstants.taxPercent;
+    _icrRatePerUnit = AppConstants.icrRatePerUnit;
+    _icrLastYearUnits = 0.0;
+    _lfIncentivePercent = AppConstants.lfIncentivePercent;
+    _ppdPercent = AppConstants.ppdPercent;
+    _bulkRebatePercent = AppConstants.bulkRebatePercent;
+    _arrearsDpcAmount = AppConstants.arrearsDpcAmount;
+    roundToTen = AppConstants.roundToTen;
+    billOnKvah = AppConstants.billOnKvah;
+    _facRatesByMonth = {};
   }
 }
 
@@ -264,6 +335,27 @@ class TariffStore {
     } else if (map.containsKey('tax_percent')) {
       // Legacy: ignore old percentage, keep default per-unit
     }
+    if (map.containsKey('tax_percent')) {
+      setDouble('tax_percent', (v) => AppConfig.taxPercent = v);
+    }
+    setDouble('icr_rate_per_unit', (v) => AppConfig.icrRatePerUnit = v);
+    setDouble('icr_last_year_units', (v) => AppConfig.icrLastYearUnits = v);
+    setDouble('lf_incentive_percent', (v) => AppConfig.lfIncentivePercent = v);
+    setDouble('ppd_percent', (v) => AppConfig.ppdPercent = v);
+    setDouble('bulk_rebate_percent', (v) => AppConfig.bulkRebatePercent = v);
+    setDouble('arrears_dpc_amount', (v) => AppConfig.arrearsDpcAmount = v);
+    if (map['round_to_ten'] is bool) {
+      AppConfig.roundToTen = map['round_to_ten'] as bool;
+    }
+    if (map['bill_on_kvah'] is bool) {
+      AppConfig.billOnKvah = map['bill_on_kvah'] as bool;
+    }
+    final facMap = map['fac_rates_by_month'];
+    if (facMap is Map) {
+      AppConfig.facRatesByMonth = facMap.map(
+        (k, v) => MapEntry(k as String, (v as num).toDouble()),
+      );
+    }
     setDouble('fixed_charge', (v) => AppConfig.fixedCharge = v);
 
     setDouble('subsidy_percent', (v) => AppConfig.subsidyPercent = v);
@@ -309,7 +401,16 @@ class TariffStore {
         'fac_rate_per_unit': facRatePerUnit,
         'wheeling_charge_per_unit': wheelingChargePerUnit,
         'electricity_duty_percent': AppConfig.dutyPercent,
-        'tax_per_unit': taxPerUnit,
+        'tax_percent': AppConfig.taxPercent,
+        'icr_rate_per_unit': AppConfig.icrRatePerUnit,
+        'icr_last_year_units': AppConfig.icrLastYearUnits,
+        'lf_incentive_percent': AppConfig.lfIncentivePercent,
+        'ppd_percent': AppConfig.ppdPercent,
+        'bulk_rebate_percent': AppConfig.bulkRebatePercent,
+        'arrears_dpc_amount': AppConfig.arrearsDpcAmount,
+        'round_to_ten': AppConfig.roundToTen,
+        'bill_on_kvah': AppConfig.billOnKvah,
+        'fac_rates_by_month': AppConfig.facRatesByMonth,
         'subsidy_percent': subsidyPercent,
         'contract_demand_kva': contractDemandKva,
         'tariff_category': AppConfig.tariffCategory.id,
@@ -343,6 +444,41 @@ class TariffStore {
       if (todMultipliers != null) AppConfig.todMultipliers = todMultipliers;
     } catch (e) {
       AppLogger.e('Failed to save tariff settings', e);
+      rethrow;
+    }
+  }
+  /// Saves (or clears, when [rate] is null/≤0) the per-month FAC rate for
+  /// [monthKey] ("YYYY-MM") without touching the other tariff settings.
+  static Future<void> saveFacRate(String monthKey, double? rate) async {
+    final uid = _currentUserId();
+    if (uid == null) {
+      throw const RemoteStorageException('You must be signed in to save settings.');
+    }
+    try {
+      final existing = await SupabaseClientManager.client
+          .from(_table)
+          .select('data')
+          .eq('user_id', uid)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 10));
+      final data = Map<String, Object?>.from(
+        (existing?['data'] as Map? ?? {}).cast<String, Object?>(),
+      );
+      final facMap = Map<String, double>.from(AppConfig.facRatesByMonth);
+      if (rate == null || rate <= 0) {
+        facMap.remove(monthKey);
+      } else {
+        facMap[monthKey] = rate;
+      }
+      data['fac_rates_by_month'] = facMap;
+      AppConfig.facRatesByMonth = facMap;
+      await SupabaseClientManager.client.from(_table).upsert({
+        'user_id': uid,
+        'data': data,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (e) {
+      AppLogger.e('Failed to save monthly FAC rate', e);
       rethrow;
     }
   }

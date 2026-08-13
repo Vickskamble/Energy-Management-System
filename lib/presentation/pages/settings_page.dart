@@ -40,8 +40,17 @@ class _SettingsScreenState extends State<SettingsScreen>
   final _taxCtrl = TextEditingController();
   final _subsidyCtrl = TextEditingController();
   final _mdCtrl = TextEditingController();
+  final _icrRateCtrl = TextEditingController();
+  final _icrUnitsCtrl = TextEditingController();
+  final _lfCtrl = TextEditingController();
+  final _ppdCtrl = TextEditingController();
+  final _bulkCtrl = TextEditingController();
+  final _arrearsCtrl = TextEditingController();
   final _precedingCtrls = List.generate(11, (_) => TextEditingController());
   final _tariffFormKey = GlobalKey<FormState>();
+
+  bool _roundToTen = AppConstants.roundToTen;
+  bool _billOnKvah = AppConstants.billOnKvah;
 
   /// Labels for the preceding 11 months (oldest → most recent).
   List<String> get _precedingMonthLabels {
@@ -63,9 +72,21 @@ class _SettingsScreenState extends State<SettingsScreen>
     _facCtrl.text = AppConfig.facRatePerUnit.toStringAsFixed(2);
     _wheelingCtrl.text = AppConfig.wheelingChargePerUnit.toStringAsFixed(2);
     _dutyCtrl.text = AppConfig.dutyPercent.toStringAsFixed(0);
-    _taxCtrl.text = AppConfig.taxPerUnit.toStringAsFixed(2);
+    _taxCtrl.text = AppConfig.taxPercent.toStringAsFixed(2);
     _subsidyCtrl.text = AppConfig.subsidyPercent.toStringAsFixed(2);
     _mdCtrl.text = AppConfig.contractDemandKva.toStringAsFixed(0);
+    _icrRateCtrl.text = AppConfig.icrRatePerUnit.toStringAsFixed(2);
+    _icrUnitsCtrl.text = AppConfig.icrLastYearUnits == 0
+        ? ''
+        : AppConfig.icrLastYearUnits.toStringAsFixed(0);
+    _lfCtrl.text = AppConfig.lfIncentivePercent.toStringAsFixed(1);
+    _ppdCtrl.text = AppConfig.ppdPercent.toStringAsFixed(1);
+    _bulkCtrl.text = AppConfig.bulkRebatePercent.toStringAsFixed(1);
+    _arrearsCtrl.text = AppConfig.arrearsDpcAmount == 0
+        ? ''
+        : AppConfig.arrearsDpcAmount.toStringAsFixed(0);
+    _roundToTen = AppConfig.roundToTen;
+    _billOnKvah = AppConfig.billOnKvah;
     final preceding = AppConfig.precedingDemandKva;
     for (var i = 0; i < 11; i++) {
       if (preceding[i] > 0) {
@@ -118,6 +139,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     _dutyCtrl.dispose();
     _taxCtrl.dispose();
     _subsidyCtrl.dispose();
+    _icrRateCtrl.dispose();
+    _icrUnitsCtrl.dispose();
+    _lfCtrl.dispose();
+    _ppdCtrl.dispose();
+    _bulkCtrl.dispose();
+    _arrearsCtrl.dispose();
     _mdCtrl.removeListener(_onMdChanged);
     _mdCtrl.dispose();
     for (final c in _precedingCtrls) {
@@ -310,6 +337,15 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
     try {
       AppConfig.dutyPercent = double.parse(_dutyCtrl.text.trim());
+      AppConfig.taxPercent = double.parse(_taxCtrl.text.trim());
+      AppConfig.icrRatePerUnit = double.parse(_icrRateCtrl.text.trim());
+      AppConfig.icrLastYearUnits = double.tryParse(_icrUnitsCtrl.text.trim()) ?? 0;
+      AppConfig.lfIncentivePercent = double.parse(_lfCtrl.text.trim());
+      AppConfig.ppdPercent = double.parse(_ppdCtrl.text.trim());
+      AppConfig.bulkRebatePercent = double.parse(_bulkCtrl.text.trim());
+      AppConfig.arrearsDpcAmount = double.tryParse(_arrearsCtrl.text.trim()) ?? 0;
+      AppConfig.roundToTen = _roundToTen;
+      AppConfig.billOnKvah = _billOnKvah;
       await TariffStore.saveAll(
         tariffPerUnit: double.parse(_tariffCtrl.text.trim()),
         demandChargePerKva: double.parse(_demandCtrl.text.trim()),
@@ -347,8 +383,28 @@ class _SettingsScreenState extends State<SettingsScreen>
   Future<void> _resetTariff() async {
     _applyPreset(TariffCategory.htIndustrial, TariffVersion.fy2627);
     _facCtrl.text = AppConfig.facRatePerUnit.toStringAsFixed(2);
-    _taxCtrl.text = AppConfig.taxPerUnit.toStringAsFixed(2);
-    _subsidyCtrl.text = AppConfig.subsidyPercent.toStringAsFixed(2);
+    AppConfig.taxPercent = AppConstants.taxPercent;
+    AppConfig.icrRatePerUnit = AppConstants.icrRatePerUnit;
+    AppConfig.icrLastYearUnits = 0;
+    AppConfig.lfIncentivePercent = AppConstants.lfIncentivePercent;
+    AppConfig.ppdPercent = AppConstants.ppdPercent;
+    AppConfig.bulkRebatePercent = AppConstants.bulkRebatePercent;
+    AppConfig.arrearsDpcAmount = AppConstants.arrearsDpcAmount;
+    AppConfig.roundToTen = AppConstants.roundToTen;
+    AppConfig.billOnKvah = AppConstants.billOnKvah;
+    AppConfig.facRatesByMonth = {};
+    setState(() {
+      _taxCtrl.text = AppConfig.taxPercent.toStringAsFixed(2);
+      _icrRateCtrl.text = AppConfig.icrRatePerUnit.toStringAsFixed(2);
+      _icrUnitsCtrl.text = '';
+      _lfCtrl.text = AppConfig.lfIncentivePercent.toStringAsFixed(1);
+      _ppdCtrl.text = AppConfig.ppdPercent.toStringAsFixed(1);
+      _bulkCtrl.text = AppConfig.bulkRebatePercent.toStringAsFixed(1);
+      _arrearsCtrl.text = '';
+      _roundToTen = AppConfig.roundToTen;
+      _billOnKvah = AppConfig.billOnKvah;
+      _subsidyCtrl.text = AppConfig.subsidyPercent.toStringAsFixed(2);
+    });
     for (final c in _precedingCtrls) {
       c.clear();
     }
@@ -496,8 +552,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                     Expanded(
                       child: _rateField(
                         _taxCtrl,
-                        'Tax (₹ per unit)',
-                        'e.g. 0.279',
+                        'Tax (% of EC)',
+                        'e.g. 1.25',
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -577,6 +633,110 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                   if (i + 2 < 11) const SizedBox(height: 12),
                 ],
+                const SizedBox(height: 16),
+                Text(
+                  'Rebates & adjustments',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _rateField(
+                        _icrRateCtrl,
+                        'ICR (₹/unit)',
+                        '0 = off',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _rateField(
+                        _icrUnitsCtrl,
+                        'Last-yr same month units',
+                        'kVAh if known',
+                        optional: true,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Incremental Consumption Rebate — applies ₹/unit on the '
+                  'consumption growth when it exceeds last year\u2019s same '
+                  'month by ≥ 10%.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _rateField(
+                        _lfCtrl,
+                        'LF incentive (%)',
+                        '0 = off',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _rateField(
+                        _ppdCtrl,
+                        'PPD (%)',
+                        'e.g. 2.0',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _rateField(
+                        _bulkCtrl,
+                        'Bulk rebate (%)',
+                        '0 = off',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _rateField(
+                        _arrearsCtrl,
+                        'Arrears/DPC (₹)',
+                        '0 = none',
+                        optional: true,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  title: const Text(
+                    'Round bill to nearest ₹10',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  value: _roundToTen,
+                  onChanged: (v) => setState(() => _roundToTen = v),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                SwitchListTile(
+                  title: const Text(
+                    'Bill on kVAh (PF-adjusted)',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'On = kVAh (official), Off = kWh',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  value: _billOnKvah,
+                  onChanged: (v) => setState(() => _billOnKvah = v),
+                  contentPadding: EdgeInsets.zero,
+                ),
                 const SizedBox(height: 16),
                 AppButton(
                   label: 'Save Tariff',

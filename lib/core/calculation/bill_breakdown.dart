@@ -13,6 +13,12 @@ class BillBreakdown {
   final double regionSubsidy;
   final double rebateSection106;
   final double fixedCharge;
+  final double icrRebate;
+  final double lfIncentive;
+  final double ppdRebate;
+  final double bulkRebate;
+  final double arrearsDpc;
+  final double roundingAdjustment;
   final double netBill;
   final double billingDemand;
   final double contractDemand;
@@ -35,6 +41,12 @@ class BillBreakdown {
     this.regionSubsidy = 0,
     this.rebateSection106 = 0,
     this.fixedCharge = 0,
+    this.icrRebate = 0,
+    this.lfIncentive = 0,
+    this.ppdRebate = 0,
+    this.bulkRebate = 0,
+    this.arrearsDpc = 0,
+    this.roundingAdjustment = 0,
     required this.netBill,
     required this.billingDemand,
     required this.contractDemand,
@@ -63,6 +75,12 @@ class BillBreakdown {
     'Taxes': taxes,
     if (todCharges != 0) 'TOD Charges': todCharges,
     if (fixedCharge != 0) 'Fixed Charge': fixedCharge,
+    if (icrRebate != 0) 'ICR Rebate': -icrRebate,
+    if (lfIncentive != 0) 'LF Incentive': -lfIncentive,
+    if (ppdRebate != 0) 'PPD Rebate': -ppdRebate,
+    if (bulkRebate != 0) 'Bulk Rebate': -bulkRebate,
+    if (arrearsDpc != 0) 'Arrears/DPC': arrearsDpc,
+    if (roundingAdjustment != 0) 'Rounding': roundingAdjustment,
   };
 
   Map<String, double> toPercentMap() => {

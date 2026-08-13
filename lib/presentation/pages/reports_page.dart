@@ -607,11 +607,17 @@ class _ReportsContentState extends State<_ReportsContent> {
     final month = int.parse(parts[1]);
     final label = DateFormat('MMM yyyy').format(DateTime(year, month, 1));
 
-    var estimated = 0.0;
-    for (final e in _entities) {
-      if (_monthKey(e.loggedAt.year, e.loggedAt.month) == key) {
-        estimated += e.estimatedBill;
-      }
+    final monthLogs = _entities
+        .where((e) => _monthKey(e.loggedAt.year, e.loggedAt.month) == key)
+        .toList();
+    var estimated = monthLogs.fold(0.0, (s, e) => s + e.estimatedBill);
+    if (monthLogs.isNotEmpty) {
+      final monthBreakdown = BillCalculator.calculate(
+        logs: monthLogs,
+        ratchetLogs: _allEntities,
+        facRate: AppConfig.facRateForMonth(key),
+      );
+      estimated = monthBreakdown.netBill;
     }
     final actual = _actualBills[key];
 
@@ -747,7 +753,8 @@ class _ReportsContentState extends State<_ReportsContent> {
     final formKey = GlobalKey<FormState>();
     var selectedKey = months.first;
     final amountCtrl = TextEditingController();
-    final result = await showDialog<String>(
+    final facCtrl = TextEditingController();
+    final result = await showDialog<({String amount, String? fac})>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Enter Actual Bill'),
@@ -784,6 +791,28 @@ class _ReportsContentState extends State<_ReportsContent> {
                   return null;
                 },
               ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: facCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText:
+                      'FAC rate (₹/unit) — optional',
+                  hintText: AppConfig.facRateForMonth(selectedKey)
+                      .toStringAsFixed(2),
+                  isDense: true,
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return null;
+                  final value = double.tryParse(v.trim());
+                  if (value == null || value < 0) {
+                    return 'Invalid FAC rate';
+                  }
+                  return null;
+                },
+              ),
             ],
           ),
         ),
@@ -795,7 +824,10 @@ class _ReportsContentState extends State<_ReportsContent> {
           FilledButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
-                Navigator.pop(dialogContext, amountCtrl.text);
+                Navigator.pop(
+                  dialogContext,
+                  (amount: amountCtrl.text, fac: facCtrl.text.trim()),
+                );
               }
             },
             child: const Text('Save'),
@@ -805,12 +837,18 @@ class _ReportsContentState extends State<_ReportsContent> {
     );
 
     if (result == null) return;
-    final amount = double.tryParse(result);
+    final amount = double.tryParse(result.amount);
     if (amount == null || amount <= 0) return;
 
     await BillReconcileStore.saveActualBill(selectedKey, amount);
+    final fac = result.fac;
+    if (fac != null && fac.isNotEmpty) {
+      await TariffStore.saveFacRate(selectedKey, double.tryParse(fac));
+    }
     if (!mounted) return;
-    setState(() => _actualBills[selectedKey] = amount);
+    setState(() {
+      _actualBills[selectedKey] = amount;
+    });
   }
 
   Future<void> _clearActualBills() async {

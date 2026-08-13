@@ -41,7 +41,7 @@ void main() {
       expect(breakdown.facCharges, closeTo(375, 0.01)); // 1250 × 0.30
       expect(breakdown.wheelingCharges, closeTo(1012.5, 0.01)); // 1250 × 0.81
       expect(breakdown.electricityDuty, closeTo(343.75, 0.01)); // 1250 × 0.275
-      expect(breakdown.taxes, closeTo(348.75, 0.01)); // 1250 × 0.279
+      expect(breakdown.taxes, closeTo(131.88, 0.01)); // 1.25% of 10550 energy
       expect(breakdown.pfSurcharge, closeTo(49277.5, 0.01)); // PF 0.8 < 0.9 → 5%
       expect(breakdown.pfRebate, 0);
       expect(breakdown.loadFactor, 1.0);

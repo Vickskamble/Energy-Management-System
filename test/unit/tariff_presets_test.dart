@@ -146,4 +146,83 @@ void main() {
       expect(b.energyCharges, greaterThan(flat));
     });
   });
+
+  group('Rebates & adjustments', () {
+    EnergyLogEntity log(double kwh, double kvah, double md) => EnergyLogEntity(
+          id: 'm1',
+          meterName: 'Meter-01',
+          kwh: kwh,
+          kvah: kvah,
+          rkvarhLag: 0,
+          rkvarhLead: 0,
+          powerFactor: 0.95,
+          mdRecorded: md,
+          contractDemand: 201,
+          estimatedBill: 0,
+          loggedAt: DateTime(2026, 7, 15),
+        );
+
+    setUp(() {
+      AppConfig.reset();
+      AppConfig.applyTariffPreset(
+        TariffCategory.htIndustrial,
+        TariffVersion.fy2627,
+      );
+    });
+
+    test('tax is a percentage of energy charges by default', () {
+      final b = BillCalculator.calculate(logs: [log(1000, 1100, 150)]);
+      expect(b.taxes, closeTo(b.energyCharges * 0.0125, 0.01));
+    });
+
+    test('ICR applies only when growth >= 10% vs last year', () {
+      AppConfig.icrLastYearUnits = 1000;
+      final grown = BillCalculator.calculate(logs: [log(1100, 1100, 150)]);
+      expect(grown.icrRebate, closeTo(100 * AppConfig.icrRatePerUnit, 0.01));
+
+      final flat = BillCalculator.calculate(logs: [log(1050, 1050, 150)]);
+      expect(flat.icrRebate, 0);
+    });
+
+    test('PPD is a percentage of the bill', () {
+      AppConfig.ppdPercent = 2.0;
+      final b = BillCalculator.calculate(logs: [log(1000, 1100, 150)]);
+      final base = b.energyCharges + b.demandCharges + b.facCharges +
+          b.wheelingCharges + b.todCharges + b.electricityDuty + b.taxes -
+          b.pfRebate - b.icrRebate - b.lfIncentive - b.bulkRebate;
+      expect(b.ppdRebate, closeTo(base * 0.02, 0.01));
+    });
+
+    test('arrears add to the bill and rounding snaps to nearest 10', () {
+      AppConfig.arrearsDpcAmount = 1250;
+      AppConfig.roundToTen = true;
+      final b = BillCalculator.calculate(logs: [log(1000, 1100, 150)]);
+      expect(b.arrearsDpc, 1250);
+      expect(b.netBill % 10, 0);
+      expect(b.roundingAdjustment, closeTo(b.netBill - (b.netBill - b.roundingAdjustment), 1));
+    });
+
+    test('kVAh toggle switches billing unit', () {
+      final onKvah = BillCalculator.calculate(
+        logs: [log(1000, 1100, 150)],
+        billOnKvah: true,
+      );
+      final onKwh = BillCalculator.calculate(
+        logs: [log(1000, 1100, 150)],
+        billOnKvah: false,
+      );
+      expect(onKvah.totalUnits, closeTo(1100, 0.01));
+      expect(onKwh.totalUnits, closeTo(1000, 0.01));
+      expect(onKvah.energyCharges, greaterThan(onKwh.energyCharges));
+    });
+
+    test('per-month FAC rate overrides the default', () {
+      AppConfig.facRatePerUnit = 0.30;
+      final b = BillCalculator.calculate(
+        logs: [log(1000, 1100, 150)],
+        facRate: 0.55,
+      );
+      expect(b.facCharges, closeTo(1100 * 0.55, 0.01));
+    });
+  });
 }

@@ -33,4 +33,32 @@ class AppConstants {
 
   /// Tolerance (%) for actual vs estimated bill reconciliation (Issue 7B).
   static const double billAccuracyTolerancePercent = 10.0;
+
+  /// Tax as % of energy charges (official ~1.25%; used instead of the flat
+  /// per-unit [taxPerUnit] whenever > 0).
+  static const double taxPercent = 1.25;
+
+  /// Incremental Consumption Rebate (ICR) — ₹ per unit on the incremental
+  /// consumption when it grows ≥ 10% vs the same month last year.
+  static const double icrRatePerUnit = 0.75;
+
+  /// Load Factor incentive — % of (energy + demand) charges.
+  static const double lfIncentivePercent = 0.0;
+
+  /// Prompt Payment Discount — % of the bill (energy + demand + FAC +
+  /// wheeling + TOD + duty + taxes) when paid on time.
+  static const double ppdPercent = 2.0;
+
+  /// Bulk consumption rebate — % of energy charges.
+  static const double bulkRebatePercent = 0.0;
+
+  /// Arrears / DPC flat amount in ₹ (added to the bill).
+  static const double arrearsDpcAmount = 0.0;
+
+  /// Round the final bill to the nearest ₹10 (MSEDCL practice).
+  static const bool roundToTen = true;
+
+  /// Bill on kVAh (apparent energy, PF-adjusted — official). When off the
+  /// kWh (active energy) is used as the billing unit.
+  static const bool billOnKvah = true;
 }

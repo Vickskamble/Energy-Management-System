@@ -350,6 +350,18 @@ class _AnalysisContentState extends State<_AnalysisContent> {
       ('PF Rebate', -breakdown.pfRebate, AppColors.kpiSavings),
       ('PF Surcharge', breakdown.pfSurcharge, AppColors.danger),
       ('Subsidy', -breakdown.subsidy, AppColors.kpiSavings),
+      if (breakdown.icrRebate > 0)
+        ('ICR Rebate', -breakdown.icrRebate, AppColors.kpiSavings),
+      if (breakdown.lfIncentive > 0)
+        ('LF Incentive', -breakdown.lfIncentive, AppColors.kpiSavings),
+      if (breakdown.ppdRebate > 0)
+        ('PPD Rebate', -breakdown.ppdRebate, AppColors.kpiSavings),
+      if (breakdown.bulkRebate > 0)
+        ('Bulk Rebate', -breakdown.bulkRebate, AppColors.kpiSavings),
+      if (breakdown.arrearsDpc > 0)
+        ('Arrears/DPC', breakdown.arrearsDpc, AppColors.danger),
+      if (breakdown.roundingAdjustment != 0)
+        ('Rounding', breakdown.roundingAdjustment, AppColors.textPrimary),
     ];
     return AppCard(
       child: Column(

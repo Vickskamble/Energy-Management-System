@@ -319,10 +319,12 @@ class EnergyLogModel {
             totalUnits,
             AppConfig.electricityDutyPerUnit,
           );
-    final taxes = CalculationEngine.calculateTaxes(
-      totalUnits,
-      AppConfig.taxPerUnit,
-    );
+    final taxes = AppConfig.taxPercent > 0
+        ? energyCharges * AppConfig.taxPercent / 100
+        : CalculationEngine.calculateTaxes(
+            totalUnits,
+            AppConfig.taxPerUnit,
+          );
 
     final pfRebate = CalculationEngine.calculatePfRebate(
       energyCharges,
