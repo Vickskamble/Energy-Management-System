@@ -143,12 +143,15 @@ async function applyPaidPaymentLink(supabase: any, paymentLinkId: string) {
   if (!user?.user?.id) return;
   const { data: rows } = await admin
     .from("subscriptions")
-    .select("id, extra_meters, payment_link_id")
+    .select("id, extra_meters, payment_link_id, paid_at")
     .eq("user_id", user.user.id)
     .order("created_at", { ascending: false })
     .limit(1);
   const row = rows?.[0];
-  if (!row || row.payment_link_id === paymentLinkId) return;
+  // Idempotency: persist+guard on paid_at (NOT payment_link_id), because the
+  // link id is written PRE-payment at checkout — comparing it would always
+  // short-circuit and never apply the delta.
+  if (!row || row.paid_at != null) return;
   await admin.from("subscriptions").update({
     extra_meters: Math.min(50, (Number(row.extra_meters) || 0) + delta),
     payment_link_id: paymentLinkId,

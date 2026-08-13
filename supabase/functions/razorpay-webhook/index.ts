@@ -99,11 +99,12 @@ serve(async (req) => {
     if (addonUserId && delta > 0) {
       const { data: cur } = await supabase
         .from("subscriptions")
-        .select("extra_meters, payment_link_id")
+        .select("extra_meters, payment_link_id, paid_at")
         .eq("user_id", addonUserId)
         .single();
-      // Idempotency: Razorpay retries deliveries; never apply a link twice.
-      if (cur && cur.payment_link_id !== linkId) {
+      // Idempotency: guard on paid_at, not on payment_link_id (the link id is
+      // written before payment, so comparing it would always skip apply).
+      if (cur && cur.paid_at == null) {
         const { error: linkError } = await supabase
           .from("subscriptions")
           .update({

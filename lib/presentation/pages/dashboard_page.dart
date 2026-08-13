@@ -209,9 +209,12 @@ class _DashboardContentState extends State<_DashboardContent> {
     return logs;
   }
 
-  /// Distinct meters present in the (site-filtered) data, for the chips row.
+  /// Meters for the chips row: every meter added in the app (Meter table)
+  /// plus any distinct meter still present in historical log data, so the
+  /// selector is visible even when only one meter exists.
   List<String> get _meterNames {
     final names = <String>{
+      for (final name in _meterSites.keys) name,
       for (final l in widget.logs.cast<EnergyLogEntity>()) l.meterName,
     }.toList()
       ..sort();
@@ -626,7 +629,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             _buildSiteSelector(),
             const SizedBox(height: AppSpacing.sm),
           ],
-          if (_meterNames.length > 1) ...[
+          if (_meterNames.isNotEmpty) ...[
             _buildMeterSelector(),
             const SizedBox(height: AppSpacing.sm),
           ],
