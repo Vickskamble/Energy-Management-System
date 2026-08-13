@@ -70,11 +70,15 @@ class RazorpayCheckoutPage extends StatefulWidget {
 
   /// Whether this device/OS can render the in-app checkout.
   /// Falls back to the external hosted page otherwise.
+  ///
+  /// Windows/macOS are EXCLUDED: the WebView2/macOS WKWebView platform view
+  /// can throw during build when the runtime is missing, which surfaces as a
+  /// full-screen Flutter crash ("Something went wrong"). Desktop uses the
+  /// hosted checkout.html in the default browser instead — reliable, and the
+  /// caller's flow is unchanged (browser path + payment-status polling).
   static bool get supported =>
-      !kIsWeb && (defaultTargetPlatform == TargetPlatform.windows ||
-          defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.macOS);
+      !kIsWeb && (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   @override
   State<RazorpayCheckoutPage> createState() => _RazorpayCheckoutPageState();
@@ -162,6 +166,7 @@ class _RazorpayCheckoutPageState extends State<RazorpayCheckoutPage> {
             }
             return NavigationDecision.navigate;
           },
+          onWebResourceError: (_) => _markInitFailed(),
         ),
       )
       ..addJavaScriptChannel(
