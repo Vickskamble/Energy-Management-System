@@ -205,9 +205,26 @@ jobs:
           Compress-Archive -Path "$releaseDir/*" -DestinationPath $zip -Force
           Write-Output "Zipped -> $zip"
 
-      - name: Upload Windows bundle to Release
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+
+      - name: Build Setup.exe installer
+        shell: pwsh
+        run: |
+          $iscc = Get-ChildItem "C:\Program Files*\Inno Setup*\ISCC.exe" `
+            | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $iscc) { Write-Error "ISCC.exe not found"; exit 1 }
+          & $iscc "windows/installer.iss" "/DAppVersion=${{ github.ref_name }}"
+          if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup failed"; exit $LASTEXITCODE }
+          Get-ChildItem "build/installer"
+
+      - name: Upload installer + bundle to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: Energy-Management-System-Windows-${{ github.ref_name }}.zip
+          files: |
+            build/installer/EMS*Setup*.exe
+            Energy-Management-System-Windows-${{ github.ref_name }}.zip
           fail_on_unmatched_files: false
