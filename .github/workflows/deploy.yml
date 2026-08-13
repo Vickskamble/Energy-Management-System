@@ -17,8 +17,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  # ----- Web build + deploy to GitHub Pages (every push, incl. tags) -----
+  web-deploy:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,9 +42,9 @@ jobs:
 
       - name: Create .env from secrets
         run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
-          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
-          echo "RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}" >> .env
+          echo "SUPABASE_URL=$SUPABASE_URL" >> .env
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env
+          echo "RAZORPAY_KEY_ID=$RAZORPAY_KEY_ID" >> .env
 
       - name: Install dependencies
         run: flutter pub get
@@ -50,23 +55,12 @@ jobs:
       - name: Static analysis
         run: dart analyze lib/
 
-      - name: Dependency health check
-        run: |
-          echo "Checking for outdated dependencies..."
-          flutter pub outdated || true
-          echo "Review Dependabot PRs for dependency updates."
-        continue-on-error: true
-
-      # ----- Web -----
       - name: Build Web
         run: flutter build web --release --base-href=/Energy-Management-System/
         if: success()
 
       - name: Configure Security Headers
         run: |
-          # Insert security meta tags into <head> - never overwrite the file.
-          # NOTE: HSTS cannot be set via <meta> (only honored as an HTTP header,
-          # which GitHub Pages does not emit) - handled by CDN/proxy if needed.
           python3 - <<'PYEOF'
           import re
           path = "build/web/index.html"
@@ -100,7 +94,6 @@ jobs:
         with:
           path: build/web
 
-      # ----- Deploy to GitHub Pages -----
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
@@ -109,7 +102,6 @@ jobs:
       - name: Security Headers Verification
         run: |
           if [ -f build/web/index.html ]; then
-            echo "Verifying security headers..."
             if grep -q "Content-Security-Policy" build/web/index.html && \
                grep -q "X-Content-Type-Options" build/web/index.html && \
                grep -q "X-Frame-Options" build/web/index.html; then
@@ -130,31 +122,92 @@ jobs:
           fi
         if: success()
 
-      - name: Security Quality Gate
-        run: |
-          echo "🔒 Performing security quality checks..."
-          
-          # Check for common security issues in index.html
-          if [ -f build/web/index.html ]; then
-            # Check for inline event handlers (XSS risk)
-            if grep -E "onerror=|onclick=|onload=|onmouseover=" build/web/index.html; then
-              echo "❌ Inline event handlers detected - REMOVE REQUIRED"
-              exit 1
-            fi
-            
-            # Check for eval() usage (XSS risk)
-            if grep -E "eval\(|Function(" build/web/index.html; then
-              echo "❌ Dangerous JavaScript functions detected - REMOVE REQUIRED"
-              exit 1
-            fi
-            
-            echo "✅ Security quality checks passed"
-          fi
-        if: success()
+  # ----- Android APK (only on version tags) -----
+  android-apk:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Security Report
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.4
+          cache: true
+
+      - name: Create .env from secrets
         run: |
-          echo "Security Implementation Summary (verified):"
-          echo "================================"
-          echo "X Single-Device Sessions - Active (fail-open by design)"
-          echo "X Content Security Policy - Implemented via meta tags"
+          echo "SUPABASE_URL=$SUPABASE_URL" >> .env
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> .env
+          echo "RAZORPAY_KEY_ID=$RAZORPAY_KEY_ID" >> .env
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK (release)
+        run: flutter build apk --release
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: build/app/outputs/flutter-apk/app-release.apk
+          fail_on_unmatched_files: false
+
+  # ----- Windows desktop bundler (only on version tags) -----
+  windows-desktop:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.4
+          cache: true
+
+      - name: Create .env from secrets
+        shell: pwsh
+        run: |
+          "SUPABASE_URL=$env:SUPABASE_URL" | Out-File -FilePath .env -Encoding utf8
+          "SUPABASE_ANON_KEY=$env:SUPABASE_ANON_KEY" | Out-File -FilePath .env -Append -Encoding utf8
+          "RAZORPAY_KEY_ID=$env:RAZORPAY_KEY_ID" | Out-File -FilePath .env -Append -Encoding utf8
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows (release)
+        run: flutter build windows --release
+
+      - name: Package Windows bundle
+        shell: pwsh
+        run: |
+          $releaseDir = "build/windows/x64/runner/Release"
+          if (-not (Test-Path $releaseDir)) { Write-Error "Windows release dir missing"; exit 1 }
+          $zip = "Energy-Management-System-Windows-${{ github.ref_name }}.zip"
+          Compress-Archive -Path "$releaseDir/*" -DestinationPath $zip -Force
+          Write-Output "Zipped -> $zip"
+
+      - name: Upload Windows bundle to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: Energy-Management-System-Windows-${{ github.ref_name }}.zip
+          fail_on_unmatched_files: false
