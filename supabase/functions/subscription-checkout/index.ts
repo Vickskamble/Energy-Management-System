@@ -170,6 +170,17 @@ serve(async (req) => {
       });
     }
     const link = await createExtraMeterLink(user, delta);
+    // Persist the link id on the subscription row BEFORE handing it to the
+    // user: it is the idempotency key for applying the paid add-on (webhook
+    // and/or payment-status fallback), since Razorpay delivery can be flaky.
+    try {
+      await supabase.from("subscriptions").update({
+        payment_link_id: link.id,
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", user.id);
+    } catch (e) {
+      console.error("addon link persist failed:", String(e));
+    }
     return json({
       mode: "addon",
       payment_link_id: link.id,

@@ -805,7 +805,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         AppCard(
           child: Column(
             children: [
-              _accountRow(Icons.info_outline, 'App Version', '1.0.0'),
+              _accountRow(Icons.info_outline, 'App Version', AppConfig.appVersion),
               const Divider(),
               _accountRow(
                 Icons.cloud_outlined,

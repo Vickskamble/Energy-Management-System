@@ -141,6 +141,7 @@ class SubscriptionStore {
 
   static const _secureStorage = FlutterSecureStorage();
   static const _pendingReferralKey = 'ems_pending_referral_code';
+  static const _pendingLinkKey = 'ems_pending_payment_link_id';
 
   static Entitlement? _cached;
   static DateTime? _cachedAt;
@@ -257,6 +258,52 @@ class SubscriptionStore {
     } catch (_) {
       // Unknown → allow; the server trigger is the hard gate.
       return true;
+    }
+  }
+
+  /// Persist the add-on payment link id so the app can re-confirm the payment
+  /// after the checkout page closes/refreshes (webhook delivery is unreliable,
+  /// payment-status is the source of truth).
+  static Future<void> setPendingCheckoutLink(String paymentLinkId) async {
+    if (paymentLinkId.isEmpty) return;
+    try {
+      await _secureStorage.write(key: _pendingLinkKey, value: paymentLinkId);
+    } catch (_) {
+      // best-effort
+    }
+  }
+
+  static Future<String?> getPendingCheckoutLink() async {
+    try {
+      return await _secureStorage.read(key: _pendingLinkKey);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> clearPendingCheckoutLink() async {
+    try {
+      await _secureStorage.delete(key: _pendingLinkKey);
+    } catch (_) {
+      // best-effort
+    }
+  }
+
+  /// Ask the payment-status Edge Function whether the payment went through.
+  /// Returns true only when Razorpay confirms it; not a local optimization.
+  static Future<bool> isPaymentDone(String paymentLinkId) async {
+    try {
+      final res = await SupabaseClientManager.client.functions
+          .invoke(
+            'payment-status',
+            body: {'payment_link_id': paymentLinkId},
+          )
+          .timeout(const Duration(seconds: 20));
+      final data = (res.data as Map?)?.cast<String, dynamic>() ?? {};
+      return data['paid'] == true;
+    } catch (e) {
+      AppLogger.e('payment-status check failed', e);
+      return false;
     }
   }
 }

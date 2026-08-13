@@ -58,12 +58,23 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   }
 
   Future<void> _load() async {
+    final meterRepo = context.read<MeterRepository>();
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final meterRepo = context.read<MeterRepository>();
+      // Re-confirm any add-on payment whose checkout page was closed before
+      // confirmation completed — payment-status flips the plan server-side
+      // even when the webhook never delivered.
+      final pendingLink = await SubscriptionStore.getPendingCheckoutLink();
+      if (pendingLink != null && pendingLink.isNotEmpty) {
+        final paid = await SubscriptionStore.isPaymentDone(pendingLink);
+        if (paid) {
+          await SubscriptionStore.clearPendingCheckoutLink();
+          SubscriptionStore.invalidateCache();
+        }
+      }
       final ent = await SubscriptionStore.getEntitlement(force: true);
       final meters = await meterRepo.getAllMeters();
       if (!mounted) return;
@@ -114,6 +125,12 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       }
 
       bool paidInApp = false;
+      // Remember the add-on link so a closed/refreshed checkout never loses
+      // the payment: payment-status re-checks Razorpay directly on next load.
+      if (result.isAddon) {
+        await SubscriptionStore.setPendingCheckoutLink(result.paymentLinkId);
+      }
+      if (!mounted) return;
       if (RazorpayCheckoutPage.supported) {
         final attempt = await Navigator.of(context).push<PaymentAttemptResult>(
           MaterialPageRoute(
