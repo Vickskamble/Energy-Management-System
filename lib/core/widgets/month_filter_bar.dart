@@ -7,26 +7,35 @@ import '../theme/app_colors.dart';
 /// - [month] == null and [allTime] == false → "This Month": auto-follows the
 ///   current month, so every screen shows live data when a new month starts.
 /// - [allTime] == true → no month filter (Reports "All Time").
+/// - [year] != null → the whole year (any month within it).
 /// - otherwise → the exact (year, month) the user picked.
 class MonthFilterValue {
-  const MonthFilterValue.current() : month = null, allTime = false;
-  const MonthFilterValue.allTime() : month = null, allTime = true;
-  const MonthFilterValue.month(DateTime this.month) : allTime = false;
+  const MonthFilterValue.current() : month = null, allTime = false, year = null;
+  const MonthFilterValue.allTime() : month = null, allTime = true, year = null;
+  const MonthFilterValue.month(DateTime this.month) : allTime = false, year = null;
+  const MonthFilterValue.year(int this.year) : allTime = false, month = null;
 
   final DateTime? month;
   final bool allTime;
 
-  bool get isCurrent => month == null && !allTime;
+  /// When set, the filter is "the whole [year]" (any month in it).
+  final int? year;
+
+  bool get isCurrent => month == null && !allTime && year == null;
 
   /// Whether [loggedAt] belongs to the selected period.
   bool matches(DateTime loggedAt) {
     if (allTime) return true;
+    final y = year;
+    if (y != null) return loggedAt.year == y;
     final m = month ?? DateTime.now();
     return loggedAt.year == m.year && loggedAt.month == m.month;
   }
 
   String get label {
     if (allTime) return 'All Time';
+    final y = year;
+    if (y != null) return '$y';
     final m = month ?? DateTime.now();
     return DateFormat('MMMM yyyy').format(m);
   }
@@ -35,13 +44,14 @@ class MonthFilterValue {
   bool operator ==(Object other) {
     if (other is! MonthFilterValue) return false;
     if (other.allTime != allTime) return false;
+    if (other.year != year) return false;
     if (month == null || other.month == null) return month == other.month;
     return month!.year == other.month!.year &&
         month!.month == other.month!.month;
   }
 
   @override
-  int get hashCode => Object.hash(allTime, month?.year, month?.month);
+  int get hashCode => Object.hash(allTime, year, month?.year, month?.month);
 }
 
 /// ValueNotifier holding the shared month selection.
@@ -70,18 +80,38 @@ class MonthFilterBar extends StatelessWidget {
     this.includeAllTime = false,
   });
 
-  Future<void> _pickMonth(BuildContext context, MonthFilterValue current) async {
+  Future<void> _pickYear(BuildContext context, MonthFilterValue current) async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
+    final years = <int>{
+      for (final m in availableMonths) m.year,
+      now.year,
+    }.toList()
+      ..sort((a, b) => b.compareTo(a));
+    final picked = await showDialog<int>(
       context: context,
-      initialDate: current.month ?? now,
-      firstDate: DateTime(2020),
-      lastDate: now,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Select year'),
+        children: [
+          for (final y in years)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, y),
+              child: Text(
+                '$y',
+                style: TextStyle(
+                  fontWeight: y == (current.year ?? now.year)
+                      ? FontWeight.w700
+                      : null,
+                  color: y == (current.year ?? now.year)
+                      ? AppColors.primary
+                      : null,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
     if (picked == null) return;
-    controller.value = MonthFilterValue.month(
-      DateTime(picked.year, picked.month),
-    );
+    controller.value = MonthFilterValue.year(picked);
   }
 
   @override
@@ -122,6 +152,7 @@ class MonthFilterBar extends StatelessWidget {
                   label: DateFormat('MMM yy').format(m),
                   selected: !value.allTime &&
                       !value.isCurrent &&
+                      value.year == null &&
                       value.month!.year == m.year &&
                       value.month!.month == m.month,
                   onTap: () => controller.value = MonthFilterValue.month(m),
@@ -129,12 +160,10 @@ class MonthFilterBar extends StatelessWidget {
               ],
               const SizedBox(width: 4),
               _chip(
-                label: DateFormat('MMM yyyy').format(
-                  value.month ?? DateTime.now(),
-                ),
-                icon: Icons.calendar_month,
-                selected: false,
-                onTap: () => _pickMonth(context, value),
+                label: value.year != null ? 'Year ${value.year}' : 'Year…',
+                icon: Icons.date_range,
+                selected: value.year != null,
+                onTap: () => _pickYear(context, value),
               ),
             ],
           ),

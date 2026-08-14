@@ -35,6 +35,7 @@ class Entitlement {
   final DateTime? trialEnd;
   final DateTime? creditEnd;
   final DateTime? currentPeriodEnd;
+  final DateTime? ownerAccessUntil;
   final String subscriptionStatus;
   final String referralCode;
   final int metersAllowed;
@@ -50,6 +51,7 @@ class Entitlement {
     this.trialEnd,
     this.creditEnd,
     this.currentPeriodEnd,
+    this.ownerAccessUntil,
     required this.subscriptionStatus,
     required this.referralCode,
     required this.metersAllowed,
@@ -73,6 +75,7 @@ class Entitlement {
       trialEnd: parse('trial_end'),
       creditEnd: parse('credit_end'),
       currentPeriodEnd: parse('current_period_end'),
+      ownerAccessUntil: parse('owner_access_until'),
       subscriptionStatus: (json['subscription_status'] ?? 'none') as String,
       referralCode: (json['referral_code'] ?? '') as String,
       metersAllowed: (json['meters_allowed'] as num?)?.toInt() ?? 1,
@@ -83,7 +86,7 @@ class Entitlement {
 
   /// Next date access ends (trial, credit, or paid period).
   DateTime? get accessEndsAt {
-    final candidates = [trialEnd, creditEnd, currentPeriodEnd]
+    final candidates = [trialEnd, creditEnd, currentPeriodEnd, ownerAccessUntil]
         .whereType<DateTime>()
         .where((d) => d.isAfter(DateTime.now()))
         .toList();
@@ -91,6 +94,19 @@ class Entitlement {
     candidates.sort();
     return candidates.first;
   }
+}
+
+/// Outcome of redeeming the owner (manager) access key (`NEW20`).
+class RedeemResult {
+  final bool ok;
+  final String error;
+
+  /// When full access expires (6 months from redemption).
+  final DateTime? until;
+
+  const RedeemResult({required this.ok, this.error = '', this.until});
+
+  String get message => error;
 }
 
 /// Result of starting a checkout: either a full Razorpay subscription
@@ -211,6 +227,26 @@ class SubscriptionStore {
         .rpc('claim_referral', params: {'p_code': code.trim()});
     if (ok == true) invalidateCache();
     return ok == true;
+  }
+
+  /// Result of redeeming the owner (manager) access key.
+  static Future<RedeemResult> redeemOwnerKey(String key) async {
+    try {
+      final data = await SupabaseClientManager.client
+          .rpc('redeem_owner_key', params: {'p_code': key.trim()});
+      final map = (data as Map?)?.cast<String, dynamic>() ?? {};
+      if (map['ok'] == true) invalidateCache();
+      return RedeemResult(
+        ok: map['ok'] == true,
+        error: (map['error'] as String?) ?? '',
+        until: (map['until'] as String?) == null
+            ? null
+            : DateTime.tryParse(map['until'] as String),
+      );
+    } catch (e) {
+      AppLogger.e('redeem_owner_key failed', e);
+      return const RedeemResult(ok: false, error: 'Could not redeem the key.');
+    }
   }
 
   /// Remember a referral code entered at signup so it can be claimed after

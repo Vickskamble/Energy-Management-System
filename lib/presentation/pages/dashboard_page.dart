@@ -247,27 +247,6 @@ class _DashboardContentState extends State<_DashboardContent> {
     return sorted.first;
   }
 
-  DateTime? get _latestLogDate {
-    if (_siteLogs.isEmpty) return null;
-    final sorted = _siteLogs.map((l) => l.loggedAt).toList()
-      ..sort((a, b) => b.compareTo(a));
-    return sorted.first;
-  }
-
-  void _enableDayMode() {
-    if (_selectedDate != null) {
-      setState(() {});
-      return;
-    }
-    final now = DateTime.now();
-    final hasToday = _siteLogs.any((l) => _isSameDay(l.loggedAt, now));
-    setState(() {
-      _selectedDate = hasToday
-          ? now
-          : (_latestLogDate ?? now);
-    });
-  }
-
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final first = _earliestLogDate ?? now;
@@ -414,112 +393,223 @@ class _DashboardContentState extends State<_DashboardContent> {
       0.0,
       (s, l) => s + l.kwh * l.multiplyingFactor,
     );
-    final days = DateTime(
-      _selection.month!.year,
-      _selection.month!.month + 1,
-      0,
-    ).day;
+    final year = _selection.year;
+    final days = year != null
+        ? 365
+        : DateTime(
+            _selection.month!.year,
+            _selection.month!.month + 1,
+            0,
+          ).day;
     return (total / days * 100).roundToDouble() / 100;
   }
 
-  Widget _modeChip(
-    String label, {
-    required bool selected,
-    required VoidCallback onTap,
-    IconData? icon,
+  /// Distinct years present in the (site-filtered) data, for the filter bar.
+  List<int> get _availableYears {
+    final years = <int>{};
+    for (final l in _siteLogs) {
+      years.add(l.loggedAt.year);
+    }
+    final list = years.toList()..sort((a, b) => b.compareTo(a));
+    return list;
+  }
+
+  /// Days present in the selected month, for the Daily dropdown.
+  List<DateTime> get _availableDays {
+    final keys = <String, DateTime>{};
+    for (final l in _selectedMonthLogs) {
+      keys['${l.loggedAt.year}-${l.loggedAt.month}-${l.loggedAt.day}'] =
+          DateTime(l.loggedAt.year, l.loggedAt.month, l.loggedAt.day);
+    }
+    final list = keys.values.toList()..sort((a, b) => b.compareTo(a));
+    return list;
+  }
+
+  Widget _filterDropdown<T>({
+    required String label,
+    required IconData icon,
+    required T value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        avatar: icon == null
-            ? null
-            : Icon(icon, size: 16, color: AppColors.primary),
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => onTap(),
-        selectedColor: AppColors.primary.withValues(alpha: 0.12),
-        labelStyle: TextStyle(
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? AppColors.primary : AppColors.textSecondary,
+    final scheme = Theme.of(context).colorScheme;
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<T>(
+        isDense: true,
+        borderRadius: BorderRadius.circular(10),
+        value: value,
+        icon: Icon(icon, size: 18, color: AppColors.primary),
+        hint: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
         ),
-        side: BorderSide(
-          color: selected ? AppColors.primary : AppColors.borderLight,
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+          color: scheme.onSurface,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        dropdownColor: scheme.surface,
+        items: items,
+        onChanged: onChanged,
       ),
     );
   }
 
-  Widget _buildSiteSelector() {
+  /// Compact single-row filter bar: Site, Meter, Year, Month, Daily — every
+  /// control is a dropdown so the dashboard no longer scrolls vertically just
+  /// to change a filter.
+  Widget _buildDropdownFilterBar() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          _siteChip('All Sites', null),
-          for (final site in _siteNames) _siteChip(site, site),
+          // Site
+          if (_siteNames.isNotEmpty) ...[
+            _filterDropdown<String>(
+              label: 'All Sites',
+              icon: Icons.location_on_outlined,
+              value: _site ?? 'all',
+              items: [
+                const DropdownMenuItem(value: 'all', child: Text('All Sites')),
+                for (final s in _siteNames)
+                  DropdownMenuItem(
+                    value: s,
+                    child: Text(s, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: (v) => setState(() => _site = (v == 'all') ? null : v),
+            ),
+          ] else
+            DropdownButtonHideUnderline(
+              child: DropdownButton<String?>(
+                isDense: true,
+                value: 'all',
+                hint: const Text('No site'),
+                items: const [DropdownMenuItem(value: 'all', child: Text('No site'))],
+                onChanged: (_) {},
+              ),
+            ),
+          const SizedBox(width: 12),
+          // Meter
+          _filterDropdown<String>(
+            label: 'All Meters',
+            icon: Icons.speed_rounded,
+            value: _meter ?? 'all',
+            items: [
+              const DropdownMenuItem(value: 'all', child: Text('All Meters')),
+              for (final m in _meterNames)
+                DropdownMenuItem(
+                  value: m,
+                  child: Text(m, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: (v) => setState(() => _meter = (v == 'all') ? null : v),
+          ),
+          const SizedBox(width: 12),
+          // Year
+          _filterDropdown<String>(
+            label: 'All Years',
+            icon: Icons.date_range,
+            value: _selection.year?.toString() ?? 'all',
+            items: [
+              const DropdownMenuItem(
+                value: 'all',
+                child: Text('This Month'),
+              ),
+              for (final y in _availableYears)
+                DropdownMenuItem(value: '$y', child: Text('$y')),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              if (v == 'all') {
+                widget.monthFilter.value = const MonthFilterValue.current();
+              } else {
+                widget.monthFilter.value = MonthFilterValue.year(int.parse(v));
+              }
+            },
+          ),
+          const SizedBox(width: 12),
+          // Month
+          _filterDropdown<String>(
+            label: 'This Month',
+            icon: Icons.calendar_month,
+            value: _selection.month != null
+                ? '${_selection.month!.year}-${_selection.month!.month}'
+                : 'current',
+            items: [
+              const DropdownMenuItem(
+                value: 'current',
+                child: Text('This Month'),
+              ),
+              for (final m in _availableMonths)
+                DropdownMenuItem(
+                  value: '${m.year}-${m.month}',
+                  child: Text(DateFormat('MMM yy').format(m)),
+                ),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              if (v == 'current') {
+                widget.monthFilter.value = const MonthFilterValue.current();
+                return;
+              }
+              final parts = v.split('-');
+              widget.monthFilter.value = MonthFilterValue.month(
+                DateTime(int.parse(parts[0]), int.parse(parts[1])),
+              );
+            },
+          ),
+          const SizedBox(width: 12),
+          // Daily
+          _filterDropdown<String>(
+            label: 'Monthly',
+            icon: _isDayMode ? Icons.today : Icons.calendar_month,
+            value: _selectedDate == null
+                ? 'monthly'
+                : _availableDays.any(
+                        (d) =>
+                            _isSameDay(d, _selectedDate!)) &&
+                        _selectedLogs.isNotEmpty
+                    ? '${_selectedDate!.year}-${_selectedDate!.month}-${_selectedDate!.day}'
+                    : 'pick',
+            items: [
+              const DropdownMenuItem(
+                value: 'monthly',
+                child: Text('Monthly'),
+              ),
+              for (final d in _availableDays)
+                DropdownMenuItem(
+                  value: '${d.year}-${d.month}-${d.day}',
+                  child: Text(DateFormat('d MMM yy').format(d)),
+                ),
+              const DropdownMenuItem(
+                value: 'pick',
+                child: Text('Pick a date…'),
+              ),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              if (v == 'monthly') {
+                setState(() => _selectedDate = null);
+              } else if (v == 'pick') {
+                _pickDate();
+              } else {
+                final p = v.split('-');
+                setState(() {
+                  _selectedDate = DateTime(
+                    int.parse(p[0]),
+                    int.parse(p[1]),
+                    int.parse(p[2]),
+                  );
+                });
+              }
+            },
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMeterSelector() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _meterChip('All Meters', null),
-          for (final meter in _meterNames) _meterChip(meter, meter),
-        ],
-      ),
-    );
-  }
-
-  Widget _meterChip(String label, String? value) {
-    final selected = _meter == value;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        avatar: Icon(
-          Icons.speed_rounded,
-          size: 16,
-          color: selected ? AppColors.primary : AppColors.textSecondary,
-        ),
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => setState(() => _meter = value),
-        selectedColor: AppColors.primary.withValues(alpha: 0.12),
-        labelStyle: TextStyle(
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-          color: selected ? AppColors.primary : AppColors.textSecondary,
-        ),
-        side: BorderSide(
-          color: selected ? AppColors.primary : AppColors.borderLight,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      ),
-    );
-  }
-
-  Widget _siteChip(String label, String? value) {
-    final selected = _site == value;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => setState(() => _site = value),
-        selectedColor: AppColors.kpiSavings.withValues(alpha: 0.15),
-        labelStyle: TextStyle(
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-          color: selected ? AppColors.kpiSavings : AppColors.textSecondary,
-        ),
-        side: BorderSide(
-          color: selected ? AppColors.kpiSavings : AppColors.borderLight,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }
@@ -537,7 +627,7 @@ class _DashboardContentState extends State<_DashboardContent> {
     final kpis = BillCalculator.calculateKpis(breakdown);
     final now = DateTime.now();
     final isCurrentMonth = _selection.isCurrent;
-    final refMonth = isCurrentMonth
+    final refMonth = isCurrentMonth || _selection.year != null
         ? null
         : DateTime(_selection.month!.year, _selection.month!.month);
     final previousMonth = refMonth == null
@@ -625,36 +715,7 @@ class _DashboardContentState extends State<_DashboardContent> {
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.page),
         children: [
-          if (_siteNames.isNotEmpty) ...[
-            _buildSiteSelector(),
-            const SizedBox(height: AppSpacing.sm),
-          ],
-          if (_meterNames.isNotEmpty) ...[
-            _buildMeterSelector(),
-            const SizedBox(height: AppSpacing.sm),
-          ],
-          MonthFilterBar(
-            controller: widget.monthFilter,
-            availableMonths: _availableMonths,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              _modeChip(
-                'Monthly',
-                selected: !_isDayMode,
-                onTap: () => setState(() => _selectedDate = null),
-              ),
-              _modeChip('Daily', selected: _isDayMode, onTap: _enableDayMode),
-              if (_isDayMode)
-                _modeChip(
-                  DateFormat('d MMM yyyy').format(_selectedDate!),
-                  selected: true,
-                  icon: Icons.calendar_month,
-                  onTap: _pickDate,
-                ),
-            ],
-          ),
+          _buildDropdownFilterBar(),
           const SizedBox(height: AppSpacing.lg),
           _buildAlertBanner(context),
           Row(

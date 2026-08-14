@@ -35,6 +35,10 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   String? _error;
   Timer? _pollTimer;
   Timer? _paymentPollTimer;
+  final _ownerKeyCtrl = TextEditingController();
+  bool _ownerBusy = false;
+  String? _ownerError;
+  DateTime? _ownerUntil;
 
   @override
   void initState() {
@@ -49,6 +53,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _paymentPollTimer?.cancel();
+    _ownerKeyCtrl.dispose();
     super.dispose();
   }
 
@@ -412,6 +417,31 @@ body: _loading
     );
   }
 
+  Future<void> _redeemOwnerKey() async {
+    final key = _ownerKeyCtrl.text.trim();
+    if (key.isEmpty) {
+      setState(() => _ownerError = 'Enter the key first.');
+      return;
+    }
+    setState(() {
+      _ownerBusy = true;
+      _ownerError = null;
+      _ownerUntil = null;
+    });
+    final result = await SubscriptionStore.redeemOwnerKey(key);
+    if (!mounted) return;
+    setState(() {
+      _ownerBusy = false;
+      if (result.ok) {
+        _ownerUntil = result.until;
+        _ownerKeyCtrl.clear();
+        _load();
+      } else {
+        _ownerError = result.message;
+      }
+    });
+  }
+
   Widget _buildContent() {
     final ent = _entitlement!;
     return SingleChildScrollView(
@@ -431,6 +461,8 @@ body: _loading
               _buildPricingCard(ent),
               const SizedBox(height: AppSpacing.md),
               _buildReferralCard(ent),
+              const SizedBox(height: AppSpacing.md),
+              _buildOwnerKeyCard(),
               const SizedBox(height: AppSpacing.md),
               TextButton.icon(
                 onPressed: _load,
@@ -773,6 +805,105 @@ body: _loading
                 onPressed: code.isEmpty ? null : _shareReferral,
                 icon: const Icon(Icons.share_rounded, size: 20),
                 tooltip: 'Share',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOwnerKeyCard() {
+    final ent = _entitlement;
+    final activeUntil = ent?.ownerAccessUntil;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.admin_panel_settings_rounded, color: AppColors.info),
+              SizedBox(width: 10),
+              Text(
+                'Owner access key',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Enter the owner key to unlock 6 months of full access — '
+            'unlimited meters, no read-only lock.',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          if (activeUntil != null && activeUntil.isAfter(DateTime.now())) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified_rounded,
+                      size: 18, color: AppColors.success),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Full access active until '
+                      '${DateFormat('d MMM yyyy').format(activeUntil)}.',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (_ownerUntil != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                'Key accepted — full access granted until '
+                '${DateFormat('d MMM yyyy').format(_ownerUntil!)}.',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.success,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          if (_ownerError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                _ownerError!,
+                style: const TextStyle(fontSize: 13, color: AppColors.danger),
+              ),
+            ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _ownerKeyCtrl,
+                  enabled: !_ownerBusy,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    hintText: 'Enter owner key',
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onSubmitted: (_) => _redeemOwnerKey(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              AppButton(
+                label: 'Redeem',
+                loading: _ownerBusy,
+                onPressed: _ownerBusy ? null : _redeemOwnerKey,
               ),
             ],
           ),

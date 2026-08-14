@@ -35,6 +35,14 @@ const STATUS_MAP: Record<string, string> = {
   "subscription.expired": "expired",
 };
 
+function hexToBytes(hex: string): Uint8Array {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
 function verifySignature(body: string, signature: string): boolean {
   const key = new TextEncoder().encode(WEBHOOK_SECRET);
   const data = new TextEncoder().encode(body);
@@ -43,10 +51,10 @@ function verifySignature(body: string, signature: string): boolean {
     .then((k) => crypto.subtle.sign("HMAC", k, data))
     .then((sig) => {
       const expected = new Uint8Array(sig);
+      // Razorpay sends the HMAC as a HEX string (64 chars), not base64.
       let decoded: Uint8Array;
       try {
-        const raw = atob(signature);
-        decoded = Uint8Array.from(raw, (c) => c.charCodeAt(0));
+        decoded = hexToBytes(signature);
       } catch {
         return false;
       }
@@ -74,7 +82,7 @@ serve(async (req) => {
       event_type: "webhook_raw",
       user_id: raw?.payload?.subscription?.entity?.notes?.user_id ??
           raw?.payload?.payment_link?.entity?.notes?.user_id ?? null,
-      payload: { sig_present: signature.length > 0, event: raw?.event ?? null },
+      payload: { sig_present: signature.length > 0, signature, event: raw?.event ?? null, body },
     });
   } catch (e) {
     // logging must never break the webhook path

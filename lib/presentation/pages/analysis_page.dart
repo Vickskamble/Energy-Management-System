@@ -516,10 +516,14 @@ class _AnalysisContentState extends State<_AnalysisContent> {
   // ── Month-over-month comparison (Issue 5 / 4F) ────────────────────────
   Widget _buildMonthComparison() {
     if (_filtered.isEmpty) return const SizedBox.shrink();
+    final month = _selection.month;
+    if (_selection.year != null || month == null) {
+      return const SizedBox.shrink();
+    }
     final now = DateTime.now();
     final refMonth = _selection.isCurrent
         ? DateTime(now.year, now.month)
-        : _selection.month!;
+        : month;
     final prevStart = DateTime(refMonth.year, refMonth.month - 1, 1);
     final previous = _entities
         .where(
@@ -650,6 +654,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                 .toList()
               ..sort())
         : (_siteEntities
+                .where((e) => _selection.matches(e.loggedAt))
                 .map((e) => e.loggedAt.year * 12 + e.loggedAt.month - 1)
                 .toSet()
                 .toList()
