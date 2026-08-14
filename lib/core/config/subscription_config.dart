@@ -291,13 +291,17 @@ class SubscriptionStore {
 
   /// Ask the payment-status Edge Function whether the payment went through.
   /// Returns true only when Razorpay confirms it; not a local optimization.
-  static Future<bool> isPaymentDone(String paymentLinkId) async {
+  /// Pass [paymentLinkId] for add-on links or [subscriptionId] for base plans.
+  static Future<bool> isPaymentDone({
+    String? paymentLinkId,
+    String? subscriptionId,
+  }) async {
     try {
+      final body = (subscriptionId != null && subscriptionId.isNotEmpty)
+          ? {'subscription_id': subscriptionId}
+          : {'payment_link_id': paymentLinkId ?? ''};
       final res = await SupabaseClientManager.client.functions
-          .invoke(
-            'payment-status',
-            body: {'payment_link_id': paymentLinkId},
-          )
+          .invoke('payment-status', body: body)
           .timeout(const Duration(seconds: 20));
       final data = (res.data as Map?)?.cast<String, dynamic>() ?? {};
       return data['paid'] == true;

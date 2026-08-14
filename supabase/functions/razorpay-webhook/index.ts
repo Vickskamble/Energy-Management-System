@@ -63,7 +63,23 @@ serve(async (req) => {
     return new Response("method not allowed", { status: 405 });
   }
   const body = await req.text();
+  // ---- Canary: record EVERY arrival (even invalid signatures) BEFORE any
+  // verification, so we can distinguish "Razorpay never delivers here" from
+  // "delivers but signature rejected" (dashboard shows the latter as failed).
   const signature = req.headers.get("x-razorpay-signature") ?? "";
+  try {
+    const raw = JSON.parse(body);
+    await supabase.from("billing_events").insert({
+      razorpay_event_id: `raw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      event_type: "webhook_raw",
+      user_id: raw?.payload?.subscription?.entity?.notes?.user_id ??
+          raw?.payload?.payment_link?.entity?.notes?.user_id ?? null,
+      payload: { sig_present: signature.length > 0, event: raw?.event ?? null },
+    });
+  } catch (e) {
+    // logging must never break the webhook path
+    console.error("canary log failed:", String(e));
+  }
   if (!signature || !(await verifySignature(body, signature))) {
     return new Response("invalid signature", { status: 400 });
   }

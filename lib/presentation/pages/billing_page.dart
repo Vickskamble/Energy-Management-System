@@ -69,7 +69,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       // even when the webhook never delivered.
       final pendingLink = await SubscriptionStore.getPendingCheckoutLink();
       if (pendingLink != null && pendingLink.isNotEmpty) {
-        final paid = await SubscriptionStore.isPaymentDone(pendingLink);
+        final paid = await SubscriptionStore.isPaymentDone(paymentLinkId: pendingLink);
         if (paid) {
           await SubscriptionStore.clearPendingCheckoutLink();
           SubscriptionStore.invalidateCache();
@@ -153,6 +153,22 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
               backgroundColor: Colors.green,
             ),
           );
+          // Hit payment-status right now so the server flips the DB row
+          // immediately — the 3-s poll below is a safety net only.
+          final confirmId = result.isAddon
+              ? result.paymentLinkId
+              : result.subscriptionId;
+          if (confirmId.isNotEmpty) {
+            final confirmed = await SubscriptionStore.isPaymentDone(
+              paymentLinkId: result.isAddon ? confirmId : null,
+              subscriptionId: result.isAddon ? null : confirmId,
+            );
+            if (confirmed) {
+              await SubscriptionStore.clearPendingCheckoutLink();
+              SubscriptionStore.invalidateCache();
+            }
+          }
+          _load();
         }
         // In-app checkout starts the same instant-confirmation polling as
         // the browser path: the direct Razorpay status check + webhook

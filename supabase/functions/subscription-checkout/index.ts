@@ -173,9 +173,12 @@ serve(async (req) => {
     // Persist the link id on the subscription row BEFORE handing it to the
     // user: it is the idempotency key for applying the paid add-on (webhook
     // and/or payment-status fallback), since Razorpay delivery can be flaky.
+    // paid_at is RESET to null here so a NEW add-on purchase is never
+    // mistaken for an already-applied one (paid_at is the applied-flag).
     try {
       await supabase.from("subscriptions").update({
         payment_link_id: link.id,
+        paid_at: null,
         updated_at: new Date().toISOString(),
       }).eq("user_id", user.id);
     } catch (e) {
