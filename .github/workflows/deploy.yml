@@ -212,18 +212,25 @@ jobs:
           Write-Output "Zipped -> $zip"
 
       - name: Install Inno Setup
-        shell: pwsh
-        run: |
-          choco install innosetup -y --no-progress
+        uses: minhangvp/inno-setup-installer@v1
 
       - name: Build Setup.exe installer
         shell: pwsh
         run: |
-          $iscc = Get-ChildItem "C:\Program Files*\Inno Setup*\ISCC.exe" `
-            | Select-Object -First 1 -ExpandProperty FullName
-          if (-not $iscc) { Write-Error "ISCC.exe not found"; exit 1 }
+          $paths = @(
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files\Inno Setup 6\ISCC.exe",
+            "C:\Program Files (x86)\Inno Setup 5\ISCC.exe"
+          )
+          $iscc = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            $found = Get-ChildItem "C:\Program Files*\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+            if ($found) { $iscc = $found }
+          }
+          if (-not $iscc) { Write-Error "ISCC.exe not found after Inno Setup install"; exit 1 }
+          Write-Output "Using ISCC: $iscc"
           & $iscc "windows/installer.iss" "/DAppVersion=${{ github.ref_name }}"
-          if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup failed"; exit $LASTEXITCODE }
+          if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup failed (exit $LASTEXITCODE)"; exit $LASTEXITCODE }
           Get-ChildItem "build/installer"
 
       - name: Upload installer + bundle to Release
@@ -231,6 +238,6 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            build/installer/EMS*Setup*.exe
+            build/installer/EMS*.exe
             Energy-Management-System-Windows-${{ github.ref_name }}.zip
           fail_on_unmatched_files: false
