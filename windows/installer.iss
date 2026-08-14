@@ -7,7 +7,9 @@
   #define AppVersion "0.0.0"
 #endif
 
-#define MyAppVersion "EMS {#AppVersion}"
+; ISPP note: {#X} inside a #define string literal does NOT expand — use the
+; + concatenation operator (the canonical ISPP pattern) instead.
+#define MyAppVersion "EMS " + AppVersion
 #define MyAppPublisher "PowerEMS"
 
 [Setup]

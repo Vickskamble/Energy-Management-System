@@ -212,7 +212,8 @@ jobs:
           Write-Output "Zipped -> $zip"
 
       - name: Install Inno Setup
-        uses: minhangvp/inno-setup-installer@v1
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
 
       - name: Build Setup.exe installer
         shell: pwsh
