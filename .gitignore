@@ -50,3 +50,6 @@ app.*.map.json
 # Local dev artifacts
 ems_meta.db
 /release/ems.exe
+
+# Web deploy folder (own git repo -> powerems-web / Vercel)
+/web-deploy/

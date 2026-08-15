@@ -150,6 +150,7 @@ class _DashboardContentState extends State<_DashboardContent> {
   void initState() {
     super.initState();
     _loadMeterSites();
+    context.read<MeterRepository>().addListener(_loadMeterSites);
     widget.monthFilter.addListener(_onFilterChanged);
   }
 
@@ -164,6 +165,7 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   @override
   void dispose() {
+    context.read<MeterRepository>().removeListener(_loadMeterSites);
     widget.monthFilter.removeListener(_onFilterChanged);
     super.dispose();
   }
@@ -271,8 +273,13 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   /// Distinct months present in the (site-filtered) data, for the filter bar.
+  /// The current month is always included so the dropdown keeps working even
+  /// when no readings exist yet.
   List<DateTime> get _availableMonths {
-    final keys = <String, DateTime>{};
+    final now = DateTime.now();
+    final keys = <String, DateTime>{
+      '${now.year}-${now.month}': DateTime(now.year, now.month),
+    };
     for (final l in _siteLogs) {
       keys['${l.loggedAt.year}-${l.loggedAt.month}'] = DateTime(
         l.loggedAt.year,
@@ -396,17 +403,21 @@ class _DashboardContentState extends State<_DashboardContent> {
     final year = _selection.year;
     final days = year != null
         ? 365
-        : DateTime(
-            _selection.month!.year,
-            _selection.month!.month + 1,
-            0,
-          ).day;
+        : (_selection.allTime
+              ? _siteLogs.length.clamp(1, 365)
+              : DateTime(
+                  _selection.month!.year,
+                  _selection.month!.month + 1,
+                  0,
+                ).day);
     return (total / days * 100).roundToDouble() / 100;
   }
 
   /// Distinct years present in the (site-filtered) data, for the filter bar.
+  /// The current year is always included so the dropdown keeps working even
+  /// when no readings exist yet.
   List<int> get _availableYears {
-    final years = <int>{};
+    final years = <int>{DateTime.now().year};
     for (final l in _siteLogs) {
       years.add(l.loggedAt.year);
     }
@@ -472,7 +483,9 @@ class _DashboardContentState extends State<_DashboardContent> {
             _filterDropdown<String>(
               label: 'All Sites',
               icon: Icons.location_on_outlined,
-              value: _site ?? 'all',
+              value: (_site != null && _siteNames.contains(_site))
+                  ? _site!
+                  : 'all',
               items: [
                 const DropdownMenuItem(value: 'all', child: Text('All Sites')),
                 for (final s in _siteNames)
@@ -498,7 +511,9 @@ class _DashboardContentState extends State<_DashboardContent> {
           _filterDropdown<String>(
             label: 'All Meters',
             icon: Icons.speed_rounded,
-            value: _meter ?? 'all',
+            value: (_meter != null && _meterNames.contains(_meter))
+                ? _meter!
+                : 'all',
             items: [
               const DropdownMenuItem(value: 'all', child: Text('All Meters')),
               for (final m in _meterNames)
@@ -516,17 +531,20 @@ class _DashboardContentState extends State<_DashboardContent> {
             icon: Icons.date_range,
             value: _selection.year?.toString() ?? 'all',
             items: [
-              const DropdownMenuItem(
-                value: 'all',
-                child: Text('This Month'),
-              ),
+              const DropdownMenuItem(value: 'all', child: Text('All Years')),
+              if (_selection.year != null &&
+                  !_availableYears.contains(_selection.year))
+                DropdownMenuItem(
+                  value: '${_selection.year}',
+                  child: Text('${_selection.year}'),
+                ),
               for (final y in _availableYears)
                 DropdownMenuItem(value: '$y', child: Text('$y')),
             ],
             onChanged: (v) {
               if (v == null) return;
               if (v == 'all') {
-                widget.monthFilter.value = const MonthFilterValue.current();
+                widget.monthFilter.value = const MonthFilterValue.allTime();
               } else {
                 widget.monthFilter.value = MonthFilterValue.year(int.parse(v));
               }
@@ -537,7 +555,12 @@ class _DashboardContentState extends State<_DashboardContent> {
           _filterDropdown<String>(
             label: 'This Month',
             icon: Icons.calendar_month,
-            value: _selection.month != null
+            value: _selection.month != null &&
+                    _availableMonths.any(
+                      (m) =>
+                          m.year == _selection.month!.year &&
+                          m.month == _selection.month!.month,
+                    )
                 ? '${_selection.month!.year}-${_selection.month!.month}'
                 : 'current',
             items: [
@@ -627,7 +650,7 @@ class _DashboardContentState extends State<_DashboardContent> {
     final kpis = BillCalculator.calculateKpis(breakdown);
     final now = DateTime.now();
     final isCurrentMonth = _selection.isCurrent;
-    final refMonth = isCurrentMonth || _selection.year != null
+    final refMonth = isCurrentMonth || _selection.year != null || _selection.allTime
         ? null
         : DateTime(_selection.month!.year, _selection.month!.month);
     final previousMonth = refMonth == null

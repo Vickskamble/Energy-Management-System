@@ -69,6 +69,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     super.initState();
     _visibleCount = _pageSize;
     _loadMeterSites();
+    context.read<MeterRepository>().addListener(_loadMeterSites);
     widget.monthFilter.addListener(_onFilterChanged);
   }
 
@@ -86,6 +87,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
 
   @override
   void dispose() {
+    context.read<MeterRepository>().removeListener(_loadMeterSites);
     widget.monthFilter.removeListener(_onFilterChanged);
     super.dispose();
   }
@@ -126,9 +128,15 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     return names;
   }
 
+  /// Meters for the chips row: every meter registered for the selected site
+  /// (even without readings) plus any meter still present in historical log
+  /// data — so added meters always appear in the selector.
   List<String> get _meterNames {
-    final names = _siteEntities.map((e) => e.meterName).toSet().toList()
-      ..sort();
+    final names = <String>{
+      for (final e in _meterSites.entries)
+        if (_selectedSite == null || e.value == _selectedSite) e.key,
+      for (final e in _siteEntities) e.meterName,
+    }.toList()..sort();
     return names;
   }
 
@@ -157,11 +165,12 @@ class _AnalysisContentState extends State<_AnalysisContent> {
 
   @override
   Widget build(BuildContext context) {
-    if (_entities.isEmpty) {
+    // No meters and no readings at all → nothing to show.
+    if (_entities.isEmpty && _siteNames.isEmpty) {
       return const AppEmptyState(
         icon: Icons.analytics_rounded,
         title: 'No readings recorded yet',
-        subtitle: 'Add readings to see analysis',
+        subtitle: 'Add a meter and readings to see analysis',
       );
     }
 
@@ -194,6 +203,22 @@ class _AnalysisContentState extends State<_AnalysisContent> {
             _buildPowerQualityTrends(),
             const SizedBox(height: 24),
             _buildMonthComparison(),
+            const SizedBox(height: 24),
+          ] else if (_entities.isNotEmpty) ...[
+            AppCard(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 28),
+                child: Center(
+                  child: Text(
+                    'Is period me koi readings nahi',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 24),
           ],
           AppSectionHeader(

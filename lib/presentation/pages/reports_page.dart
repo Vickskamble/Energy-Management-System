@@ -101,6 +101,7 @@ class _ReportsContentState extends State<_ReportsContent> {
       if (mounted) setState(() => _actualBills = bills);
     });
     _loadMeterSites();
+    context.read<MeterRepository>().addListener(_loadMeterSites);
     widget.monthFilter.addListener(_onFilterChanged);
   }
 
@@ -118,6 +119,13 @@ class _ReportsContentState extends State<_ReportsContent> {
 
   void _onFilterChanged() {
     if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    context.read<MeterRepository>().removeListener(_loadMeterSites);
+    widget.monthFilter.removeListener(_onFilterChanged);
+    super.dispose();
   }
 
   /// Distinct months present in the data — drives the shared filter bar.
@@ -153,8 +161,17 @@ class _ReportsContentState extends State<_ReportsContent> {
         .toList();
   }
 
-  List<String> get _meterNames =>
-      _entities.map((e) => e.meterName).toSet().toList()..sort();
+  /// Meters for the dropdown: every meter registered for the selected site
+  /// (even without readings) plus any meter still present in log data — so
+  /// added meters always appear in the selector.
+  List<String> get _meterNames {
+    final names = <String>{
+      for (final e in _meterSites.entries)
+        if (_site == null || e.value == _site) e.key,
+      for (final e in _entities) e.meterName,
+    }.toList()..sort();
+    return names;
+  }
 
   /// Logs filtered by the selected meter + month (Issue 6).
   List<EnergyLogEntity> get _visibleLogs {
