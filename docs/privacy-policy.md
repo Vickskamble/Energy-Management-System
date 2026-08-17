@@ -51,7 +51,7 @@
 
 ## 4. Data Storage & Security
 
-- **Hosting:** Supabase (Postgres + Auth), data centers configured per Supabase's regional policies.
+- **Hosting:** Supabase (Postgres + Auth), hosted in **India** — your data remains inside India; no cross-border transfer of personal data.
 - **Transit:** HTTPS/TLS end-to-end; no plaintext endpoints.
 - **At rest:** encrypted at the infrastructure level; database-level Row-Level Security isolates every user's data (`auth.uid() = user_id`).
 - **Session tokens:** stored in OS-level secure storage (Android Keystore / Keychain / Windows DPAPI / Web Crypto).

@@ -80,7 +80,8 @@ The Processor maintains technical and organizational measures (T&OM), as impleme
 
 ## 10. International Transfers
 
-- Data may be processed in India and in jurisdictions used by the subprocessors. Standard contractual clauses / appropriate safeguards apply for any cross-border transfer; where Supabase processes data, its regional configuration and DPA apply.
+- The primary database and authentication service (Supabase) is hosted in **India**; personal data is processed and stored within India and is not transferred outside India.
+- Ancillary services (web hosting on Vercel, app distribution on GitHub Releases, Google Fonts CDN) may process transient technical data (IP addresses, logs) on global infrastructure. Where any cross-border transfer occurs, standard contractual clauses / appropriate safeguards apply.
 
 ## 11. Liability & Indemnity
 
