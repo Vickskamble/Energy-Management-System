@@ -17,7 +17,12 @@ Client & investor-ready documentation for the PowerEMS Energy Management System.
 - [dpa.md](dpa.md) — data processing agreement (controller/processor, subprocessors, security, breach)
 - [nda.md](nda.md) — mutual non-disclosure agreement
 
+## Operations
+- [sla.md](sla.md) — service levels: availability (99.5%), support response (P1–P4), backup RPO (≤24h) / RTO (≤48h), credits
+- [release-notes.md](release-notes.md) — full version history / changelog (1.0.x → 1.2.2)
+- [uat-sat-checklist.md](uat-sat-checklist.md) — client UAT/SAT acceptance checklist with sign-off
+
 ## Placeholders to fill before external use
-- Support email & company address (privacy-policy, terms-of-service, dpa, nda)
+- Company address (privacy-policy, terms-of-service, dpa, nda) — email filled: Mrvikas_kamble@rediffmail.com
 - Governing-law city/state (terms-of-service §12, nda §9)
-- Signatures on dpa.md and nda.md
+- Signatures on dpa.md, nda.md, sla.md, uat-sat-checklist.md
