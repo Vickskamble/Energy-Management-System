@@ -136,18 +136,12 @@ class EnergyRepository {
     double totalKwh = 0;
     double totalKvah = 0;
     double latestPf = 0;
-    double pfStoredSum = 0;
-    double pfEnergySum = 0;
     for (final log in hydrated) {
       final t = log.loggedAt;
       final inMonth = !t.isBefore(monthStart) && t.isBefore(nextMonthStart);
       if (inMonth) {
         totalKwh += log.kwh;
         totalKvah += log.kvah;
-        if (log.powerFactor > 0) {
-          pfStoredSum += log.powerFactor * log.kwh * log.multiplyingFactor;
-          pfEnergySum += log.kwh * log.multiplyingFactor;
-        }
         final actualMd = log.mdRecorded * log.multiplyingFactor;
         if (actualMd > maxDemandPeak) {
           maxDemandPeak = actualMd;
@@ -158,11 +152,8 @@ class EnergyRepository {
       }
     }
 
-    // Client-recorded PF wins (meter display / Excel) — the kWh ÷ kVAh
-    // ratio is only the fallback when no reading stores a PF.
-    if (pfEnergySum > 0) {
-      latestPf = pfStoredSum / pfEnergySum;
-    } else if (totalKvah > 0) {
+    // Aggregate PF = ΣkWh ÷ ΣkVAh for the month (utility billing method).
+    if (totalKvah > 0) {
       latestPf = (totalKwh / totalKvah).clamp(0.0, 1.0);
     }
 

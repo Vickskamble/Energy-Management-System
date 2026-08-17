@@ -1,7 +1,7 @@
 # PowerEMS — Terms of Service
 
 **Effective date:** 11 August 2026
-**Last updated:** 11 August 2026
+**Last updated:** 17 August 2026
 **Applies to:** PowerEMS ("the Service") — web, Android, Windows, and macOS applications provided by PowerEMS ("we", "us", "our").
 
 > By creating an account or using the Service, you agree to these Terms. Read them carefully. If you are using the Service on behalf of a company (e.g., a factory), you confirm that you are authorized to bind that company.
@@ -85,8 +85,10 @@ We may update these Terms; material changes are posted with a new effective date
 ## 13. Contact
 
 **PowerEMS (Vick Skamble)**
-Email: [support email — to be filled]
+Email: Mrvikas_kamble@rediffmail.com
 Address: [to be filled]
+
+Grievances, account-deletion requests, and data-protection questions: contact the above with a clear subject line. We respond within 30 days.
 
 ---
 

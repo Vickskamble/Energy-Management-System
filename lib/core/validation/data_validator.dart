@@ -96,25 +96,36 @@ class DataValidator {
       }
     }
 
-    if (powerFactor == null) {
-      warnings.add(
-        'Power Factor is missing — will be calculated from kWh/kVAh',
-      );
-    } else if (powerFactor < 0 || powerFactor > 1) {
-      errors.add('Power Factor must be between 0 and 1 (got $powerFactor)');
-    } else if (powerFactor < AppConstants.pfPenaltyThreshold) {
-      warnings.add(
-        'PF ($powerFactor) below threshold (${AppConstants.pfPenaltyThreshold})',
-      );
-    } else {
-      passed.add('PF ($powerFactor) meets threshold');
+    // Power Factor is always derived from kWh / kVAh (utility billing method);
+    // any stored per-reading PF is ignored for billing, so validate the
+    // calculated value to stay consistent with BillCalculator.
+    if (kwh != null && kvah != null && kvah > 0 && kwh > 0) {
+      final calculatedPf = (kwh / kvah).clamp(0.0, 1.0);
+      if (calculatedPf < AppConstants.pfPenaltyThreshold) {
+        warnings.add(
+          'PF (${calculatedPf.toStringAsFixed(2)}) below threshold (${AppConstants.pfPenaltyThreshold})',
+        );
+      } else {
+        passed.add('PF (${calculatedPf.toStringAsFixed(2)}) meets threshold');
+      }
+    } else if (kwh != null && kvah != null && kvah > 0) {
+      warnings.add('PF cannot be calculated — kWh is zero');
     }
 
-    if (kwh != null && kvah != null && kvah > 0) {
+    // A stored per-reading PF is kept only as an informational note; it never
+    // affects billing. Flag it only when it diverges meaningfully.
+    if (powerFactor != null &&
+        powerFactor >= 0 &&
+        powerFactor <= 1 &&
+        kwh != null &&
+        kvah != null &&
+        kvah > 0 &&
+        kwh > 0) {
       final calculatedPf = (kwh / kvah).clamp(0.0, 1.0);
-      if (powerFactor != null && (powerFactor - calculatedPf).abs() > 0.02) {
+      if ((powerFactor - calculatedPf).abs() > 0.05) {
         warnings.add(
-          'PF mismatch: reported $powerFactor vs calculated $calculatedPf',
+          'Stored PF ($powerFactor) differs from kWh/kVAh PF '
+          '(${calculatedPf.toStringAsFixed(2)}) — billing uses the calculated value',
         );
       }
     }

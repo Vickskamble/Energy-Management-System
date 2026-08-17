@@ -2,65 +2,86 @@ import '../config/app_config.dart';
 import '../network/supabase_client.dart';
 import '../utils/app_logger.dart';
 
-/// Wipes ALL business data for the current user from Supabase (RLS allows
-/// deleting own rows): energy logs, meters, tariff settings and bill
-/// reconciliation. Used by Settings > Danger Zone > Reset All Data.
+/// Wipes the signed-in user's business data from Supabase (RLS allows
+/// deleting own rows; the `delete_all_user_data` RPC is security definer
+/// and also covers sessions + legacy tables atomically).
+///
+/// Used by:
+///  - Settings > Danger Zone > Reset All Data  (keeps the account)
+///  - Settings > Danger Zone > Delete Account  (full erasure, DPDP s12/13)
 class DataResetService {
   DataResetService._();
 
+  /// Deletes ALL business data rows for the current user across every
+  /// table (energy logs, meters, settings, reconciliation, sessions,
+  /// legacy rows) but keeps the account and subscription.
   static Future<void> resetAllData() async {
     if (!SupabaseClientManager.isInitialized) {
       AppConfig.reset();
       return;
     }
-    final user = SupabaseClientManager.client.auth.currentUser;
-    if (user == null) {
+    final uid = SupabaseClientManager.client.auth.currentUser?.id;
+    if (uid == null) {
       AppConfig.reset();
       return;
     }
-    final uid = user.id;
-    final client = SupabaseClientManager.client;
 
-    // 1. Cloud: energy logs.
     try {
-      await client
-          .from('energy_logs')
-          .delete()
-          .eq('user_id', uid);
+      await SupabaseClientManager.client.rpc('delete_all_user_data');
     } catch (e) {
-      AppLogger.w('Cloud reset of energy logs failed (best-effort): $e');
-    }
-
-    // 2. Cloud: meters.
-    try {
-      await client
-          .from('user_meters')
-          .delete()
-          .eq('user_id', uid);
-    } catch (e) {
-      AppLogger.w('Cloud reset of meters failed (best-effort): $e');
-    }
-
-    // 3. Cloud: tariff settings.
-    try {
-      await client
-          .from('user_settings')
-          .delete()
-          .eq('user_id', uid);
-    } catch (e) {
-      AppLogger.w('Cloud reset of settings failed (best-effort): $e');
-    }
-
-    // 4. Cloud: bill reconciliation.
-    try {
-      await client
-          .from('bill_reconcile')
-          .delete()
-          .eq('user_id', uid);
-    } catch (e) {
-      AppLogger.w('Cloud reset of bills failed (best-effort): $e');
+      // Fallback: per-table deletes (RPC may not be deployed yet).
+      AppLogger.w('delete_all_user_data RPC failed, falling back: $e');
+      await _fallbackDeleteOwnRows();
     }
 
     AppConfig.reset();
+  }
+
+  /// Full erasure: wipes every user row AND removes the account itself.
+  /// Callers must sign the user out afterwards (auth session is dead).
+  static Future<void> deleteAccount() async {
+    if (!SupabaseClientManager.isInitialized) {
+      AppConfig.reset();
+      return;
+    }
+    final uid = SupabaseClientManager.client.auth.currentUser?.id;
+    if (uid == null) {
+      AppConfig.reset();
+      return;
+    }
+
+    try {
+      await SupabaseClientManager.client.rpc('delete_account');
+    } catch (e) {
+      AppLogger.w('delete_account RPC failed (best-effort): $e');
+    }
+
+    AppConfig.reset();
+  }
+
+  static Future<void> _fallbackDeleteOwnRows() async {
+    final uid = SupabaseClientManager.client.auth.currentUser?.id;
+    if (uid == null) return;
+    final client = SupabaseClientManager.client;
+
+    for (final table in const [
+      'energy_logs',
+      'user_meters',
+      'user_settings',
+      'bill_reconcile',
+      'user_sessions',
+      'sites',
+      'panels',
+      'meters',
+      'readings',
+      'contract_demands',
+      'analysis_results',
+    ]) {
+      try {
+        await client.from(table).delete().eq('user_id', uid);
+      } catch (e) {
+        AppLogger.w('Cloud reset of $table failed (best-effort): $e');
+      }
+    }
   }
 }

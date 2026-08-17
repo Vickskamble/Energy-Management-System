@@ -1,5 +1,4 @@
-import 'package:file_picker/file_picker.dart';
-import 'package:fl_chart/fl_chart.dart';
+﻿import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -9,20 +8,15 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_logger.dart';
 import '../../core/utils/export_service.dart';
-import '../../core/utils/excel_import_service.dart';
 import '../../core/utils/pdf_report_service.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
-import '../../core/widgets/app_input.dart';
 import '../../core/widgets/app_section.dart';
 import '../../core/widgets/app_states.dart';
 import '../../core/widgets/app_table.dart';
 import '../../core/widgets/month_filter_bar.dart';
 import '../../core/calculation/bill_breakdown.dart';
 import '../../core/calculation/bill_calculator.dart';
-import '../../data/models/energy_log_model.dart';
-import '../../data/models/meter_model.dart';
-import '../../data/repositories/energy_repository.dart';
 import '../../data/repositories/meter_repository.dart';
 import '../../domain/entities/energy_log_entity.dart';
 import '../bloc/energy_bloc.dart';
@@ -57,8 +51,18 @@ class ReportsPage extends StatelessWidget {
               maxDemandPeak: maxDemandPeak,
               monthFilter: monthFilter,
             ),
-          EnergyValidationError _ => Center(child: Text(state.message)),
-          EnergyOperationFailure _ => Center(child: Text(state.message)),
+          EnergyValidationError _ => AppErrorState(
+            message: state.message,
+            onRetry: () => context
+                .read<EnergyBloc>()
+                .add(const LoadInitialDashboardData()),
+          ),
+          EnergyOperationFailure _ => AppErrorState(
+            message: state.message,
+            onRetry: () => context
+                .read<EnergyBloc>()
+                .add(const LoadInitialDashboardData()),
+          ),
         };
       },
     );
@@ -113,7 +117,7 @@ class _ReportsContentState extends State<_ReportsContent> {
         _meterSites = {for (final m in meters) m.name: m.site};
       });
     } catch (_) {
-      // Best-effort — reports still render without site filter.
+      // Best-effort â€” reports still render without site filter.
     }
   }
 
@@ -128,7 +132,7 @@ class _ReportsContentState extends State<_ReportsContent> {
     super.dispose();
   }
 
-  /// Distinct months present in the data — drives the shared filter bar.
+  /// Distinct months present in the data â€” drives the shared filter bar.
   List<DateTime> get _monthKeys {
     final keys = <String, DateTime>{};
     for (final e in _allEntities) {
@@ -162,7 +166,7 @@ class _ReportsContentState extends State<_ReportsContent> {
   }
 
   /// Meters for the dropdown: every meter registered for the selected site
-  /// (even without readings) plus any meter still present in log data — so
+  /// (even without readings) plus any meter still present in log data â€” so
   /// added meters always appear in the selector.
   List<String> get _meterNames {
     final names = <String>{
@@ -182,93 +186,9 @@ class _ReportsContentState extends State<_ReportsContent> {
     return result.where((e) => _selection.matches(e.loggedAt)).toList();
   }
 
-  Future<void> _pickAndImportExcel(BuildContext context) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls'],
-      allowMultiple: true,
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
-
-    var sourceFile = '';
-    final drafts = <ExcelReadingDraft>[];
-    try {
-      // Read the first file's headers to let the user confirm the column
-      // mapping (auto-detection is prefilled). This fits every client file
-      // format, e.g. kVA demand recorded under "Contract KVA".
-      ExcelColumnMap? columnMap;
-      if (result.files.isNotEmpty) {
-        final bytes = result.files.first.bytes;
-        if (bytes != null) {
-          final headers = await ExcelImportService.readHeaders(bytes);
-          final detected = ExcelImportService.detectMapping(headers);
-          if (context.mounted) {
-            columnMap = await showDialog<ExcelColumnMap>(
-              context: context,
-              barrierDismissible: false,
-              builder: (_) => _ColumnMappingDialog(
-                headers: headers,
-                initial: detected,
-              ),
-            );
-          }
-        }
-      }
-      if (columnMap == null) return;
-
-      for (final file in result.files) {
-        final bytes = file.bytes;
-        if (bytes == null) continue;
-        sourceFile = file.name;
-        drafts.addAll(
-          await ExcelImportService.extractReadings(
-            bytes,
-            columnMap: columnMap,
-          ),
-        );
-      }
-    } catch (e) {
-      AppLogger.e('Excel import failed', e);
-      if (context.mounted) {
-        final message = e is FormatException
-            ? e.message
-            : 'Import failed. Check the file and try again.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
-      }
-      return;
-    }
-
-    if (drafts.isEmpty) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No readings found in the selected Excel file(s)'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-      return;
-    }
-
-    if (!context.mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (_) => _ImportPreviewDialog(
-        drafts: drafts,
-        sourceFile: sourceFile,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final currencyFmt = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
+    final currencyFmt = NumberFormat.currency(symbol: 'â‚¹', decimalDigits: 0);
     final entityLogs = _visibleLogs;
     final breakdown = BillCalculator.calculate(
       logs: entityLogs,
@@ -289,12 +209,6 @@ class _ReportsContentState extends State<_ReportsContent> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     AppButtonOutline(
-                      label: 'Import Data',
-                      icon: Icons.file_upload_outlined,
-                      onPressed: () => _pickAndImportExcel(context),
-                    ),
-                    const SizedBox(width: 8),
-                    AppButtonOutline(
                       label: 'PDF',
                       icon: Icons.picture_as_pdf_outlined,
                       onPressed: () async {
@@ -304,7 +218,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                             logs: entities,
                             title: 'Energy Management Report',
                             subtitle:
-                                '${entities.length} reading(s) — '
+                                '${entities.length} reading(s) â€” '
                                 '${_selection.label}${_meter != null ? ', $_meter' : ''}',
                           );
                         } catch (e) {
@@ -312,7 +226,9 @@ class _ReportsContentState extends State<_ReportsContent> {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('PDF export failed: $e'),
+                                content: const Text(
+                                  'Could not generate the PDF report. Please try again.',
+                                ),
                                 backgroundColor: Colors.red.shade700,
                               ),
                             );
@@ -336,12 +252,6 @@ class _ReportsContentState extends State<_ReportsContent> {
             child: Row(
               children: [
                 AppButtonOutline(
-                  label: 'Import Data',
-                  icon: Icons.file_upload_outlined,
-                  onPressed: () => _pickAndImportExcel(context),
-                ),
-                const SizedBox(width: 8),
-                AppButtonOutline(
                   label: 'PDF',
                   icon: Icons.picture_as_pdf_outlined,
                   onPressed: () async {
@@ -351,7 +261,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                         logs: entities,
                         title: 'Energy Management Report',
                         subtitle:
-                            '${entities.length} reading(s) — '
+                            '${entities.length} reading(s) â€” '
                             '${_selection.label}${_meter != null ? ', $_meter' : ''}',
                       );
                     } catch (e) {
@@ -359,7 +269,9 @@ class _ReportsContentState extends State<_ReportsContent> {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('PDF export failed: $e'),
+                            content: const Text(
+                              'Could not generate the PDF report. Please try again.',
+                            ),
                             backgroundColor: Colors.red.shade700,
                           ),
                         );
@@ -428,7 +340,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                 onChanged: (v) => setState(() => _meter = v),
               ),
               const SizedBox(height: 12),
-              MonthFilterBar(
+              MonthFilterDropdown(
                 controller: widget.monthFilter,
                 availableMonths: _monthKeys,
                 includeAllTime: true,
@@ -490,7 +402,7 @@ class _ReportsContentState extends State<_ReportsContent> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: MonthFilterBar(
+                child: MonthFilterDropdown(
                   controller: widget.monthFilter,
                   availableMonths: _monthKeys,
                   includeAllTime: true,
@@ -646,7 +558,7 @@ class _ReportsContentState extends State<_ReportsContent> {
     } else {
       final diff = actual - estimated;
       final pct = estimated > 0 ? (diff / estimated).abs() * 100 : 0;
-      final sign = diff > 0 ? '+' : (diff < 0 ? '-' : '±');
+      final sign = diff > 0 ? '+' : (diff < 0 ? '-' : 'Â±');
       diffText =
           '$sign${currencyFmt.format(diff.abs())} '
           '(${pct.toStringAsFixed(1)}%)';
@@ -691,7 +603,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                     Expanded(
                       child: Text(
                         actual == null
-                            ? '—'
+                            ? 'â€”'
                             : 'Actual ${currencyFmt.format(actual)}',
                         style: const TextStyle(
                           fontSize: 12,
@@ -737,7 +649,7 @@ class _ReportsContentState extends State<_ReportsContent> {
               Expanded(
                 child: Text(
                   actual == null
-                      ? '—'
+                      ? 'â€”'
                       : 'Actual ${currencyFmt.format(actual)}',
                   style: const TextStyle(
                     fontSize: 12,
@@ -797,7 +709,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                 controller: amountCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Bill amount (₹)',
+                  labelText: 'Bill amount (â‚¹)',
                   isDense: true,
                 ),
                 validator: (v) {
@@ -816,7 +728,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                 ),
                 decoration: InputDecoration(
                   labelText:
-                      'FAC rate (₹/unit) — optional',
+                      'FAC rate (â‚¹/unit) â€” optional',
                   hintText: AppConfig.facRateForMonth(selectedKey)
                       .toStringAsFixed(2),
                   isDense: true,
@@ -876,7 +788,15 @@ class _ReportsContentState extends State<_ReportsContent> {
 
   String _monthKey(int year, int month) => '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
 
-  /// Last 12 months bill trend — bar chart (Issue 6).
+  /// Compact â‚¹ label for bar tops: â‚¹950, â‚¹1.2k, â‚¹3.4L, â‚¹1.1Cr.
+  String _compactInr(double v) {
+    if (v >= 10000000) return 'â‚¹${(v / 10000000).toStringAsFixed(1)}Cr';
+    if (v >= 100000) return 'â‚¹${(v / 100000).toStringAsFixed(1)}L';
+    if (v >= 1000) return 'â‚¹${(v / 1000).toStringAsFixed(1)}k';
+    return 'â‚¹${v.toStringAsFixed(0)}';
+  }
+
+  /// Last 12 months bill trend â€” bar chart (Issue 6).
   Widget _buildMonthlyHistory() {
     final now = DateTime.now();
     final monthDates = <DateTime>[];
@@ -888,7 +808,7 @@ class _ReportsContentState extends State<_ReportsContent> {
       var total = 0.0;
       for (final e in _entities) {
         if (e.loggedAt.year == date.year && e.loggedAt.month == date.month) {
-          total += e.estimatedBill;
+          total += e.netBill > 0 ? e.netBill : e.estimatedBill;
         }
       }
       monthBills.add(total);
@@ -905,7 +825,7 @@ class _ReportsContentState extends State<_ReportsContent> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Last 12 months — estimated bill (₹)',
+            'Last 12 months â€” estimated bill (â‚¹)',
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
@@ -920,7 +840,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       return BarTooltipItem(
                         '${DateFormat('MMM yy').format(monthDates[group.x])}: '
-                        '₹${rod.toY.toStringAsFixed(0)}',
+                        'â‚¹${rod.toY.toStringAsFixed(0)}',
                         const TextStyle(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.bold,
@@ -936,8 +856,31 @@ class _ReportsContentState extends State<_ReportsContent> {
                   leftTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: false),
                   ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
+                  topTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 24,
+                      getTitlesWidget: (value, meta) {
+                        final i = value.toInt();
+                        if (i < 0 || i >= monthBills.length) {
+                          return const SizedBox.shrink();
+                        }
+                        if (monthBills[i] <= 0) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 3),
+                          child: Text(
+                            _compactInr(monthBills[i]),
+                            style: const TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                   rightTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: false),
@@ -1038,7 +981,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                     width: width,
                     child: _summaryItem(
                       'Avg Unit Cost',
-                      '₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
+                      'â‚¹${breakdown.averageUnitCost.toStringAsFixed(2)}',
                       AppColors.kpiCost,
                     ),
                   ),
@@ -1141,21 +1084,21 @@ class _ReportsContentState extends State<_ReportsContent> {
             Text(
               log.currentKwh != null
                   ? log.currentKwh!.toStringAsFixed(1)
-                  : '—',
+                  : 'â€”',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             Text(log.kwh.toStringAsFixed(1)),
             Text(
               log.currentKvah != null
                   ? log.currentKvah!.toStringAsFixed(1)
-                  : '—',
+                  : 'â€”',
             ),
             Text(log.kvah.toStringAsFixed(1)),
             Text(log.powerFactor.toStringAsFixed(3)),
             Text(
               (log.mdRecorded * log.multiplyingFactor).toStringAsFixed(1),
             ),
-            Text('₹ ${log.estimatedBill.toStringAsFixed(0)}'),
+            Text('â‚¹ ${log.estimatedBill.toStringAsFixed(0)}'),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
@@ -1178,644 +1121,3 @@ class _ReportsContentState extends State<_ReportsContent> {
   }
 }
 
-/// Preview + edit screen for readings parsed from an Excel file.
-/// Nothing is saved until the user confirms (Issue 11 — manual edit mandatory).
-class _ColumnMappingDialog extends StatefulWidget {
-  final List<String> headers;
-  final ExcelColumnMap initial;
-
-  const _ColumnMappingDialog({
-    required this.headers,
-    required this.initial,
-  });
-
-  @override
-  State<_ColumnMappingDialog> createState() => _ColumnMappingDialogState();
-}
-
-class _ColumnMappingDialogState extends State<_ColumnMappingDialog> {
-  late final ExcelColumnMap _map = widget.initial;
-
-  String _colName(int index) {
-    var n = index;
-    var label = '';
-    while (n >= 0) {
-      label = String.fromCharCode(65 + (n % 26)) + label;
-      n = n ~/ 26 - 1;
-    }
-    return label;
-  }
-
-  Widget _fieldDropdown({
-    required String label,
-    required int? value,
-    required void Function(int?) onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: DropdownButtonFormField<int>(
-        initialValue: value,
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 12,
-          ),
-        ),
-        items: [
-          const DropdownMenuItem<int>(value: -1, child: Text('— Auto —')),
-          for (var i = 0; i < widget.headers.length; i++)
-            if (widget.headers[i].trim().isNotEmpty)
-              DropdownMenuItem<int>(
-                value: i,
-                child: Text(
-                  '${_colName(i)}: ${widget.headers[i].trim()}',
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-        ],
-        onChanged: onChanged,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Confirm Column Mapping'),
-      content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Auto-detection is prefilled. Adjust if your client file '
-                'uses different column names (e.g. kVA demand under '
-                '"Contract KVA").',
-                style: TextStyle(fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              _fieldDropdown(
-                label: 'Reading Date',
-                value: _map.date,
-                onChanged: (v) => setState(() => _map.date = v == -1 ? null : v),
-              ),
-              _fieldDropdown(
-                label: 'kWh (consumed or cumulative)',
-                value: _map.kwh,
-                onChanged: (v) => setState(() => _map.kwh = v == -1 ? null : v),
-              ),
-              _fieldDropdown(
-                label: 'kVAh',
-                value: _map.kvah,
-                onChanged: (v) => setState(() => _map.kvah = v == -1 ? null : v),
-              ),
-              _fieldDropdown(
-                label: 'Max Demand kVA',
-                value: _map.md,
-                onChanged: (v) => setState(() => _map.md = v == -1 ? null : v),
-              ),
-              _fieldDropdown(
-                label: 'rkVARh Lag',
-                value: _map.lag,
-                onChanged: (v) => setState(() => _map.lag = v == -1 ? null : v),
-              ),
-              _fieldDropdown(
-                label: 'rkVARh Lead',
-                value: _map.lead,
-                onChanged: (v) => setState(() => _map.lead = v == -1 ? null : v),
-              ),
-              _fieldDropdown(
-                label: 'Power Factor (as-is)',
-                value: _map.pf,
-                onChanged: (v) => setState(() => _map.pf = v == -1 ? null : v),
-              ),
-              _fieldDropdown(
-                label: 'Meter Name',
-                value: _map.meter,
-                onChanged: (v) =>
-                    setState(() => _map.meter = v == -1 ? null : v),
-              ),
-            ],
-          ),
-        ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(null),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_map),
-          child: const Text('Continue'),
-        ),
-      ],
-    );
-  }
-}
-
-class _ImportPreviewDialog extends StatefulWidget {
-  const _ImportPreviewDialog({required this.drafts, required this.sourceFile});
-
-  final List<ExcelReadingDraft> drafts;
-  final String sourceFile;
-
-  @override
-  State<_ImportPreviewDialog> createState() => _ImportPreviewDialogState();
-}
-
-class _ImportPreviewDialogState extends State<_ImportPreviewDialog> {
-  List<MeterModel> _meters = [];
-  bool _saving = false;
-
-  late final List<_DraftEditor> _editors =
-      widget.drafts.map((d) => _DraftEditor(d)).toList();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadMeters();
-  }
-
-  @override
-  void dispose() {
-    for (final e in _editors) {
-      e.dispose();
-    }
-    super.dispose();
-  }
-
-  Future<void> _loadMeters() async {
-    final meters = await context.read<MeterRepository>().getAllMeters();
-    if (!mounted) return;
-    setState(() {
-      _meters = meters;
-      for (final e in _editors) {
-        if (meters.isEmpty) break;
-        final known = meters.any((m) => m.name == e.meterName);
-        if (e.meterName.isEmpty || !known) {
-          e.meterName = meters.first.name;
-        }
-      }
-    });
-  }
-
-  MeterModel? _meterByName(String name) {
-    for (final m in _meters) {
-      if (m.name == name) return m;
-    }
-    return null;
-  }
-
-  Future<void> _pickDate(_DraftEditor editor) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: editor.loggedAt,
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) {
-      setState(() {
-        editor.dateCtrl.text =
-            '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-      });
-    }
-  }
-
-  Future<void> _import() async {
-    setState(() => _saving = true);
-    final models = <EnergyLogModel>[];
-    for (final e in _editors) {
-      if (!e.valid) continue;
-      final meter = _meterByName(e.meterName);
-      models.add(
-        EnergyLogModel.create(
-          meterName: e.meterName,
-          kwh: e.kwh,
-          kvah: e.kvah,
-          currentKwh: e.currentKwh,
-          currentKvah: e.currentKvah,
-          rkvarhLag: e.lag,
-          rkvarhLead: e.lead,
-          powerFactor: e.powerFactor,
-          mdRecorded: e.md,
-          contractDemand:
-              meter?.contractDemandKw ?? AppConstants.defaultContractDemandKva,
-          loggedAt: e.loggedAt,
-          multiplyingFactor:
-              meter?.multiplyingFactor ?? AppConstants.multiplyingFactor,
-        ),
-      );
-    }
-
-    if (models.isEmpty) {
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Koi valid reading nahi mili — kWh aur MD bharo'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    try {
-      final count = await context
-          .read<EnergyRepository>()
-          .bulkSaveReadings(models);
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$count reading(s) imported successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      context.read<EnergyBloc>().add(const LoadInitialDashboardData());
-    } catch (e) {
-      AppLogger.e('Bulk import save failed', e);
-      if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e is FormatException
-                ? e.message
-                : 'Import failed. Check the file and try again.',
-          ),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final validCount = _editors.where((e) => e.valid).length;
-    return AlertDialog(
-      title: const Text('Import Readings'),
-      content: SizedBox(
-        width: MediaQuery.of(context).size.width < 600
-            ? double.maxFinite
-            : 620,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${widget.drafts.length} reading(s) mili — ${widget.sourceFile}. '
-              'Values verify karke import karo.',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _editors.length,
-                itemBuilder: (context, i) => _buildDraftCard(_editors[i], i),
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        AppButton(
-          label: 'Import $validCount Reading(s)',
-          icon: Icons.check_circle_outline,
-          onPressed: _saving || validCount == 0 ? null : _import,
-          loading: _saving,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDraftCard(_DraftEditor e, int index) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  e.draft.sourceLabel,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const Spacer(),
-                if (!e.valid)
-                  const Text(
-                    'Incomplete',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.danger,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              key: ValueKey('meter-$index-${e.meterName}'),
-              initialValue: _meters.any((m) => m.name == e.meterName)
-                  ? e.meterName
-                  : null,
-              hint: const Text('Select Meter'),
-              decoration: const InputDecoration(
-                labelText: 'Meter',
-                isDense: true,
-                prefixIcon: Icon(Icons.speed_rounded, size: 20),
-              ),
-              items: _meters
-                  .map(
-                    (m) => DropdownMenuItem(
-                      value: m.name,
-                      child: Text(m.name),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => e.meterName = v);
-              },
-            ),
-            const SizedBox(height: 12),
-            AppTextField(
-              controller: e.dateCtrl,
-              label: 'Reading Date',
-              prefixIcon: Icons.event,
-              suffixIcon: Icons.calendar_month,
-              onSuffixTap: () => _pickDate(e),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: AppTextField(
-                    controller: e.kwhCtrl,
-                    label: 'Consumed (kWh)',
-                    prefixIcon: Icons.bolt,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppTextField(
-                    controller: e.kvahCtrl,
-                    label: 'Consumed kVAh',
-                    prefixIcon: Icons.electrical_services,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: AppTextField(
-                    controller: e.currentKwhCtrl,
-                    label: 'Actual Reading kWh',
-                    hint: 'Optional — meter display value',
-                    prefixIcon: Icons.speed,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppTextField(
-                    controller: e.currentKvahCtrl,
-                    label: 'Actual Reading kVAh',
-                    hint: 'Optional',
-                    prefixIcon: Icons.speed,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (MediaQuery.of(context).size.width < 600)
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AppTextField(
-                          controller: e.mdCtrl,
-                          label: 'MD Recorded (kVA)',
-                          prefixIcon: Icons.trending_up,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: AppTextField(
-                          controller: e.pfCtrl,
-                          label: 'Power Factor',
-                          prefixIcon: Icons.percent,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AppTextField(
-                          controller: e.lagCtrl,
-                          label: 'rkVARh Lag',
-                          prefixIcon: Icons.warning_outlined,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: AppTextField(
-                          controller: e.leadCtrl,
-                          label: 'rkVARh Lead',
-                          prefixIcon: Icons.check_circle_outline,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              )
-            else
-              Row(
-              children: [
-                Expanded(
-                  child: AppTextField(
-                    controller: e.mdCtrl,
-                    label: 'MD Recorded (kVA)',
-                    prefixIcon: Icons.trending_up,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppTextField(
-                    controller: e.pfCtrl,
-                    label: 'Power Factor',
-                    prefixIcon: Icons.percent,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppTextField(
-                    controller: e.lagCtrl,
-                    label: 'rkVARh Lag',
-                    prefixIcon: Icons.warning_outlined,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppTextField(
-                    controller: e.leadCtrl,
-                    label: 'rkVARh Lead',
-                    prefixIcon: Icons.check_circle_outline,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DraftEditor {
-  _DraftEditor(this.draft)
-    : meterName = draft.meterName,
-      dateCtrl = TextEditingController(
-        text: '${draft.loggedAt.day.toString().padLeft(2, '0')}'
-            '/${draft.loggedAt.month.toString().padLeft(2, '0')}'
-            '/${draft.loggedAt.year}',
-      ),
-      kwhCtrl = TextEditingController(text: _fmt(draft.kwh)),
-      kvahCtrl = TextEditingController(text: _fmt(draft.kvah)),
-      currentKwhCtrl = TextEditingController(
-        text: draft.currentKwh != null
-            ? draft.currentKwh!.toStringAsFixed(2)
-            : '',
-      ),
-      currentKvahCtrl = TextEditingController(
-        text: draft.currentKvah != null
-            ? draft.currentKvah!.toStringAsFixed(2)
-            : '',
-      ),
-      lagCtrl = TextEditingController(text: _fmt(draft.rkvarhLag)),
-      leadCtrl = TextEditingController(text: _fmt(draft.rkvarhLead)),
-      mdCtrl = TextEditingController(text: _fmt(draft.mdRecorded)),
-      pfCtrl = TextEditingController(
-        text: draft.powerFactor != null
-            ? draft.powerFactor!.toStringAsFixed(3)
-            : '',
-      );
-
-  final ExcelReadingDraft draft;
-  String meterName = '';
-  final TextEditingController dateCtrl;
-  final TextEditingController kwhCtrl;
-  final TextEditingController kvahCtrl;
-  final TextEditingController currentKwhCtrl;
-  final TextEditingController currentKvahCtrl;
-  final TextEditingController lagCtrl;
-  final TextEditingController leadCtrl;
-  final TextEditingController mdCtrl;
-  final TextEditingController pfCtrl;
-
-  static String _fmt(double v) => v > 0 ? v.toStringAsFixed(2) : '';
-
-  double get kwh => double.tryParse(kwhCtrl.text.trim()) ?? 0;
-  double get kvah => double.tryParse(kvahCtrl.text.trim()) ?? 0;
-  double get md => double.tryParse(mdCtrl.text.trim()) ?? 0;
-  double get lag => double.tryParse(lagCtrl.text.trim()) ?? 0;
-  double get lead => double.tryParse(leadCtrl.text.trim()) ?? 0;
-
-  /// Actual (cumulative) meter reading — blank means "not known" (the system
-  /// reconstructs it from the consumption chain on read).
-  double? get currentKwh {
-    final v = double.tryParse(currentKwhCtrl.text.trim());
-    return v == null || v <= 0 ? null : v;
-  }
-
-  double? get currentKvah {
-    final v = double.tryParse(currentKvahCtrl.text.trim());
-    return v == null || v <= 0 ? null : v;
-  }
-
-  /// PF as imported from the file (or edited by the user). Null → let the
-  /// system calculate from kWh/kVAh.
-  double? get powerFactor {
-    final v = double.tryParse(pfCtrl.text.trim());
-    if (v == null || v <= 0) return null;
-    return v > 1 ? v / 100 : v;
-  }
-
-  /// Importable when it has consumption or an actual reading, plus MD.
-  /// Opening rows (0 consumption, real reading) anchor the reading chain.
-  bool get valid => (kwh > 0 || currentKwh != null) && md > 0;
-
-  DateTime get loggedAt {
-    final m = RegExp(
-      r'^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$',
-    ).firstMatch(dateCtrl.text.trim());
-    if (m != null) {
-      final day = int.parse(m.group(1)!);
-      final month = int.parse(m.group(2)!);
-      var year = int.parse(m.group(3)!);
-      if (year < 100) year += 2000;
-      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-        return DateTime(year, month, day);
-      }
-    }
-    return DateTime.now();
-  }
-
-  void dispose() {
-    dateCtrl.dispose();
-    kwhCtrl.dispose();
-    kvahCtrl.dispose();
-    currentKwhCtrl.dispose();
-    currentKvahCtrl.dispose();
-    lagCtrl.dispose();
-    leadCtrl.dispose();
-    mdCtrl.dispose();
-    pfCtrl.dispose();
-  }
-}

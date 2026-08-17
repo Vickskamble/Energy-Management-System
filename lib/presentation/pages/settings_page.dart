@@ -605,8 +605,20 @@ class _SettingsScreenState extends State<SettingsScreen>
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 12),
-                for (var i = 0; i < 11; i += 2) ...[
+                ExpansionTile(
+                  title: const Text('Advanced tariff settings'),
+                  subtitle: const Text(
+                    'Only adjust these if you are familiar with tariff mechanics',
+                  ),
+                  initiallyExpanded: false,
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(top: 8, bottom: 8),
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 12),
+                        for (var i = 0; i < 11; i += 2) ...[
                   Row(
                     children: [
                       Expanded(
@@ -737,7 +749,16 @@ class _SettingsScreenState extends State<SettingsScreen>
                   onChanged: (v) => setState(() => _billOnKvah = v),
                   contentPadding: EdgeInsets.zero,
                 ),
+                      ],
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 16),
+                const Text(
+                  'Saving updates the tariff used for all future bill estimates.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 8),
                 AppButton(
                   label: 'Save Tariff',
                   icon: Icons.save_outlined,
@@ -849,14 +870,27 @@ class _SettingsScreenState extends State<SettingsScreen>
         const SizedBox(height: AppSpacing.lg),
         AppSectionHeader(
           title: 'Danger Zone',
-          subtitle: 'Permanently delete all readings, meters and settings',
+          subtitle:
+              'Reset data (keep account) or delete the account permanently',
         ),
         AppCard(
-          child: AppButtonOutline(
-            label: 'Reset All Data',
-            icon: Icons.delete_forever_outlined,
-            expanded: true,
-            onPressed: _confirmResetAll,
+          child: Column(
+            children: [
+              AppButton(
+                label: 'Reset All Data',
+                icon: Icons.delete_forever_outlined,
+                color: AppColors.danger,
+                expanded: true,
+                onPressed: _confirmResetAll,
+              ),
+              const SizedBox(height: 8),
+              AppButtonOutline(
+                label: 'Delete Account',
+                icon: Icons.person_remove_outlined,
+                expanded: true,
+                onPressed: _confirmDeleteAccount,
+              ),
+            ],
           ),
         ),
       ],
@@ -864,22 +898,51 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _exportBackup() async {
-    final passphrase = await _askPassphrase(
-      title: 'Encrypt backup?',
-      message:
-          'Backups are encrypted with a passphrase you choose. '
-          'If you lose it, the backup cannot be recovered.\n'
-          'Min ${ValidationRules.minPasswordLength} characters, '
-          'at least one letter and one number.',
+    final encrypt = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Export backup'),
+        content: const Text(
+          'You can encrypt the backup with a passphrase for safety, or export '
+          'it without a password. Keep an unencrypted file secure.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No password'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Encrypt'),
+          ),
+        ],
+      ),
     );
-    if (passphrase == null) return;
+    if (encrypt == null) return;
+
+    String? passphrase;
+    if (encrypt) {
+      passphrase = await _askPassphrase(
+        title: 'Set backup passphrase',
+        message:
+            'Choose a passphrase for the backup. If you lose it, the backup '
+            'cannot be recovered.\n'
+            'Min ${ValidationRules.minPasswordLength} characters, '
+            'at least one letter and one number.',
+      );
+      if (passphrase == null) return;
+    }
 
     try {
       await BackupService.exportBackup(passphrase: passphrase);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Encrypted backup exported'),
+          SnackBar(
+            content: Text(
+              passphrase == null
+                  ? 'Backup exported (unencrypted)'
+                  : 'Encrypted backup exported',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -1071,6 +1134,57 @@ class _SettingsScreenState extends State<SettingsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Reset failed: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete account?'),
+        content: const Text(
+          'This permanently deletes your account AND ALL your data '
+          '(readings, meters, settings, backups on the server, sessions) '
+          'from Supabase. It cannot be undone. '
+          'Export a backup first if you want to keep anything.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Yes, Delete Account',
+              style: TextStyle(color: AppColors.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await DataResetService.deleteAccount();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account deleted — you have been signed out'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.of(context).pop();
+      context.read<AuthBloc>().add(const AppAuthLogoutRequested());
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Account deletion failed: $e'),
             backgroundColor: Colors.red.shade700,
           ),
         );

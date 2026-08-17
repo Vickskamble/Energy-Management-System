@@ -531,6 +531,48 @@ class ExcelImportService {
     if (month < 1 || month > 12 || day < 1 || day > 31) return null;
     return DateTime(year, month, day);
   }
+
+  /// Builds a ready-to-use .xlsx template that matches the column headers the
+  /// importer auto-detects, so users have a concrete starting point instead of
+  /// guessing the required layout.
+  static Future<Uint8List> generateSampleTemplate() async {
+    final excel = Excel.createExcel();
+    final sheet = excel.sheets.values.first;
+
+    const headers = [
+      'Reading Date',
+      'Meter Name',
+      'kWh',
+      'kVAh',
+      'MD Recorded (kVA)',
+      'PF',
+      'rkVARh Lag',
+      'rkVARh Lead',
+    ];
+    for (var c = 0; c < headers.length; c++) {
+      final cell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: c, rowIndex: 0),
+      );
+      cell.value = TextCellValue(headers[c]);
+    }
+
+    const samples = [
+      ['01/06/2026', 'Main Meter', '1250.50', '1320.00', '145.0', '0.98', '120.0', '10.0'],
+      ['02/06/2026', 'Main Meter', '1180.00', '1245.50', '142.5', '0.97', '115.0', '8.0'],
+    ];
+    for (var r = 0; r < samples.length; r++) {
+      final row = samples[r];
+      for (var c = 0; c < row.length; c++) {
+        final cell = sheet.cell(
+          CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1),
+        );
+        cell.value = TextCellValue(row[c]);
+      }
+    }
+
+    final encoded = excel.encode();
+    return Uint8List.fromList(encoded ?? []);
+  }
 }
 
 class ExcelColumnMap {

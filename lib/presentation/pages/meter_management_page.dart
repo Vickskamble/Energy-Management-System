@@ -53,6 +53,11 @@ class MeterManagementPage extends StatelessWidget {
       text: existing?.ptRatio.toStringAsFixed(2) ?? '1',
     );
     final siteCtrl = TextEditingController(text: existing?.site ?? 'Main Site');
+    final targetCtrl = TextEditingController(
+      text: existing != null && existing.dailyKwhTarget > 0
+          ? existing.dailyKwhTarget.toStringAsFixed(0)
+          : '',
+    );
     final formKey = GlobalKey<FormState>();
 
     if (!context.mounted) return;
@@ -128,6 +133,20 @@ class MeterManagementPage extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 12),
+              AppTextField(
+                controller: targetCtrl,
+                label: 'Daily Avg Consumption Target (kWh/day)',
+                hint: 'Optional — sets the chart cross line and alerts',
+                prefixIcon: Icons.electric_bolt_rounded,
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return null;
+                  final val = double.tryParse(v.trim());
+                  if (val == null || val <= 0) return 'Invalid number';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -175,7 +194,7 @@ class MeterManagementPage extends StatelessWidget {
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Multiplying Factor (MF) = CT × PT — meter readings isse multiply honge',
+                  'Multiplying Factor (MF) = CT × PT — meter readings are multiplied by this value',
                   style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
               ),
@@ -239,6 +258,9 @@ class MeterManagementPage extends StatelessWidget {
                       site: siteCtrl.text.trim().isEmpty
                           ? 'Main Site'
                           : siteCtrl.text.trim(),
+                      dailyKwhTarget: targetCtrl.text.trim().isEmpty
+                          ? 0.0
+                          : double.parse(targetCtrl.text.trim()),
                     )
                   : MeterModel.create(
                       name: nameCtrl.text.trim(),
@@ -251,13 +273,28 @@ class MeterManagementPage extends StatelessWidget {
                       site: siteCtrl.text.trim().isEmpty
                           ? 'Main Site'
                           : siteCtrl.text.trim(),
+                      dailyKwhTarget: targetCtrl.text.trim().isEmpty
+                          ? 0.0
+                          : double.parse(targetCtrl.text.trim()),
                     );
-              if (existing != null) {
-                repo.updateMeter(meter);
-              } else {
-                repo.saveMeter(meter);
+              try {
+                if (existing != null) {
+                  repo.updateMeter(meter);
+                } else {
+                  repo.saveMeter(meter);
+                }
+                nav.pop(true);
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Meter save failed — $e',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    backgroundColor: Colors.red.shade700,
+                  ),
+                );
               }
-              nav.pop(true);
             },
           ),
         ],
@@ -455,7 +492,7 @@ class _MeterListState extends State<_MeterList> {
                                   builder: (ctx) => AlertDialog(
                                     title: const Text('Delete Meter'),
                                     content: Text(
-                                      'Meter "${meter.name}" aur uski saari readings delete ho jayengi. Kya aap sure hain?',
+                                      'Meter "${meter.name}" and all of its readings will be permanently deleted. Are you sure?',
                                     ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(20),

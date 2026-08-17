@@ -31,6 +31,9 @@ class AppConstants {
   static const double pfSurchargeThreshold = 0.90;
   static const double loadFactorThresholdGood = 0.75;
 
+  /// Fraction of the daily kWh target at which a "near target" alert fires.
+  static const double dailyKwhWarningRatio = 0.9;
+
   /// Tolerance (%) for actual vs estimated bill reconciliation (Issue 7B).
   static const double billAccuracyTolerancePercent = 10.0;
 

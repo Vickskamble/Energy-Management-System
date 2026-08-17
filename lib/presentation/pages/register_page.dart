@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/validation_rules.dart';
 import '../../core/widgets/app_button.dart';
 import '../auth_bloc/auth_bloc.dart';
+import '../widgets/legal_consent_text.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -20,6 +21,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final _confirmCtrl = TextEditingController();
   final _referralCtrl = TextEditingController();
   bool _obscurePass = true;
+  bool _consentAccepted = false;
+  bool _consentError = false;
 
   @override
   void dispose() {
@@ -32,6 +35,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    if (!_consentAccepted) {
+      setState(() => _consentError = true);
+      return;
+    }
     final referral = _referralCtrl.text.trim();
     if (referral.isNotEmpty) {
       // Remember it — claimed once the user signs in (idempotent server-side).
@@ -134,6 +141,47 @@ class _RegisterPageState extends State<RegisterPage> {
                     },
                   ),
                   const SizedBox(height: 24),
+                  InkWell(
+                    onTap: () => setState(() {
+                      _consentAccepted = !_consentAccepted;
+                      _consentError = false;
+                    }),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            _consentAccepted
+                                ? Icons.check_box_rounded
+                                : Icons.check_box_outline_blank_rounded,
+                            color: _consentError
+                                ? AppColors.danger
+                                : (_consentAccepted
+                                      ? AppColors.primary
+                                      : AppColors.textSecondary),
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(child: LegalConsentText()),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_consentError)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Please accept the Terms of Service and Privacy '
+                        'Policy to continue.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.danger,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
                   BlocConsumer<AuthBloc, AppAuthState>(
                     listener: (context, state) {
                       if (state is AppAuthRegisterSuccess) {
@@ -171,6 +219,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     onPressed: () => Navigator.pop(context),
                     child: const Text('Already have an account? Sign in'),
                   ),
+                  const SizedBox(height: 12),
+                  const LegalConsentText(),
                 ],
               ),
             ),

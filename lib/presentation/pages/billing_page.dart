@@ -318,7 +318,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Payment confirmed — plan activate ho raha hai (thoda wait karo)…',
+                'Payment confirmed — your plan is activating (please wait a moment)…',
               ),
               backgroundColor: Colors.green,
             ),
@@ -390,7 +390,7 @@ body: _loading
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Payment window me payment complete karo — plan yahan automatically update ho jayega',
+              'Complete the payment in the payment window — your plan will update here automatically',
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
             ),
           ),

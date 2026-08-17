@@ -77,27 +77,13 @@ class BillCalculator {
       mdCount++;
     }
 
-    // PF = the values the client recorded (meter display / Excel import) —
-    // NEVER recalculated. Multiple readings are kWh-weighted. Only when no
-    // reading carries a stored PF is the kWh ÷ kVAh ratio used, so legacy
-    // rows without PF data still bill/penalize correctly.
-    double powerFactor = 0;
-    double pfSum = 0;
-    double energySum = 0;
-    for (final log in logs) {
-      if (log.powerFactor > 0) {
-        pfSum += log.powerFactor * log.kwh * log.multiplyingFactor;
-        energySum += log.kwh * log.multiplyingFactor;
-      }
-    }
-    if (energySum > 0) {
-      powerFactor = pfSum / energySum;
-    } else if (totalKvah > 0) {
-      powerFactor = EnergyCalculator.calculatePowerFactor(
-        totalKwh,
-        totalKvah,
-      );
-    }
+    // Aggregate monthly PF = total active energy ÷ total apparent energy
+    // (ΣkWh / ΣkVAh) — the same ratio the utility meter reports. Per-reading
+    // stored PF is NOT averaged: a weighted average of ratios over-estimates
+    // PF when it varies between readings, which can wrongly skip a penalty.
+    double powerFactor = totalKvah > 0
+        ? EnergyCalculator.calculatePowerFactor(totalKwh, totalKvah)
+        : 0.0;
     // Billing units: official kVAh (apparent energy, PF-adjusted) or kWh
     // when the user switches the toggle off. Each reading's own multiplying
     // factor (CT × PT ratio) is applied so meters with different MF never

@@ -36,8 +36,11 @@ class SavingOpportunityGenerator {
     final ops = <SavingOpportunity>[];
     final floor = breakdown.contractDemand * 0.75;
 
+    // Only suggest shaving the peak when demand is already high enough to
+    // matter (above 75% of contract). The reduction is a genuine 10% of the
+    // billed demand, so the title/description stay consistent with the saving.
     if (breakdown.billingDemand > floor) {
-      final reducedBilling = max(floor, breakdown.billingDemand * 0.9);
+      final reducedBilling = breakdown.billingDemand * 0.9;
       if (reducedBilling < breakdown.billingDemand - 1) {
         final savings =
             (breakdown.billingDemand - reducedBilling) *
@@ -48,9 +51,9 @@ class SavingOpportunityGenerator {
             title:
                 'Max Demand ${breakdown.billingDemand.toStringAsFixed(0)} → ${reducedBilling.toStringAsFixed(0)} kVA',
             description:
-                'Peak demand 10% kam karne se demand charges me direct bachat.',
+                'Lowering peak demand by 10% reduces demand charges directly.',
             action:
-                'Heavy machines ko alag-alag time par chalao, peak ek saath na aaye',
+                'Stagger heavy machinery operation to avoid simultaneous peaks',
             monthlySavings: savings,
           ),
         );
@@ -70,9 +73,9 @@ class SavingOpportunityGenerator {
           title:
               'PF ${breakdown.powerFactor.toStringAsFixed(2)} → ${AppConstants.pfRebateThreshold.toStringAsFixed(2)}',
           description: breakdown.powerFactor < AppConstants.pfSurchargeThreshold
-              ? 'Abhi ${AppConstants.pfSurchargePercent.toInt()}% surcharge lag raha hai, rebate bhi miss ho rahi hai.'
-              : 'Rebate boundary se thoda neeche ho — thoda improvement me rebate mil jayegi.',
-          action: 'APFC panel / capacitor bank check karo',
+              ? 'A ${AppConstants.pfSurchargePercent.toInt()}% surcharge currently applies and you are also missing the rebate.'
+              : 'Just below the rebate threshold — a small improvement will earn the rebate.',
+          action: 'Check the APFC panel / capacitor bank',
           monthlySavings: savings,
         ),
       );
@@ -91,10 +94,10 @@ class SavingOpportunityGenerator {
           SavingOpportunity(
             type: SavingType.loadSmoothing,
             title:
-                'Load smooth karo — Load Factor ${(breakdown.loadFactor * 100).toStringAsFixed(0)}%',
+                'Smooth the load — Load Factor ${(breakdown.loadFactor * 100).toStringAsFixed(0)}%',
             description:
-                'Peak ko flat karne se demand charges ghatenge bina consumption kam kiye.',
-            action: 'High-power loads ko peak hours se bahar shift karo',
+                'Flattening the peak reduces demand charges without lowering consumption.',
+            action: 'Shift high-power loads outside peak hours',
             monthlySavings: savings,
           ),
         );
@@ -107,8 +110,8 @@ class SavingOpportunityGenerator {
 
   /// Issue 7C — Contract Demand Optimizer.
   ///
-  /// Jab last 6 months ka peak MD contract demand ke 80% se bhi kam ho to
-  /// contract kam karne ki suggestion — direct ₹ bachat.
+  /// When the last 6 months' peak MD stays below 80% of the contract demand,
+  /// suggest lowering the contract — direct ₹ savings.
   static SavingOpportunity? generateContractDemandOptimizer({
     required List<EnergyLogEntity> logs,
     required double contractDemand,
@@ -129,7 +132,7 @@ class SavingOpportunityGenerator {
       monthlyPeaks.add(peak);
     }
 
-    // Sirf tab suggest karo jab kaafi history ho (>= 6 months data).
+    // Only suggest when there is enough history (>= 6 months of data).
     final monthsWithData = monthlyPeaks.where((p) => p > 0).length;
     if (monthsWithData < 6) return null;
 
@@ -147,10 +150,10 @@ class SavingOpportunityGenerator {
       title:
           'Contract ${contractDemand.toStringAsFixed(0)} → ${suggested.toStringAsFixed(0)} kVA',
       description:
-          'Last 6 months ka peak MD sirf ${maxPeak.toStringAsFixed(0)} kVA hai — '
-          'contract demand ${((maxPeak / contractDemand) * 100).toStringAsFixed(0)}% use ho raha hai.',
+          'The peak MD over the last 6 months is only ${maxPeak.toStringAsFixed(0)} kVA — '
+          '${((maxPeak / contractDemand) * 100).toStringAsFixed(0)}% of the contract demand is being used.',
       action:
-          'Utility se contract demand reduce karne ke liye apply karo (rate revision ke saath compare karke)',
+          'Apply to the utility to reduce the contract demand (compare with a rate revision first)',
       monthlySavings: savings,
     );
   }

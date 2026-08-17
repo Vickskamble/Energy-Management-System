@@ -1,7 +1,7 @@
 # PowerEMS — Privacy Policy
 
 **Effective date:** 11 August 2026
-**Last updated:** 11 August 2026
+**Last updated:** 17 August 2026
 **Applies to:** PowerEMS ("the Service", "we", "us", "our") — web app, Android app, Windows and macOS desktop apps, and any related services.
 
 > This policy explains what data we collect, why we collect it, how we protect it, and the rights you have over it. It applies to all users of PowerEMS, including the demo account.
@@ -86,7 +86,8 @@ Subject to applicable law (DPDP Act 2023 / GDPR where relevant), you may:
 |---|---|---|
 | Supabase | Cloud hosting, database, auth | Your account data (processed per their DPA) |
 | Google Fonts / gstatic (web) | Font rendering | IP address (standard web request) |
-| GitHub Pages | Web hosting | Standard web server logs |
+| Vercel | Web app hosting (app.brilliants.in) | Standard web server logs |
+| GitHub Releases | App distribution (installer/APK) | Standard download logs |
 
 We enter appropriate data-processing terms with providers. We do **not** share your data with any other third party.
 
@@ -107,13 +108,13 @@ In the event of a breach affecting your data, we will notify you within 72 hours
 
 Material changes are posted here with an updated date at the top. Continued use after the effective date constitutes acceptance. For material changes, we will additionally notify via in-app notice.
 
-## 12. Contact
+## 12. Contact / Grievance Officer
 
 **Data controller / service provider:** PowerEMS (Vick Skamble)
-**Email:** [support email — to be filled]
+**Email:** Mrvikas_kamble@rediffmail.com
 **Address:** [to be filled]
 
-Questions, rights requests, or complaints: contact the above with the subject "Privacy".
+Questions, rights requests, or complaints: contact the above with the subject "Privacy". We acknowledge requests within 7 days and respond within 30 days. If you are dissatisfied with our response, you may file a complaint with the Data Protection Board of India (once constituted) or the appropriate authority.
 
 ---
 

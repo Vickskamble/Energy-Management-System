@@ -20,6 +20,7 @@ import '../../domain/entities/energy_log_entity.dart';
 import '../bloc/energy_bloc.dart';
 import '../bloc/energy_event.dart';
 import '../bloc/energy_state.dart';
+import '../widgets/readings_preview_sheet.dart';
 
 class AnalysisPage extends StatelessWidget {
   final MonthFilterController monthFilter;
@@ -38,8 +39,18 @@ class AnalysisPage extends StatelessWidget {
             logs: logs,
             monthFilter: monthFilter,
           ),
-          EnergyValidationError _ => Center(child: Text(state.message)),
-          EnergyOperationFailure _ => Center(child: Text(state.message)),
+          EnergyValidationError _ => AppErrorState(
+            message: state.message,
+            onRetry: () => context
+                .read<EnergyBloc>()
+                .add(const LoadInitialDashboardData()),
+          ),
+          EnergyOperationFailure _ => AppErrorState(
+            message: state.message,
+            onRetry: () => context
+                .read<EnergyBloc>()
+                .add(const LoadInitialDashboardData()),
+          ),
         };
       },
     );
@@ -210,7 +221,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                 padding: const EdgeInsets.symmetric(vertical: 28),
                 child: Center(
                   child: Text(
-                    'Is period me koi readings nahi',
+                    'No readings found for this period',
                     style: TextStyle(
                       fontSize: 12.5,
                       color: AppColors.textSecondary,
@@ -244,76 +255,94 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     );
   }
 
-  // ── Site selector chips (Issue 7E) ────────────────────────────────────
+  // ── Site selector dropdown (Issue 7E) ────────────────────────────────
   Widget _buildSiteSelector() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    final names = _siteNames;
+    final value =
+        (_selectedSite != null && names.contains(_selectedSite))
+        ? _selectedSite!
+        : 'All Sites';
+    return AppCard(
       child: Row(
         children: [
-          _siteChip('All Sites', null),
-          for (final site in _siteNames) _siteChip(site, site),
+          const Icon(
+            Icons.location_on_outlined,
+            size: 20,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Site',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              child: DropdownButton<String>(
+                value: value,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                items: [
+                  'All Sites',
+                  for (final site in names) site,
+                ]
+                    .map(
+                      (s) => DropdownMenuItem(value: s, child: Text(s)),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() {
+                  _selectedSite = (v == 'All Sites') ? null : v;
+                  _selectedMeter = null;
+                }),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _siteChip(String label, String? value) {
-    final selected = _selectedSite == value;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => setState(() {
-          _selectedSite = value;
-          _selectedMeter = null;
-        }),
-        selectedColor: AppColors.kpiSavings.withValues(alpha: 0.15),
-        labelStyle: TextStyle(
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-          color: selected ? AppColors.kpiSavings : AppColors.textSecondary,
-        ),
-        side: BorderSide(
-          color: selected ? AppColors.kpiSavings : AppColors.borderLight,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      ),
-    );
-  }
-
-  // ── Meter selector chips ──────────────────────────────────────────────
+  // ── Meter selector dropdown ──────────────────────────────────────────
   Widget _buildMeterSelector() {
     final names = _meterNames;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    final value = (_selectedMeter != null && names.contains(_selectedMeter))
+        ? _selectedMeter!
+        : 'All Meters';
+    return AppCard(
       child: Row(
         children: [
-          _meterChip('All Meters', null),
-          for (final name in names) _meterChip(name, name),
+          const Icon(
+            Icons.speed_rounded,
+            size: 20,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Meter',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              child: DropdownButton<String>(
+                value: value,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                items: [
+                  'All Meters',
+                  for (final name in names) name,
+                ]
+                    .map(
+                      (m) => DropdownMenuItem(value: m, child: Text(m)),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() {
+                  _selectedMeter = (v == 'All Meters') ? null : v;
+                }),
+              ),
+            ),
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _meterChip(String label, String? value) {
-    final selected = _selectedMeter == value;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => setState(() => _selectedMeter = value),
-        selectedColor: AppColors.primary.withValues(alpha: 0.15),
-        labelStyle: TextStyle(
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-          color: selected ? AppColors.primary : AppColors.textSecondary,
-        ),
-        side: BorderSide(
-          color: selected ? AppColors.primary : AppColors.borderLight,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }
@@ -345,7 +374,9 @@ class _AnalysisContentState extends State<_AnalysisContent> {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('PDF export failed: $e'),
+                    content: const Text(
+                      'Could not generate the PDF report. Please try again.',
+                    ),
                     backgroundColor: Colors.red.shade700,
                   ),
                 );
@@ -457,6 +488,26 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     if (logs.length < 2) return const SizedBox.shrink();
     final recent = logs.length > 30 ? logs.sublist(logs.length - 30) : logs;
 
+    // Tap a trend point → preview all readings of that day.
+    void showDayReadings(EnergyLogEntity log) {
+      final sameDay =
+          _filtered
+              .where(
+                (l) =>
+                    l.loggedAt.year == log.loggedAt.year &&
+                    l.loggedAt.month == log.loggedAt.month &&
+                    l.loggedAt.day == log.loggedAt.day,
+              )
+              .toList()
+            ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+      showReadingsPreviewSheet(
+        context,
+        title:
+            'Readings · ${DateFormat('d MMM yyyy').format(log.loggedAt)}',
+        logs: sameDay.isEmpty ? [log] : sameDay,
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -479,6 +530,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     ),
                   ],
                   unit: '',
+                  onTapPoint: (i) => showDayReadings(recent[i]),
                 ),
               ),
               const SizedBox(height: 12),
@@ -493,6 +545,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     ),
                   ],
                   unit: '',
+                  onTapPoint: (i) => showDayReadings(recent[i]),
                 ),
               ),
             ],
@@ -513,6 +566,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                       ),
                     ],
                     unit: '',
+                    onTapPoint: (i) => showDayReadings(recent[i]),
                   ),
                 ),
               ),
@@ -529,6 +583,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                       ),
                     ],
                     unit: '',
+                    onTapPoint: (i) => showDayReadings(recent[i]),
                   ),
                 ),
               ),
@@ -541,14 +596,13 @@ class _AnalysisContentState extends State<_AnalysisContent> {
   // ── Month-over-month comparison (Issue 5 / 4F) ────────────────────────
   Widget _buildMonthComparison() {
     if (_filtered.isEmpty) return const SizedBox.shrink();
-    final month = _selection.month;
-    if (_selection.year != null || month == null) {
-      return const SizedBox.shrink();
-    }
-    final now = DateTime.now();
-    final refMonth = _selection.isCurrent
-        ? DateTime(now.year, now.month)
-        : month;
+    // "This Month" has month == null but should still compare vs last month.
+    final effectiveMonth = _selection.month ??
+        (_selection.isCurrent
+            ? DateTime(DateTime.now().year, DateTime.now().month)
+            : null);
+    if (effectiveMonth == null) return const SizedBox.shrink();
+    final refMonth = effectiveMonth;
     final prevStart = DateTime(refMonth.year, refMonth.month - 1, 1);
     final previous = _entities
         .where(
@@ -667,7 +721,14 @@ class _AnalysisContentState extends State<_AnalysisContent> {
       AppColors.kpiDemand,
     ];
 
-    final daily = _selection.month != null;
+    // "This Month" keeps `month == null` (so it auto-follows the live month);
+    // treat it exactly like a picked month so the chart shows a DAILY breakdown
+    // (multiple points) instead of collapsing to a single monthly point.
+    final effectiveMonth = _selection.month ??
+        (_selection.isCurrent
+            ? DateTime(DateTime.now().year, DateTime.now().month)
+            : null);
+    final daily = effectiveMonth != null;
 
     // Union axis: days of the selected month, or every (year, month) in
     // history — every meter's series aligns to the same x positions.
@@ -688,7 +749,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
 
     final xLabels = <String>[];
     if (daily) {
-      final m = _selection.month!;
+      final m = effectiveMonth;
       xLabels.addAll(
         [
           for (final d in axisKeys)
@@ -751,6 +812,47 @@ class _AnalysisContentState extends State<_AnalysisContent> {
         ? 'Daily — ${_selection.label}'
         : 'Monthly — all readings';
 
+    // Tap a trend point → preview all readings of that day / month.
+    void showBucketReadings(int index) {
+      if (index < 0 || index >= axisKeys.length) return;
+      final k = axisKeys[index];
+      if (daily) {
+        final m = effectiveMonth;
+        final logs =
+            _siteEntities
+                .where(
+                  (e) =>
+                      e.loggedAt.year == m.year &&
+                      e.loggedAt.month == m.month &&
+                      e.loggedAt.day == k,
+                )
+                .toList()
+              ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+        showReadingsPreviewSheet(
+          context,
+          title:
+              'Readings · ${DateFormat('d MMM').format(DateTime(m.year, m.month, k))}',
+          logs: logs,
+        );
+      } else {
+        final year = k ~/ 12;
+        final month = (k % 12) + 1;
+        final logs =
+            _siteEntities
+                .where(
+                  (e) =>
+                      e.loggedAt.year == year && e.loggedAt.month == month,
+                )
+                .toList()
+              ..sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+        showReadingsPreviewSheet(
+          context,
+          title: 'Readings · ${DateFormat('MMM yy').format(DateTime(year, month))}',
+          logs: logs,
+        );
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -769,6 +871,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   unit: 'kWh',
                   xLabels: xLabels,
                   xLabelStep: xLabelStep,
+                  onTapPoint: showBucketReadings,
                 ),
               ),
               const SizedBox(height: 12),
@@ -779,6 +882,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   unit: 'kVA',
                   xLabels: xLabels,
                   xLabelStep: xLabelStep,
+                  onTapPoint: showBucketReadings,
                 ),
               ),
             ],
@@ -795,6 +899,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     unit: 'kWh',
                     xLabels: xLabels,
                     xLabelStep: xLabelStep,
+                    onTapPoint: showBucketReadings,
                   ),
                 ),
               ),
@@ -807,6 +912,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     unit: 'kVA',
                     xLabels: xLabels,
                     xLabelStep: xLabelStep,
+                    onTapPoint: showBucketReadings,
                   ),
                 ),
               ),
@@ -817,7 +923,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
   }
 
   // ── MD breach prediction (Issue 5) ────────────────────────────────────
-  /// "Is rate par kab breach hoga" — latest month ki MD growth rate se.
+  /// "When will MD breach at this rate" — from the latest month MD growth rate.
   Widget _buildMdBreachPrediction() {
     final now = DateTime.now();
     final monthLogs = _siteEntities
@@ -862,13 +968,13 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     if (peakMd >= contract) {
       title = 'MD Breach — ${peakMd.toStringAsFixed(0)} kVA > contract ${contract.toStringAsFixed(0)} kVA';
       body =
-          'Is month ka peak demand contract limit cross kar chuka hai — excess demand penalty lagegi.';
+          'This month peak demand has crossed the contract limit — an excess demand penalty will apply.';
       color = AppColors.danger;
       icon = Icons.error_rounded;
     } else if (peakMd >= threshold) {
-      title = 'MD ${peakMd.toStringAsFixed(0)} kVA — breach threshold par';
+      title = 'MD ${peakMd.toStringAsFixed(0)} kVA — at breach threshold';
       body =
-          'Current peak contract ke ${AppConstants.mdWarningRatio * 100}% par hai. Non-essential loads shift karo.';
+          'Current peak is at ${(AppConstants.mdWarningRatio * 100).toStringAsFixed(0)}% of contract. Shift non-essential loads to off-peak hours.';
       color = AppColors.warning;
       icon = Icons.warning_amber_rounded;
     } else if (rate > 0.01) {
@@ -876,26 +982,28 @@ class _AnalysisContentState extends State<_AnalysisContent> {
       if (daysToBreach <= daysLeft) {
         final breachDate = now.add(Duration(days: daysToBreach.ceil()));
         title =
-            'Is rate par ${DateFormat('d MMM').format(breachDate)} ko breach hoga';
+            'Breach expected on ${DateFormat('d MMM').format(breachDate)} at this rate';
         body =
-            'MD ${rate.toStringAsFixed(1)} kVA/day badh raha hai — '
-            '${daysToBreach.ceil().toString()} din me threshold '
-            '${threshold.toStringAsFixed(0)} kVA cross hoga (contract ${contract.toStringAsFixed(0)} kVA).';
+            'MD is rising ${rate.toStringAsFixed(1)} kVA/day — it will cross the '
+            '${threshold.toStringAsFixed(0)} kVA threshold in '
+            '${daysToBreach.ceil().toString()} days (contract ${contract.toStringAsFixed(0)} kVA).';
         color = AppColors.warning;
         icon = Icons.trending_up_rounded;
       } else {
-        title = 'MD breach ka risk nahi';
+        title = 'No risk of MD breach';
         body =
-            'Peak ${peakMd.toStringAsFixed(0)} kVA contract se door hai; '
-            '${rate.toStringAsFixed(1)} kVA/day ki growth par bhi month-end safe rahega.';
+            'Peak ${peakMd.toStringAsFixed(0)} kVA is well below the '
+            '${contract.toStringAsFixed(0)} kVA contract; month-end remains '
+            'safe even at ${rate.toStringAsFixed(1)} kVA/day growth.';
         color = AppColors.success;
         icon = Icons.verified_rounded;
       }
     } else {
-      title = 'MD control me hai';
+      title = 'MD is under control';
       body =
-          'Peak ${peakMd.toStringAsFixed(0)} kVA — contract ${contract.toStringAsFixed(0)} kVA ka '
-          '${((peakMd / contract) * 100).toStringAsFixed(0)}% use hua.';
+          'Peak is ${peakMd.toStringAsFixed(0)} kVA — '
+          '${((peakMd / contract) * 100).toStringAsFixed(0)}% of the '
+          '${contract.toStringAsFixed(0)} kVA contract.';
       color = AppColors.success;
       icon = Icons.verified_rounded;
     }
@@ -1038,6 +1146,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     required String unit,
     List<String>? xLabels,
     int xLabelStep = 1,
+    void Function(int index)? onTapPoint,
   }) {
     final maxY = series
         .expand((s) => s.values)
@@ -1056,7 +1165,9 @@ class _AnalysisContentState extends State<_AnalysisContent> {
           child: LineChart(
             LineChartData(
               minX: 0,
-              maxX: (series.first.values.length - 1).toDouble(),
+              maxX: (series.first.values.length - 1)
+                  .toDouble()
+                  .clamp(1.0, double.infinity),
               minY: 0,
               maxY: maxY.clamp(1.0, double.infinity),
               gridData: FlGridData(
@@ -1125,6 +1236,22 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   ),
               ],
               lineTouchData: LineTouchData(
+                touchCallback:
+                    onTapPoint == null
+                        ? null
+                        : (event, response) {
+                            if (event is FlTapUpEvent &&
+                                response != null &&
+                                response.lineBarSpots != null &&
+                                response.lineBarSpots!.isNotEmpty) {
+                              final idx = response.lineBarSpots!.first.x
+                                  .toInt();
+                              if (idx >= 0 &&
+                                  idx < series.first.values.length) {
+                                onTapPoint(idx);
+                              }
+                            }
+                          },
                 touchTooltipData: LineTouchTooltipData(
                   getTooltipItems: (touchedSpots) => touchedSpots
                       .map(

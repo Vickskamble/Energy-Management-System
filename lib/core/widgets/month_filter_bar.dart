@@ -59,6 +59,143 @@ class MonthFilterController extends ValueNotifier<MonthFilterValue> {
   MonthFilterController() : super(const MonthFilterValue.current());
 }
 
+/// Dropdown-based month/year filter — same shared controller as
+/// [MonthFilterBar], but every option lives in compact dropdowns so no month
+/// is ever hidden behind a horizontal scroll.
+class MonthFilterDropdown extends StatelessWidget {
+  final MonthFilterController controller;
+
+  /// Distinct months present in the data (deduped + sorted inside).
+  final List<DateTime> availableMonths;
+
+  /// Show the "All Time" option (used by Reports).
+  final bool includeAllTime;
+
+  const MonthFilterDropdown({
+    super.key,
+    required this.controller,
+    required this.availableMonths,
+    this.includeAllTime = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final seen = <String, DateTime>{};
+    final months = <DateTime>[];
+    for (final m in availableMonths) {
+      final key = '${m.year}-${m.month}';
+      if (seen.containsKey(key)) continue;
+      seen[key] = m;
+      months.add(DateTime(m.year, m.month));
+    }
+    months.sort((a, b) => b.compareTo(a));
+    final years = <int>{for (final m in months) m.year}.toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    return ValueListenableBuilder<MonthFilterValue>(
+      valueListenable: controller,
+      builder: (context, value, _) {
+        final String yearKey;
+        if (value.isCurrent) {
+          yearKey = 'current';
+        } else if (value.allTime) {
+          yearKey = 'all';
+        } else {
+          yearKey = '${value.year ?? value.month!.year}';
+        }
+        final year = int.tryParse(yearKey);
+        final monthsOfYear = year == null
+            ? const <DateTime>[]
+            : months.where((m) => m.year == year).toList();
+
+        Widget yearDropdown = DropdownButtonFormField<String>(
+          key: ValueKey(yearKey),
+          initialValue: yearKey,
+          isExpanded: true,
+          isDense: true,
+          decoration: InputDecoration(
+            labelText: value.isCurrent
+                ? 'Period'
+                : (year == null ? 'Year' : 'Period'),
+            isDense: true,
+            prefixIcon: const Icon(Icons.calendar_month_outlined, size: 20),
+          ),
+          items: [
+            const DropdownMenuItem(
+              value: 'current',
+              child: Text('This Month'),
+            ),
+            if (includeAllTime)
+              const DropdownMenuItem(value: 'all', child: Text('All Time')),
+            for (final y in years)
+              DropdownMenuItem(value: '$y', child: Text('$y')),
+          ],
+          onChanged: (v) {
+            if (v == null) return;
+            if (v == 'current') {
+              controller.value = const MonthFilterValue.current();
+            } else if (v == 'all') {
+              controller.value = const MonthFilterValue.allTime();
+            } else {
+              controller.value = MonthFilterValue.year(int.parse(v));
+            }
+          },
+        );
+
+        if (year != null) {
+          final selectedMonth =
+              value.month != null && value.month!.year == year
+              ? '${value.month!.year}-${value.month!.month}'
+              : '$year';
+          yearDropdown = Row(
+            children: [
+              Expanded(child: yearDropdown),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey(selectedMonth),
+                  initialValue: selectedMonth,
+                  isExpanded: true,
+                  isDense: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Month',
+                    isDense: true,
+                    prefixIcon: Icon(Icons.date_range_outlined, size: 20),
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: '$year',
+                      child: const Text('Whole Year'),
+                    ),
+                    for (final m in monthsOfYear)
+                      DropdownMenuItem(
+                        value: '${m.year}-${m.month}',
+                        child: Text(DateFormat('MMMM').format(m)),
+                      ),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    final parts = v.split('-');
+                    if (parts.length == 1) {
+                      controller.value = MonthFilterValue.year(year);
+                    } else {
+                      controller.value = MonthFilterValue.month(
+                        DateTime(int.parse(parts[0]), int.parse(parts[1])),
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
+          );
+        }
+
+        return yearDropdown;
+      },
+    );
+  }
+}
+
 /// Top filter bar: "This Month" + every month present in the data + optional
 /// "All Time" + a calendar picker for any month.
 ///

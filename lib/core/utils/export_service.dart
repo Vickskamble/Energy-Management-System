@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import '../../domain/entities/energy_log_entity.dart';
 import 'export_service_io.dart'
@@ -40,5 +41,15 @@ class ExportService {
       return '"${value.replaceAll('"', '""')}"';
     }
     return value;
+  }
+
+  /// Saves the Excel import sample template (see
+  /// [ExcelImportService.generateSampleTemplate]).
+  Future<void> exportSampleTemplate(Uint8List bytes) async {
+    await save.saveBytes(
+      bytes,
+      'ems_import_template.xlsx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
   }
 }

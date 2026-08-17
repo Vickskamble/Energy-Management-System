@@ -47,12 +47,31 @@ class BackupService {
   /// exhaust memory or JSON nesting (SECURITY.md gap G8).
   static const int maxRestoreSizeBytes = 20 * 1024 * 1024; // 20 MB
 
-  static Future<void> exportBackup({required String passphrase}) async {
+  /// Fetch ALL logs via pagination (default limit caps at 1000 rows, so
+  /// plain fetchLogs would silently truncate large histories).
+  static Future<List<EnergyLogModel>> _fetchAllLogs() async {
+    const pageSize = 1000;
+    final all = <EnergyLogModel>[];
+    var offset = 0;
+    while (true) {
+      final batch = await EnergyLogRemoteDatasource().fetchLogs(
+        limit: pageSize,
+        offset: offset,
+      );
+      all.addAll(batch);
+      if (batch.length < pageSize) break;
+      offset += pageSize;
+    }
+    return all;
+  }
+
+  static Future<void> exportBackup({String? passphrase}) async {
     final client = SupabaseClientManager.client;
     final uid = client.auth.currentUser?.id;
     if (uid == null) throw StateError('You must be signed in to export data.');
 
-    final logs = await EnergyLogRemoteDatasource().fetchLogs(limit: 1000);
+    final logs = await _fetchAllLogs();
+
     final meters = await MeterRemoteDatasource().getAllMeters();
 
     final settingsRow = await client
@@ -63,7 +82,7 @@ class BackupService {
 
     final billRows = await client
         .from('bill_reconcile')
-        .select('month_key,amount')
+        .select('month_key,amount')      
         .eq('user_id', uid);
 
     final payload = jsonEncode({
@@ -76,6 +95,18 @@ class BackupService {
           .map((r) => {'month_key': r['month_key'], 'amount': r['amount']})
           .toList(),
     });
+
+    // Plaintext export when no passphrase is supplied — easier for users who
+    // just want a quick copy. Keep the file secure; it is unencrypted.
+    if (passphrase == null || passphrase.isEmpty) {
+      final stamp = DateTime.now().toIso8601String().split('T').first;
+      await save.saveBytes(
+        Uint8List.fromList(utf8.encode(payload)),
+        'ems_backup_$stamp.json',
+        'application/json',
+      );
+      return;
+    }
 
     final encrypted = await _encrypt(utf8.encode(payload), passphrase);
     final container = jsonEncode({

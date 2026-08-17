@@ -228,17 +228,17 @@ void main() {
       expect(b.facCharges, closeTo(1100 * 0.55, 0.01));
     });
 
-    test('combined PF uses client-recorded PFs (kWh-weighted, multi-meter)',
-        () {
-      // Meter A: PF recorded 0.9, MF 1; Meter B: PF recorded 0.8, MF 10 —
-      // the recorded values win; kWh×MF weights combine them.
-      final a = log(900, 1000, 150, mf: 1, pf: 0.9);
-      final b = log(800, 1000, 120, mf: 10, pf: 0.8);
+    test('combined PF is ΣkWh ÷ ΣkVAh, ignoring stored per-reading PF', () {
+      // Meter A and B with very different recorded PFs — the aggregate must be
+      // the ratio of sums, never a weighted blend of the stored values.
+      final a = log(900, 1000, 150, mf: 1, pf: 0.95);
+      final b = log(800, 1000, 120, mf: 10, pf: 0.50);
       final calc = BillCalculator.calculate(logs: [a, b]);
-      final expected = (0.9 * 900 * 1 + 0.8 * 800 * 10) /
-          (900 * 1 + 800 * 10);
+      final expected = (900 * 1 + 800 * 10) / (1000 * 1 + 1000 * 10);
       expect(calc.powerFactor, closeTo(expected, 0.001));
-      expect(calc.powerFactor, isNot(closeTo(1700 / 2000, 0.001)));
+      // The recorded PFs (0.95, 0.50) must NOT influence the aggregate.
+      final weighted = (0.95 * 900 + 0.50 * 800) / (900 + 800);
+      expect(calc.powerFactor, isNot(closeTo(weighted, 0.001)));
     });
 
     test('combined PF falls back to kWh ÷ kVAh when no PF was recorded', () {
@@ -249,7 +249,7 @@ void main() {
       expect(calc.powerFactor, closeTo(expected, 0.001));
     });
 
-    test('PF falls back to kWh-weighted stored PF when kVAh is missing', () {
+    test('PF is 0 when total kVAh is 0 (stored PF is ignored)', () {
       final noKvah = EnergyLogEntity(
         id: 'c',
         meterName: 'Meter C',
@@ -264,8 +264,8 @@ void main() {
         loggedAt: DateTime(2026, 7, 20),
       );
       final calc = BillCalculator.calculate(logs: [noKvah]);
-      expect(calc.powerFactor, closeTo(0.91, 0.001));
-      expect(calc.pfSurcharge, 0);
+      expect(calc.powerFactor, 0);
+      expect(calc.pfRebate, 0);
     });
 
     test('PF is 0 only when no PF data at all', () {

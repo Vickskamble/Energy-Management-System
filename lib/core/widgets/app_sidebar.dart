@@ -82,6 +82,12 @@ class _AppSidebarState extends State<AppSidebar> {
         index: 4,
       ),
       SidebarItem(
+        icon: Icons.file_upload_outlined,
+        activeIcon: Icons.file_upload_rounded,
+        label: 'Import',
+        index: 7,
+      ),
+      SidebarItem(
         icon: Icons.workspace_premium_outlined,
         activeIcon: Icons.workspace_premium_rounded,
         label: 'Plan & Billing',

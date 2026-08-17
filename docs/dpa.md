@@ -40,7 +40,8 @@ In practice the Service processes **minimal personal data** — primarily busine
 | Subprocessor | Role | Location |
 |---|---|---|
 | Supabase | Cloud hosting, database (Postgres), authentication, RLS enforcement | Data centers per Supabase's regional configuration |
-| GitHub Pages / GitHub Releases | Web hosting and distribution of the client app | GitHub's global infrastructure |
+| Vercel | Web app hosting (app.brilliants.in) | Vercel's global infrastructure |
+| GitHub Releases | Distribution of the client apps (installer/APK) | GitHub's global infrastructure |
 | Google Fonts (web) | Font assets for the web build | Google CDN |
 
 - Prior written notice will be given before adding or replacing subprocessors; Controller may object within 30 days.
@@ -92,7 +93,7 @@ The Processor maintains technical and organizational measures (T&OM), as impleme
 
 ## 13. Contact
 
-**Processor:** PowerEMS (Vick Skamble) — [email], [address]
+**Processor:** PowerEMS (Vick Skamble) — Mrvikas_kamble@rediffmail.com, [address]
 **Controller:** ______________________ — [email], [address]
 
 **Signatures:**

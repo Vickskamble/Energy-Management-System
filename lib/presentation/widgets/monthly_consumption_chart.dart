@@ -6,11 +6,36 @@ import '../../domain/entities/energy_log_entity.dart';
 class MonthlyConsumptionChart extends StatelessWidget {
   final List<EnergyLogEntity> logs;
 
-  const MonthlyConsumptionChart({super.key, required this.logs});
+  /// Called with the tapped 1-based month of the chart's max year.
+  final ValueChanged<int>? onMonthTap;
+
+  /// Client's daily avg kWh target — draws a dashed "target × days of month"
+  /// cross line. 0 = no line.
+  final double targetKwhPerDay;
+
+  const MonthlyConsumptionChart({
+    super.key,
+    required this.logs,
+    this.onMonthTap,
+    this.targetKwhPerDay = 0.0,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final onTap = onMonthTap;
     final monthlyMap = <int, double>{};
+
+    if (logs.isEmpty) {
+      return const SizedBox(
+        height: 200,
+        child: Center(
+          child: Text(
+            'No monthly data',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
 
     final maxYear = logs
         .map((l) => l.loggedAt.year)
@@ -48,16 +73,36 @@ class MonthlyConsumptionChart extends StatelessWidget {
         ),
     ];
     final maxConsumption = spots.fold(0.0, (m, s) => s.y > m ? s.y : m);
-    final chartMaxY = (maxConsumption * 1.2).clamp(1.0, double.infinity);
+    var chartMaxY = (maxConsumption * 1.2).clamp(1.0, double.infinity);
 
-    return SizedBox(
-      height: 260,
-      child: LineChart(
-        LineChartData(
-          minX: 0,
-          maxX: 11,
-          minY: 0,
-          maxY: chartMaxY,
+    // Dashed cross line = daily target × days in each month, so a monthly
+    // bar crossing it means the client exceeded the daily avg budget.
+    final targetSpots = <FlSpot>[];
+    if (targetKwhPerDay > 0) {
+      for (var m = 1; m <= 12; m++) {
+        final days = DateTime(maxYear, m + 1, 0).day;
+        final y = targetKwhPerDay * days;
+        targetSpots.add(FlSpot((m - 1).toDouble(), y));
+        if (y > chartMaxY) chartMaxY = y;
+      }
+      chartMaxY = chartMaxY * 1.05;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (targetSpots.isNotEmpty) ...[
+          _targetLegend(),
+          const SizedBox(height: 8),
+        ],
+        SizedBox(
+          height: 260,
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: 11,
+              minY: 0,
+              maxY: chartMaxY,
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
@@ -167,8 +212,34 @@ class MonthlyConsumptionChart extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.08),
               ),
             ),
+            if (targetSpots.isNotEmpty)
+              LineChartBarData(
+                spots: targetSpots,
+                isCurved: false,
+                color: AppColors.danger,
+                barWidth: 1.5,
+                dashArray: [6, 4],
+                isStrokeCapRound: true,
+                dotData: const FlDotData(show: false),
+              ),
           ],
           lineTouchData: LineTouchData(
+            touchCallback:
+                onTap == null
+                    ? null
+                    : (event, response) {
+                        if (event is FlTapUpEvent &&
+                            response != null &&
+                            response.lineBarSpots != null &&
+                            response.lineBarSpots!.isNotEmpty) {
+                          final month = response.lineBarSpots!.first.x
+                                  .toInt() +
+                              1;
+                          if (monthlyMap.containsKey(month)) {
+                            onTap(month);
+                          }
+                        }
+                      },
             touchTooltipData: LineTouchTooltipData(
               getTooltipItems: (touchedSpots) => touchedSpots
                   .map(
@@ -186,6 +257,55 @@ class MonthlyConsumptionChart extends StatelessWidget {
           ),
         ),
       ),
+      ),
+        ],
     );
   }
+
+  Widget _targetLegend() {
+    return Row(
+      children: [
+        CustomPaint(
+          size: const Size(18, 4),
+          painter: _DashPainter(AppColors.danger),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'Daily target × days '
+          '(${targetKwhPerDay.toStringAsFixed(0)} kWh/day)',
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DashPainter extends CustomPainter {
+  final Color color;
+  _DashPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2;
+    const dash = 4.0;
+    const gap = 2.0;
+    double x = 0;
+    while (x < size.width) {
+      canvas.drawLine(
+        Offset(x, size.height / 2),
+        Offset((x + dash).clamp(0.0, size.width), size.height / 2),
+        paint,
+      );
+      x += dash + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

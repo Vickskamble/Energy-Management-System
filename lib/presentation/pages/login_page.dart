@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/validation_rules.dart';
 import '../../core/widgets/app_button.dart';
 import '../auth_bloc/auth_bloc.dart';
+import '../widgets/legal_consent_text.dart';
 import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -199,6 +200,11 @@ class _LoginPageState extends State<LoginPage>
                               child: const Text('Create account'),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 24),
+                          child: LegalConsentText(),
                         ),
                       ],
                     ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
 import 'app_sidebar.dart';
 import 'app_topbar.dart';
 
@@ -60,7 +62,7 @@ class _AppShellState extends State<AppShell> {
           ),
         ),
         title: Text(widget.title),
-        actions: widget.actions,
+        actions: [_buildUserChip(context, compact: true), ...?widget.actions],
       ),
       drawer: Drawer(
         child: ListView(
@@ -135,6 +137,53 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  /// Compact user chip shown in the top bar (desktop: avatar + name/email,
+  /// mobile: avatar only to save space).
+  Widget _buildUserChip(BuildContext context, {bool compact = false}) {
+    final initial = widget.userName.isNotEmpty
+        ? widget.userName.trim()[0].toUpperCase()
+        : 'U';
+    final avatar = CircleAvatar(
+      radius: compact ? 14 : 16,
+      backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w700,
+          fontSize: compact ? 12 : 14,
+        ),
+      ),
+    );
+    if (compact) {
+      return Padding(padding: const EdgeInsets.only(right: 4), child: avatar);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(right: AppSpacing.sm),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          avatar,
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.userName,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              Text(
+                widget.userEmail,
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   IconData _mobileIcon(int index) {
     switch (index) {
       case 0:
@@ -206,7 +255,10 @@ class _AppShellState extends State<AppShell> {
                       setState(() => _sidebarCollapsed = !_sidebarCollapsed),
                   onNotificationsTap: widget.onNotificationsTap,
                   notificationCount: widget.notificationCount,
-                  actions: widget.actions,
+                  actions: [
+                    _buildUserChip(context),
+                    ...?widget.actions,
+                  ],
                 ),
                 Divider(
                   height: 1,

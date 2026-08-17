@@ -78,7 +78,8 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
               onPressed: () {},
               tooltip: 'Search',
             ),
-          if (showNotifications)
+          if (showNotifications &&
+              (notificationCount > 0 || onNotificationsTap != null))
             Stack(
               children: [
                 IconButton(

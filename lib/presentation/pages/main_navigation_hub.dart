@@ -13,6 +13,7 @@ import 'analysis_page.dart';
 import 'reports_page.dart';
 import 'meter_management_page.dart';
 import 'billing_page.dart';
+import 'excel_import_page.dart';
 import '../pages/settings_page.dart';
 
 class MainNavigationHub extends StatefulWidget {
@@ -27,6 +28,10 @@ class MainNavigationHub extends StatefulWidget {
 
 class _MainNavigationHubState extends State<MainNavigationHub> {
   int _selectedIndex = 0;
+
+  /// Highlighted sidebar item — can be 5 (Settings) / 6 (Billing) while those
+  /// routes are pushed on top of the IndexedStack body.
+  int _sidebarIndex = 0;
 
   /// Shared month selection — one filter for Dashboard, Analysis & Reports.
   final MonthFilterController _monthFilter = MonthFilterController();
@@ -72,17 +77,22 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
             onToggleTheme: widget.onToggleTheme,
           ),
         ),
-      );
+      ).then((_) => setState(() => _sidebarIndex = _selectedIndex));
+      setState(() => _sidebarIndex = index);
       return;
     }
     if (index == 6) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const BillingPage()),
-      );
+      ).then((_) => setState(() => _sidebarIndex = _selectedIndex));
+      setState(() => _sidebarIndex = index);
       return;
     }
-    setState(() => _selectedIndex = index);
+    setState(() {
+      _selectedIndex = index;
+      _sidebarIndex = index;
+    });
   }
 
   @override
@@ -93,6 +103,9 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       'Analysis',
       'Reports',
       'Meter Management',
+      '',
+      '',
+      'Excel Import',
     ];
     final hubTitle = _selectedIndex < titles.length
         ? titles[_selectedIndex]
@@ -107,7 +120,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
     return AppShell(
       title: hubTitle,
-      selectedIndex: _selectedIndex,
+      selectedIndex: _sidebarIndex,
       onItemSelected: _onItemTapped,
       body: IndexedStack(
         index: _selectedIndex,
@@ -116,11 +129,13 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
           DashboardPage(
             isActive: _selectedIndex == 0,
             monthFilter: _monthFilter,
+            onNavigateToMeters: () => _onItemTapped(4),
           ),
           const ReadingEntryPage(),
           AnalysisPage(monthFilter: _monthFilter),
           ReportsPage(monthFilter: _monthFilter),
           const MeterManagementPage(),
+          const ExcelImportPage(),
         ],
       ),
       userName: name,
@@ -130,6 +145,31 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       onThemeToggle: () => widget.onToggleTheme?.call(),
       isDark: widget.isDark,
       notificationCount: 0,
+      floatingActionButton:
+          _selectedIndex == 0 ? _dashboardFab() : null,
+    );
+  }
+
+  /// Dashboard-only FABs — quick actions for the two most common tasks.
+  Widget _dashboardFab() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        FloatingActionButton.extended(
+          heroTag: 'fab-reading',
+          icon: const Icon(Icons.edit_note_rounded),
+          label: const Text('Reading Entry'),
+          onPressed: () => _onItemTapped(1),
+        ),
+        const SizedBox(height: 12),
+        FloatingActionButton.extended(
+          heroTag: 'fab-add-meter',
+          icon: const Icon(Icons.add),
+          label: const Text('Add Your Meter'),
+          onPressed: () => _onItemTapped(4),
+        ),
+      ],
     );
   }
 }

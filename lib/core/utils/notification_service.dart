@@ -10,6 +10,9 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
+  String? _lastAlertKey;
+  DateTime? _lastAlertAt;
+
   static const String _channelId = 'ems_alerts';
   static const String _channelName = 'EMS Alerts';
   static const String _channelDesc = 'Alerts for PF penalty, MD breach, etc.';
@@ -84,6 +87,17 @@ class NotificationService {
     if (_initialized) await initialize();
     if (kIsWeb) return;
 
+    // Suppress identical alerts re-firing on every dashboard auto-refresh.
+    final key = '$id|$title|$body';
+    final now = DateTime.now();
+    if (_lastAlertKey == key &&
+        _lastAlertAt != null &&
+        now.difference(_lastAlertAt!).inSeconds < 60) {
+      return;
+    }
+    _lastAlertKey = key;
+    _lastAlertAt = now;
+
     if (defaultTargetPlatform == TargetPlatform.windows) {
       const windowsDetails = WindowsNotificationDetails();
       const details = NotificationDetails(windows: windowsDetails);
@@ -117,22 +131,42 @@ class NotificationService {
     );
   }
 
-  Future<void> showPfAlert(double pf) => showAlert(
-    id: 1,
-    title: '⚠️ Low Power Factor Penalty',
-    body:
-        'PF is ${pf.toStringAsFixed(3)} (below 0.95). '
-        'Check APFC panel to avoid 5% reactive penalty on your bill.',
-  );
+  Future<void> showPfAlert(
+    double pf, {
+    required String meterName,
+    String? site,
+  }) =>
+      showAlert(
+        id: 1,
+        title: '⚠️ Low Power Factor — $meterName',
+        body: '${_scopeLabel(meterName, site)}'
+            'PF is ${pf.toStringAsFixed(3)} (below 0.95). '
+            'Check APFC panel to avoid 5% reactive penalty on your bill.',
+      );
 
-  Future<void> showMdAlert(double md, double limit) => showAlert(
-    id: 2,
-    title: '⚠️ Near Maximum Demand Breach',
-    body:
-        'MD at ${md.toStringAsFixed(1)} kW, approaching '
-        '${limit.toStringAsFixed(0)} kW contract limit. '
-        'Shift non-essential loads to off-peak hours.',
-  );
+  Future<void> showMdAlert(
+    double md,
+    double limit, {
+    required String meterName,
+    String? site,
+  }) =>
+      showAlert(
+        id: 2,
+        title: '⚠️ MD Breach Risk — $meterName',
+        body: '${_scopeLabel(meterName, site)}'
+            'MD at ${md.toStringAsFixed(1)} kW, approaching '
+            '$limit kW contract limit. '
+            'Shift non-essential loads to off-peak hours.',
+      );
+
+  /// "Meter \"X\" (Site: Y): " prefix so the client always knows which
+  /// meter and site an alert belongs to.
+  static String _scopeLabel(String meterName, String? site) {
+    final s = (site ?? '').trim();
+    return s.isEmpty
+        ? 'Meter "$meterName": '
+        : 'Meter "$meterName" (Site: $s): ';
+  }
 
   Future<void> showSyncCompleteAlert(int count) => showAlert(
     id: 3,

@@ -67,9 +67,10 @@ class PdfReportService {
           ? l.mdRecorded * l.multiplyingFactor
           : peak,
     );
-    final avgPf = logs.isEmpty
+    final totalKvah = logs.fold<double>(0, (sum, l) => sum + l.kvah);
+    final avgPf = (logs.isEmpty || totalKvah <= 0)
         ? 0.0
-        : logs.fold<double>(0, (sum, l) => sum + l.powerFactor) / logs.length;
+        : (totalKwh / totalKvah).clamp(0.0, 1.0);
 
     return pw.Container(
       decoration: pw.BoxDecoration(

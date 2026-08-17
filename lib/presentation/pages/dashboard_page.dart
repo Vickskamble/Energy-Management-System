@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import '../../core/config/app_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -26,6 +25,16 @@ import '../bloc/energy_event.dart';
 import '../bloc/energy_state.dart';
 import '../widgets/dashboard_chart.dart';
 import '../widgets/monthly_consumption_chart.dart';
+import '../widgets/readings_preview_sheet.dart';
+
+typedef MeterAlert = ({
+  String meterName,
+  String? site,
+  double pf,
+  double md,
+  double contract,
+  List<({String issue, String solution})> items,
+});
 
 class DashboardPage extends StatefulWidget {
   /// Only refresh automatically while this tab is visible.
@@ -34,10 +43,15 @@ class DashboardPage extends StatefulWidget {
   /// Shared month filter — Dashboard, Analysis & Reports stay in sync.
   final MonthFilterController monthFilter;
 
+  /// Called when the user taps the first-run "Add your first meter" CTA so the
+  /// shell can switch to the Meter Management tab.
+  final VoidCallback? onNavigateToMeters;
+
   const DashboardPage({
     super.key,
     this.isActive = true,
     required this.monthFilter,
+    this.onNavigateToMeters,
   });
 
   @override
@@ -46,11 +60,61 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   Timer? _refreshTimer;
+  Map<String, String> _meterSites = {};
 
   @override
   void initState() {
     super.initState();
+    _loadMeterSites();
     if (widget.isActive) _startAutoRefresh();
+  }
+
+  Future<void> _loadMeterSites() async {
+    try {
+      final meters = await context.read<MeterRepository>().getAllMeters();
+      if (!mounted) return;
+      setState(
+        () => _meterSites = {for (final m in meters) m.name: m.site},
+      );
+    } catch (_) {
+      // Best-effort; alert attribution falls back to meter name only.
+    }
+  }
+
+  /// Meter with the lowest ΣkWh/ΣkVAh across the current data — the one most
+  /// responsible for any PF penalty.
+  ({String meterName, double pf})? _worstPfMeter(List<EnergyLogEntity> logs) {
+    final sums = <String, ({double kwh, double kvah})>{};
+    for (final e in logs) {
+      final cur = sums[e.meterName] ?? (kwh: 0.0, kvah: 0.0);
+      sums[e.meterName] = (
+        kwh: cur.kwh + e.kwh * e.multiplyingFactor,
+        kvah: cur.kvah + e.kvah * e.multiplyingFactor,
+      );
+    }
+    ({String meterName, double pf})? worst;
+    for (final entry in sums.entries) {
+      final kvah = entry.value.kvah;
+      final pf = kvah > 0 ? (entry.value.kwh / kvah).clamp(0.0, 1.0) : 0.0;
+      if (worst == null || pf < worst.pf) {
+        worst = (meterName: entry.key, pf: pf);
+      }
+    }
+    return worst;
+  }
+
+  /// Meter with the highest actual MD (kVA) — the one at risk of an MD breach.
+  ({String meterName, double md, double contract})? _worstMdMeter(
+    List<EnergyLogEntity> logs,
+  ) {
+    ({String meterName, double md, double contract})? worst;
+    for (final e in logs) {
+      final md = e.mdRecorded * e.multiplyingFactor;
+      if (worst == null || md > worst.md) {
+        worst = (meterName: e.meterName, md: md, contract: e.contractDemand);
+      }
+    }
+    return worst;
   }
 
   @override
@@ -88,13 +152,24 @@ class _DashboardPageState extends State<DashboardPage> {
     return BlocListener<EnergyBloc, EnergyState>(
       listener: (context, state) {
         if (state is EnergySuccess) {
-          if (state.currentPowerFactor < AppConstants.pfPenaltyThreshold) {
-            NotificationService.instance.showPfAlert(state.currentPowerFactor);
+          final logs = state.logs.cast<EnergyLogEntity>();
+          final worstPf = _worstPfMeter(logs);
+          if (worstPf != null &&
+              worstPf.pf < AppConstants.pfPenaltyThreshold) {
+            NotificationService.instance.showPfAlert(
+              worstPf.pf,
+              meterName: worstPf.meterName,
+              site: _meterSites[worstPf.meterName],
+            );
           }
-          if (state.maxDemandPeak >= AppConstants.mdWarningThresholdKva) {
+          final worstMd = _worstMdMeter(logs);
+          if (worstMd != null &&
+              worstMd.md >= worstMd.contract * 0.95) {
             NotificationService.instance.showMdAlert(
-              state.maxDemandPeak,
-              AppConfig.contractDemandKva,
+              worstMd.md,
+              worstMd.contract,
+              meterName: worstMd.meterName,
+              site: _meterSites[worstMd.meterName],
             );
           }
         }
@@ -108,6 +183,7 @@ class _DashboardPageState extends State<DashboardPage> {
             EnergySuccess(:final logs) => _DashboardContent(
               logs: logs,
               monthFilter: widget.monthFilter,
+              onNavigateToMeters: widget.onNavigateToMeters,
             ),
             EnergyValidationError e => AppErrorState(
               message: e.message,
@@ -131,8 +207,13 @@ class _DashboardPageState extends State<DashboardPage> {
 class _DashboardContent extends StatefulWidget {
   final List<dynamic> logs;
   final MonthFilterController monthFilter;
+  final VoidCallback? onNavigateToMeters;
 
-  const _DashboardContent({required this.logs, required this.monthFilter});
+  const _DashboardContent({
+    required this.logs,
+    required this.monthFilter,
+    this.onNavigateToMeters,
+  });
 
   @override
   State<_DashboardContent> createState() => _DashboardContentState();
@@ -144,14 +225,42 @@ class _DashboardContentState extends State<_DashboardContent> {
   DateTime? _selectedDate;
   Map<String, String> _meterSites = {};
 
+  /// Meter name → client's daily avg kWh consumption target (absent = unset).
+  Map<String, double> _meterKwhTargets = {};
+
+  /// Whether the user has configured at least one meter — drives the first-run CTA.
+  bool _hasMeters = true;
+
+  /// Cached, derived results so the heavy billing/savings/alert math runs only
+  /// when the inputs (logs / filters) change — not on every rebuild.
+  BillBreakdown? _breakdown;
+  BusinessKpi? _kpis;
+  MonthComparison? _comparison;
+  BillForecast? _forecast;
+  List<SavingOpportunity> _opportunities = const [];
+  List<InsightItem> _insights = const [];
+  List<RecommendationItem> _recommendations = const [];
+  List<MeterAlert> _meterAlerts = const [];
+
   MonthFilterValue get _selection => widget.monthFilter.value;
 
   @override
   void initState() {
     super.initState();
+    _loadMeterPresence();
     _loadMeterSites();
     context.read<MeterRepository>().addListener(_loadMeterSites);
     widget.monthFilter.addListener(_onFilterChanged);
+    _recompute();
+  }
+
+  Future<void> _loadMeterPresence() async {
+    try {
+      final meters = await context.read<MeterRepository>().getAllMeters();
+      if (mounted) setState(() => _hasMeters = meters.isNotEmpty);
+    } catch (_) {
+      // Best-effort; default to true so we don't wrongly show the first-run CTA.
+    }
   }
 
   @override
@@ -161,6 +270,8 @@ class _DashboardContentState extends State<_DashboardContent> {
       oldWidget.monthFilter.removeListener(_onFilterChanged);
       widget.monthFilter.addListener(_onFilterChanged);
     }
+    // New data arrived — derived results are now stale.
+    if (oldWidget.logs != widget.logs) _recompute();
   }
 
   @override
@@ -171,7 +282,107 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   void _onFilterChanged() {
-    if (mounted) setState(() {});
+    if (mounted) setState(_recompute);
+  }
+
+  /// Single place that runs every expensive derivation (bill, KPIs, comparison,
+  /// forecast, savings opportunities, insights, recommendations, per-meter
+  /// alerts). Called only when inputs change, never from build().
+  void _recompute() {
+    final entityLogs = _siteLogs;
+    final periodLogs = _selectedLogs;
+    final dayMode = _isDayMode;
+    final breakdown = BillCalculator.calculate(
+      logs: periodLogs,
+      ratchetLogs: entityLogs,
+      demandRate: dayMode ? 0 : null,
+    );
+    final kpis = BillCalculator.calculateKpis(breakdown);
+    final now = DateTime.now();
+    final isCurrentMonth = _selection.isCurrent;
+    final refMonth = isCurrentMonth ||
+            _selection.year != null ||
+            _selection.allTime
+        ? null
+        : DateTime(_selection.month!.year, _selection.month!.month);
+    final previousMonth = refMonth == null
+        ? DateTime(now.year, now.month - 1, 1)
+        : DateTime(refMonth.year, refMonth.month - 1, 1);
+    final previousLogs = dayMode
+        ? entityLogs
+            .where(
+              (l) => _isSameDay(
+                l.loggedAt,
+                _selectedDate!.subtract(const Duration(days: 1)),
+              ),
+            )
+            .toList()
+        : entityLogs
+            .where(
+              (l) =>
+                  l.loggedAt.year == previousMonth.year &&
+                  l.loggedAt.month == previousMonth.month,
+            )
+            .toList();
+    final previousBreakdown = previousLogs.isEmpty
+        ? null
+        : BillCalculator.calculate(
+            logs: previousLogs,
+            ratchetLogs: entityLogs,
+            demandRate: dayMode ? 0 : null,
+          );
+    final comparison = periodLogs.isEmpty
+        ? null
+        : BillCalculator.compare(breakdown, previousBreakdown);
+    // Forecast is meaningful only for the live (current) month.
+    final forecast = !dayMode && isCurrentMonth
+        ? BillForecastCalculator.calculate(
+            monthLogs: periodLogs,
+            referenceDate: now,
+            ratchetLogs: entityLogs,
+          )
+        : null;
+    // Saving opportunities are ₹/month figures — always computed from the
+    // month's data, even in Daily mode.
+    final opportunities = SavingOpportunityGenerator.generate(
+      dayMode
+          ? BillCalculator.calculate(
+              logs: _selectedMonthLogs,
+              ratchetLogs: entityLogs,
+            )
+          : breakdown,
+    );
+    final contractOptimizer =
+        SavingOpportunityGenerator.generateContractDemandOptimizer(
+          logs: entityLogs,
+          contractDemand: breakdown.contractDemand,
+        );
+    if (contractOptimizer != null) {
+      opportunities.add(contractOptimizer);
+      opportunities.sort(
+        (a, b) => b.monthlySavings.compareTo(a.monthlySavings),
+      );
+    }
+    final insights = InsightGenerator.generate(
+      breakdown: breakdown,
+      comparison: comparison,
+      kpis: kpis,
+      logs: periodLogs,
+    );
+    final recommendations = RecommendationEngine.generate(
+      breakdown: breakdown,
+      comparison: null,
+      logs: periodLogs,
+    );
+
+    _breakdown = breakdown;
+    _kpis = kpis;
+    _comparison = comparison;
+    _forecast = forecast;
+    _opportunities = opportunities;
+    _insights = insights;
+    _recommendations = recommendations;
+    _meterAlerts = _allMeterAlerts;
   }
 
   Future<void> _loadMeterSites() async {
@@ -180,7 +391,12 @@ class _DashboardContentState extends State<_DashboardContent> {
       if (!mounted) return;
       setState(() {
         _meterSites = {for (final m in meters) m.name: m.site};
+        _meterKwhTargets = {
+          for (final m in meters)
+            if (m.dailyKwhTarget > 0) m.name: m.dailyKwhTarget,
+        };
       });
+      _recompute();
     } catch (_) {
       // Best-effort — dashboard still renders without site filter.
     }
@@ -214,8 +430,7 @@ class _DashboardContentState extends State<_DashboardContent> {
   /// Meters for the chips row: every meter added in the app (Meter table)
   /// plus any distinct meter still present in historical log data, so the
   /// selector is visible even when only one meter exists.
-  List<String> get _meterNames {
-    final names = <String>{
+  List<String> get _meterNames {    final names = <String>{
       for (final name in _meterSites.keys) name,
       for (final l in widget.logs.cast<EnergyLogEntity>()) l.meterName,
     }.toList()
@@ -243,10 +458,82 @@ class _DashboardContentState extends State<_DashboardContent> {
     return _selectedMonthLogs;
   }
 
+  /// Logs feeding the Monthly Consumption chart. Same site/meter scope as the
+  /// rest of the dashboard, aligned with the selection:
+  ///  - a specific month picked → ONLY that month's logs, so the chart shows
+  ///    exactly the same value as the Total Consumption KPI;
+  ///  - a year / current / all-time → that year's monthly trend.
+  List<EnergyLogEntity> get _consumptionChartLogs {
+    final logs = _siteLogs;
+    if (logs.isEmpty) return logs;
+    final m = _selection.month;
+    if (m != null) {
+      return logs
+          .where(
+            (l) => l.loggedAt.year == m.year && l.loggedAt.month == m.month,
+          )
+          .toList();
+    }
+    final int year;
+    if (_selection.year != null) {
+      year = _selection.year!;
+    } else if (_selection.isCurrent) {
+      year = DateTime.now().year;
+    } else {
+      return logs; // all-time → let the chart use its latest year
+    }
+    return logs.where((l) => l.loggedAt.year == year).toList();
+  }
+
   DateTime? get _earliestLogDate {
     if (_siteLogs.isEmpty) return null;
     final sorted = _siteLogs.map((l) => l.loggedAt).toList()..sort();
     return sorted.first;
+  }
+
+  /// Latest year present in [logs] — the year the monthly charts plot.
+  int _maxYearOf(List<EnergyLogEntity> logs) {
+    if (logs.isEmpty) return DateTime.now().year;
+    return logs
+        .map((l) => l.loggedAt.year)
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  /// Daily avg kWh budget for the visible scope — a single meter uses its own
+  /// target, all meters sum their targets (the site budget line). Based on
+  /// registered meters only, so the line shows even before readings exist.
+  double get _dailyKwhTarget {
+    if (_meterKwhTargets.isEmpty) return 0;
+    if (_meter != null) return _meterKwhTargets[_meter] ?? 0;
+    if (_site != null) {
+      final siteMeters = {
+        for (final e in _meterSites.entries)
+          if (e.value == _site) e.key,
+      };
+      var total = 0.0;
+      for (final entry in _meterKwhTargets.entries) {
+        if (siteMeters.contains(entry.key)) total += entry.value;
+      }
+      return total;
+    }
+    return _meterKwhTargets.values.fold(0.0, (a, b) => a + b);
+  }
+
+  /// Opens the readings preview sheet for a tapped chart month.
+  void _showMonthReadings(List<EnergyLogEntity> source, int month) {
+    final year = _maxYearOf(source);
+    final logs =
+        source
+            .where(
+              (l) => l.loggedAt.year == year && l.loggedAt.month == month,
+            )
+            .toList();
+    showReadingsPreviewSheet(
+      context,
+      title: '${DateFormat('MMM yyyy').format(DateTime(year, month))} — '
+          'Readings',
+      logs: logs,
+    );
   }
 
   Future<void> _pickDate() async {
@@ -259,7 +546,10 @@ class _DashboardContentState extends State<_DashboardContent> {
       lastDate: now,
     );
     if (picked != null && mounted) {
-      setState(() => _selectedDate = picked);
+      setState(() {
+        _selectedDate = picked;
+        _recompute();
+      });
     }
   }
 
@@ -293,13 +583,7 @@ class _DashboardContentState extends State<_DashboardContent> {
   /// Site-aware KPI values — full-data values when "All Sites".
   /// In Daily mode the estimated bill excludes the monthly demand charge,
   /// so the card reflects the day's actual usage cost.
-  double get _siteEstimatedBill {
-    return BillCalculator.calculate(
-      logs: _selectedLogs,
-      ratchetLogs: _siteLogs,
-      demandRate: _isDayMode ? 0 : null,
-    ).netBill;
-  }
+  double get _siteEstimatedBill => _breakdown?.netBill ?? 0;
 
   double get _siteTotalConsumption {
     return _selectedLogs.fold(
@@ -317,52 +601,38 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
-  double get _sitePowerFactor {
-    return BillCalculator.calculate(
-      logs: _selectedLogs,
-      ratchetLogs: _siteLogs,
-    ).powerFactor;
-  }
+  double get _sitePowerFactor => _breakdown?.powerFactor ?? 0;
 
-  /// Visible formula for the Power Factor card: per-meter PF as recorded
-  /// by the client (meter display / Excel) — never recomputed. Lets the
-  /// user see exactly which meter drives the combined value.
+  /// Visible formula for the Power Factor card: per-meter and combined PF as
+  /// ΣkWh ÷ ΣkVAh (ratio of sums) — the utility's billing method.
   String get _powerFactorBreakdown {
-    if (_selectedLogs.isEmpty) return 'No readings — kVAh data add karo';
-    final perMeter = <String, ({double kwh, double kvah, double pfSum})>{};
+    if (_selectedLogs.isEmpty) return 'No readings — add kVAh data';
+    final perMeter = <String, ({double kwh, double kvah})>{};
     var sumKwh = 0.0;
     var sumKvah = 0.0;
-    var sumPf = 0.0;
     for (final l in _selectedLogs) {
       final kwh = l.kwh * l.multiplyingFactor;
       final kvah = l.kvah * l.multiplyingFactor;
       final rec = perMeter.putIfAbsent(
         l.meterName,
-        () => (kwh: 0, kvah: 0, pfSum: 0),
+        () => (kwh: 0, kvah: 0),
       );
       perMeter[l.meterName] = (
         kwh: rec.kwh + kwh,
         kvah: rec.kvah + kvah,
-        pfSum: rec.pfSum + l.powerFactor * kwh,
       );
       sumKwh += kwh;
       sumKvah += kvah;
-      sumPf += l.powerFactor * kwh;
     }
     final nf = NumberFormat.decimalPattern('en_IN');
+    final combined = sumKvah > 0 ? (sumKwh / sumKvah).toStringAsFixed(3) : '—';
     final lines = <String>[
-      sumPf > 0
-          ? 'As recorded (weighted): ${(sumPf / sumKwh).toStringAsFixed(3)}'
-          : 'Auto: ${nf.format(sumKwh)} kWh \u00f7 ${nf.format(sumKvah)} kVAh'
-              '${sumKvah > 0 ? ' = ${(sumKwh / sumKvah).toStringAsFixed(3)}' : ''}',
+      'As recorded (kWh ÷ kVAh): $combined',
     ];
     for (final e in perMeter.entries) {
       final d = e.value;
-      final pf = d.pfSum > 0
-          ? 'PF ${(d.pfSum / d.kwh).toStringAsFixed(3)}'
-          : (d.kvah > 0
-                ? 'PF ${(d.kwh / d.kvah).toStringAsFixed(3)} (auto)'
-                : 'PF —');
+      final pf =
+          d.kvah > 0 ? 'PF ${(d.kwh / d.kvah).toStringAsFixed(3)}' : 'PF —';
       lines.add('${e.key}: ${nf.format(d.kwh)} kWh · $pf');
     }
     return lines.join('\n');
@@ -494,7 +764,10 @@ class _DashboardContentState extends State<_DashboardContent> {
                     child: Text(s, overflow: TextOverflow.ellipsis),
                   ),
               ],
-              onChanged: (v) => setState(() => _site = (v == 'all') ? null : v),
+              onChanged: (v) => setState(() {
+                _site = (v == 'all') ? null : v;
+                _recompute();
+              }),
             ),
           ] else
             DropdownButtonHideUnderline(
@@ -522,7 +795,10 @@ class _DashboardContentState extends State<_DashboardContent> {
                   child: Text(m, overflow: TextOverflow.ellipsis),
                 ),
             ],
-            onChanged: (v) => setState(() => _meter = (v == 'all') ? null : v),
+            onChanged: (v) => setState(() {
+              _meter = (v == 'all') ? null : v;
+              _recompute();
+            }),
           ),
           const SizedBox(width: 12),
           // Year
@@ -617,7 +893,10 @@ class _DashboardContentState extends State<_DashboardContent> {
             onChanged: (v) {
               if (v == null) return;
               if (v == 'monthly') {
-                setState(() => _selectedDate = null);
+                setState(() {
+                  _selectedDate = null;
+                  _recompute();
+                });
               } else if (v == 'pick') {
                 _pickDate();
               } else {
@@ -628,6 +907,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     int.parse(p[1]),
                     int.parse(p[2]),
                   );
+                  _recompute();
                 });
               }
             },
@@ -641,95 +921,14 @@ class _DashboardContentState extends State<_DashboardContent> {
   Widget build(BuildContext context) {
     final entityLogs = _siteLogs;
     final periodLogs = _selectedLogs;
-    final dayMode = _isDayMode;
-    final breakdown = BillCalculator.calculate(
-      logs: periodLogs,
-      ratchetLogs: entityLogs,
-      demandRate: dayMode ? 0 : null,
-    );
-    final kpis = BillCalculator.calculateKpis(breakdown);
-    final now = DateTime.now();
+    final breakdown = _breakdown!;
+    final kpis = _kpis!;
+    final comparison = _comparison;
+    final forecast = _forecast;
+    final opportunities = _opportunities;
+    final insights = _insights;
+    final recommendations = _recommendations;
     final isCurrentMonth = _selection.isCurrent;
-    final refMonth = isCurrentMonth || _selection.year != null || _selection.allTime
-        ? null
-        : DateTime(_selection.month!.year, _selection.month!.month);
-    final previousMonth = refMonth == null
-        ? DateTime(now.year, now.month - 1, 1)
-        : DateTime(refMonth.year, refMonth.month - 1, 1);
-    final previousLogs = _isDayMode
-        ? entityLogs
-              .where(
-                (l) => _isSameDay(
-                  l.loggedAt,
-                  _selectedDate!.subtract(const Duration(days: 1)),
-                ),
-              )
-              .toList()
-        : entityLogs
-              .where(
-                (l) =>
-                    l.loggedAt.year == previousMonth.year &&
-                    l.loggedAt.month == previousMonth.month,
-              )
-              .toList();
-    final currentBreakdown = periodLogs.isEmpty
-        ? null
-        : BillCalculator.calculate(
-            logs: periodLogs,
-            ratchetLogs: entityLogs,
-            demandRate: dayMode ? 0 : null,
-          );
-    final previousBreakdown = previousLogs.isEmpty
-        ? null
-        : BillCalculator.calculate(
-            logs: previousLogs,
-            ratchetLogs: entityLogs,
-            demandRate: dayMode ? 0 : null,
-          );
-    final comparison = currentBreakdown == null
-        ? null
-        : BillCalculator.compare(currentBreakdown, previousBreakdown);
-    // Forecast is meaningful only for the live (current) month.
-    final forecast = !_isDayMode && isCurrentMonth
-        ? BillForecastCalculator.calculate(
-            monthLogs: periodLogs,
-            referenceDate: now,
-            ratchetLogs: entityLogs,
-          )
-        : null;
-    // Saving opportunities are ₹/month figures — always computed from the
-    // month's data, even in Daily mode (a day's zero demand rate would
-    // otherwise zero out demand-reduction savings).
-    final opportunities = SavingOpportunityGenerator.generate(
-      dayMode
-          ? BillCalculator.calculate(
-              logs: _selectedMonthLogs,
-              ratchetLogs: entityLogs,
-            )
-          : breakdown,
-    );
-    final contractOptimizer =
-        SavingOpportunityGenerator.generateContractDemandOptimizer(
-          logs: entityLogs,
-          contractDemand: breakdown.contractDemand,
-        );
-    if (contractOptimizer != null) {
-      opportunities.add(contractOptimizer);
-      opportunities.sort(
-        (a, b) => b.monthlySavings.compareTo(a.monthlySavings),
-      );
-    }
-    final insights = InsightGenerator.generate(
-      breakdown: breakdown,
-      comparison: comparison,
-      kpis: kpis,
-      logs: periodLogs,
-    );
-    final recommendations = RecommendationEngine.generate(
-      breakdown: breakdown,
-      comparison: null,
-      logs: periodLogs,
-    );
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -740,7 +939,8 @@ class _DashboardContentState extends State<_DashboardContent> {
         children: [
           _buildDropdownFilterBar(),
           const SizedBox(height: AppSpacing.lg),
-          _buildAlertBanner(context),
+          _buildAllAlertsSection(context),
+          const SizedBox(height: AppSpacing.lg),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -764,8 +964,35 @@ class _DashboardContentState extends State<_DashboardContent> {
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              _scopeChip(
+                Icons.location_on_rounded,
+                'Site',
+                _site ?? 'All Sites',
+              ),
+              _scopeChip(
+                Icons.electrical_services_rounded,
+                'Meter',
+                _meter ?? 'All Meters',
+              ),
+            ],
+          ),
 
-          if (periodLogs.isEmpty) ...[
+          if (periodLogs.isEmpty && !_hasMeters && !_isDayMode) ...[
+            AppEmptyState(
+              icon: Icons.bolt_rounded,
+              title: 'Welcome to PowerEMS',
+              subtitle:
+                  'Add your first meter to start tracking energy usage and bills.',
+              actionLabel: 'Add your first meter',
+              onAction: widget.onNavigateToMeters,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ] else if (periodLogs.isEmpty) ...[
             AppCard(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 32),
@@ -829,7 +1056,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                 color: AppColors.kpiEnergy,
                 decimals: 0,
                 description:
-                    '$_kpiMonthLabel${breakdown.totalUnits.toStringAsFixed(0)} billed units',
+                    '$_kpiMonthLabel${_siteTotalConsumption.toStringAsFixed(0)} kWh consumed',
               ),
               AppKpiCard(
                 title: 'Max Demand',
@@ -854,7 +1081,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                           : AppColors.kpiPower),
                 decimals: 3,
                 description: _sitePowerFactor <= 0
-                    ? 'No kVAh data — readings me kVAh enter karo'
+                    ? 'No kVAh data — enter kVAh in your readings'
                     : _powerFactorBreakdown,
               ),
             ],
@@ -895,7 +1122,9 @@ class _DashboardContentState extends State<_DashboardContent> {
                     : 'Improve load smoothing',
               ),
               AppKpiCard(
-                title: _isDayMode ? 'Readings' : (_selection.isCurrent ? "Today's Usage" : 'Daily Avg'),
+                title: _isDayMode
+                    ? 'Readings'
+                    : (_selection.isCurrent ? 'Latest Reading' : 'Daily Avg'),
                 value: _isDayMode
                     ? _selectedLogs.length.toDouble()
                     : _todayUnits,
@@ -915,7 +1144,6 @@ class _DashboardContentState extends State<_DashboardContent> {
           _buildMdBreachCard(periodLogs),
           const SizedBox(height: AppSpacing.lg),
 
-          _buildAlertsSection(context),
           const SizedBox(height: AppSpacing.xxl),
 
           if (opportunities.isNotEmpty) ...[
@@ -949,6 +1177,67 @@ class _DashboardContentState extends State<_DashboardContent> {
             const SizedBox(height: AppSpacing.xxl),
           ],
 
+          AppSectionHeader(
+            title: 'Trends',
+            subtitle: 'Site / meter select kar ke trend aur consumption analyze karein',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                if (_siteNames.isNotEmpty) ...[
+                  _filterDropdown<String>(
+                    label: 'All Sites',
+                    icon: Icons.location_on_outlined,
+                    value: (_site != null && _siteNames.contains(_site))
+                        ? _site!
+                        : 'all',
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'all',
+                        child: Text('All Sites'),
+                      ),
+                      for (final s in _siteNames)
+                        DropdownMenuItem(
+                          value: s,
+                          child: Text(s, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: (v) => setState(() {
+                      _site = (v == 'all') ? null : v;
+                      _recompute();
+                    }),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                _filterDropdown<String>(
+                  label: 'All Meters',
+                  icon: Icons.speed_rounded,
+                  value: (_meter != null && _meterNames.contains(_meter))
+                      ? _meter!
+                      : 'all',
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'all',
+                      child: Text('All Meters'),
+                    ),
+                    for (final m in _meterNames)
+                      DropdownMenuItem(
+                        value: m,
+                        child: Text(m, overflow: TextOverflow.ellipsis),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _meter = (v == 'all') ? null : v;
+                    _recompute();
+                  }),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+
           if (MediaQuery.of(context).size.width < 600)
             Column(
               children: [
@@ -967,7 +1256,10 @@ class _DashboardContentState extends State<_DashboardContent> {
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 240,
-                        child: DashboardChart(logs: entityLogs),
+                        child: DashboardChart(
+                          logs: entityLogs,
+                          onMonthTap: (m) => _showMonthReadings(entityLogs, m),
+                        ),
                       ),
                     ],
                   ),
@@ -988,7 +1280,12 @@ class _DashboardContentState extends State<_DashboardContent> {
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 240,
-                        child: MonthlyConsumptionChart(logs: entityLogs),
+                        child: MonthlyConsumptionChart(
+                          logs: _consumptionChartLogs,
+                          targetKwhPerDay: _dailyKwhTarget,
+                          onMonthTap: (m) =>
+                              _showMonthReadings(_consumptionChartLogs, m),
+                        ),
                       ),
                     ],
                   ),
@@ -1016,7 +1313,10 @@ class _DashboardContentState extends State<_DashboardContent> {
                         const SizedBox(height: 16),
                         SizedBox(
                           height: 280,
-                          child: DashboardChart(logs: entityLogs),
+                          child: DashboardChart(
+                            logs: entityLogs,
+                            onMonthTap: (m) => _showMonthReadings(entityLogs, m),
+                          ),
                         ),
                       ],
                     ),
@@ -1040,7 +1340,12 @@ class _DashboardContentState extends State<_DashboardContent> {
                         const SizedBox(height: 16),
                         SizedBox(
                           height: 280,
-                          child: MonthlyConsumptionChart(logs: entityLogs),
+                          child: MonthlyConsumptionChart(
+                            logs: _consumptionChartLogs,
+                            targetKwhPerDay: _dailyKwhTarget,
+                            onMonthTap: (m) =>
+                                _showMonthReadings(_consumptionChartLogs, m),
+                          ),
                         ),
                       ],
                     ),
@@ -1049,6 +1354,11 @@ class _DashboardContentState extends State<_DashboardContent> {
               ],
             ),
           const SizedBox(height: AppSpacing.xxl),
+          AppSectionHeader(
+            title: 'Charts',
+            subtitle: 'Comparison and forecast analysis',
+          ),
+          const SizedBox(height: AppSpacing.lg),
 
           if (MediaQuery.of(context).size.width < 600)
             Column(
@@ -1327,8 +1637,8 @@ class _DashboardContentState extends State<_DashboardContent> {
               child: Center(
                 child: Text(
                   _isDayMode
-                      ? 'Is day abhi tak koi reading nahi'
-                      : 'Is month abhi tak koi reading nahi',
+                      ? 'No reading recorded for this day yet'
+                      : 'No reading recorded for this month yet',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -1461,7 +1771,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
-                  'Bill forecast sirf Monthly mode me available hai — "Monthly" select karo',
+                  'Bill forecast is only available in Monthly mode — select "Monthly"',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
@@ -1475,7 +1785,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
-                  'Is month abhi tak koi reading nahi',
+                  'No reading recorded for this month yet',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -1531,7 +1841,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Aaj ki usage rate par estimated — readings badhne par update hoga',
+            'Estimated at today\'s usage rate — updates as readings are added',
               style: TextStyle(
                 fontSize: 10.5,
                 fontStyle: FontStyle.italic,
@@ -1563,47 +1873,126 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
-  Widget _buildAlertBanner(BuildContext context) {
-    final pf = _sitePowerFactor;
-    final hasPfIssue = pf > 0 && pf < AppConstants.pfPenaltyThreshold;
-    final hasMdIssue = _siteMaxDemandPeak >= AppConstants.mdWarningThresholdKva;
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = hasPfIssue || hasMdIssue
-        ? AppColors.warning
-        : AppColors.success;
-    final IconData icon = hasPfIssue || hasMdIssue
-        ? Icons.warning_amber_rounded
-        : Icons.check_circle_rounded;
-    final String text;
-    if (hasPfIssue && hasMdIssue) {
-      text = '2 alerts — PF penalty & Max Demand high';
-    } else if (hasPfIssue) {
-      text = '1 alert — Low PF (below ${AppConstants.pfPenaltyThreshold})';
-    } else if (hasMdIssue) {
-      text = '1 alert — Max Demand high';
-    } else {
-      text = 'All systems normal';
+  /// Alerts for EVERY added meter for the selected period, ignoring the
+  /// site/meter filter — so the client always sees which specific meters
+  /// (and their site) have a PF or MD issue, with a remedy, even when only
+  /// one meter is selected.
+  List<MeterAlert> get _allMeterAlerts {
+    final periodLogs = widget.logs
+        .cast<EnergyLogEntity>()
+        .where((l) => _selection.matches(l.loggedAt))
+        .toList();
+    final byMeter = <String, List<EnergyLogEntity>>{};
+    for (final e in periodLogs) {
+      (byMeter[e.meterName] ??= []).add(e);
     }
+    final alerts = <MeterAlert>[];
+    for (final entry in byMeter.entries) {
+      final logs = entry.value;
+      var kwh = 0.0;
+      var kvah = 0.0;
+      var md = 0.0;
+      var contract = 0.0;
+      for (final e in logs) {
+        kwh += e.kwh * e.multiplyingFactor;
+        kvah += e.kvah * e.multiplyingFactor;
+        final m = e.mdRecorded * e.multiplyingFactor;
+        if (m > md) md = m;
+        if (e.contractDemand > contract) contract = e.contractDemand;
+      }
+      final pf = kvah > 0 ? (kwh / kvah).clamp(0.0, 1.0) : 0.0;
+      final items = <({String issue, String solution})>[];
+      if (pf > 0 && pf < AppConstants.pfRebateThreshold) {
+        final hasSurcharge = pf < AppConstants.pfSurchargeThreshold;
+        final target = AppConstants.pfRebateThreshold;
+        final goal = hasSurcharge
+            ? 'Raise PF to ≥$target to remove the 5% surcharge and earn the 1% rebate'
+            : 'Raise PF to ≥$target to earn the 1% rebate';
+        items.add((
+          issue: hasSurcharge
+              ? 'Low PF (${pf.toStringAsFixed(3)}) — 5% reactive penalty + missing 1% rebate'
+              : 'Low PF (${pf.toStringAsFixed(3)}) — missing the 1% PF rebate',
+          solution: '$goal — check the APFC panel and its capacitor.',
+        ));
+      }
+      if (contract > 0 && md >= contract * 0.95) {
+        items.add((
+          issue: 'MD near contract limit '
+              '(${md.toStringAsFixed(1)} / $contract kVA)',
+          solution:
+              'Shift non-essential loads to off-peak hours — peak MD is ≥95% of contract and attracts an excess-demand penalty.',
+        ));
+      }
+      // Daily avg kWh target (set on the meter) — alert near/cross.
+      final target = _meterKwhTargets[entry.key] ?? 0.0;
+      if (target > 0 && logs.isNotEmpty) {
+        final latest = logs
+            .map((e) => e.loggedAt)
+            .reduce((a, b) => a.isAfter(b) ? a : b);
+        var dayKwh = 0.0;
+        for (final e in logs) {
+          if (e.loggedAt.year == latest.year &&
+              e.loggedAt.month == latest.month &&
+              e.loggedAt.day == latest.day) {
+            dayKwh += e.kwh * e.multiplyingFactor;
+          }
+        }
+        if (dayKwh >= target) {
+          items.add((
+            issue: 'Daily consumption crossed target '
+                '(${dayKwh.toStringAsFixed(1)} / ${target.toStringAsFixed(0)} kWh)',
+            solution:
+                'Daily consumption exceeded the ${target.toStringAsFixed(0)} kWh/day budget — identify and shift the heavy loads to off-peak hours.',
+          ));
+        } else if (dayKwh >= target * AppConstants.dailyKwhWarningRatio) {
+          items.add((
+            issue: 'Daily consumption near target '
+                '(${dayKwh.toStringAsFixed(1)} / ${target.toStringAsFixed(0)} kWh)',
+            solution:
+                'Consumption is at ≥${(AppConstants.dailyKwhWarningRatio * 100).toStringAsFixed(0)}% of the ${target.toStringAsFixed(0)} kWh/day budget — avoid heavy loads for the rest of the day.',
+          ));
+        }
+      }
+      if (items.isNotEmpty) {
+        alerts.add((
+          meterName: entry.key,
+          site: _meterSites[entry.key],
+          pf: pf,
+          md: md,
+          contract: contract,
+          items: items,
+        ));
+      }
+    }
+    alerts.sort((a, b) => a.meterName.compareTo(b.meterName));
+    return alerts;
+  }
+
+  /// Small label chip used under "Energy Overview" to make it obvious which
+  /// site and meter the visible data belongs to.
+  Widget _scopeChip(IconData icon, String label, String value) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.sm + 2,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.10 : 0.08),
-        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
-        border: Border.all(color: color.withValues(alpha: 0.30)),
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: AppSpacing.sm),
+          Icon(icon, size: 14, color: AppColors.primary),
+          const SizedBox(width: 6),
           Text(
-            text,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+            '$label: ',
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),
           ),
@@ -1612,53 +2001,22 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
-  Widget _buildAlertsSection(BuildContext context) {
-    final pf = _sitePowerFactor;
-    final hasPfIssue = pf > 0 && pf < AppConstants.pfPenaltyThreshold;
-    final hasMdIssue = _siteMaxDemandPeak >= AppConstants.mdWarningThresholdKva;
-
+  /// Single, unified Alerts section — shown for ALL sites & meters regardless
+  /// of the site/meter filter, each with its issue and a remedy.
+  Widget _buildAllAlertsSection(BuildContext context) {
+    final alerts = _meterAlerts;
+    final hasIssues = alerts.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppSectionHeader(
-          title: 'System Alerts',
-          subtitle: hasPfIssue || hasMdIssue
-              ? 'Action required'
-              : 'All systems normal',
+          title: 'Alerts',
+          subtitle: hasIssues
+              ? 'All sites & meters — ${_selection.label}'
+              : 'All meters normal — ${_selection.label}',
         ),
-        if (pf == 0)
-          AppCard(
-            color: AppColors.warning.withValues(alpha: 0.05),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.info_outline_rounded,
-                    color: AppColors.warning,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Text(
-                    'Power Factor data missing — readings me kVAh value add karo',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.warning,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else if (!hasPfIssue && !hasMdIssue)
+        const SizedBox(height: AppSpacing.sm),
+        if (!hasIssues)
           AppCard(
             color: AppColors.success.withValues(alpha: 0.05),
             child: Row(
@@ -1677,124 +2035,87 @@ class _DashboardContentState extends State<_DashboardContent> {
                   ),
                 ),
                 const SizedBox(width: 14),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'All parameters within normal limits',
-                    style: TextStyle(
+                    'All meters within normal limits for ${_selection.label}.',
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.success,
                     ),
                   ),
                 ),
               ],
             ),
-          ),
-        if (hasPfIssue)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: AppCard(
-              color: AppColors.danger.withValues(alpha: 0.05),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.danger.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.warning_amber_rounded,
-                      color: AppColors.danger,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
+          )
+        else
+          for (final a in alerts)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: AppCard(
+                color: AppColors.danger.withValues(alpha: 0.05),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Problem: Low PF Penalty',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.danger.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.warning_amber_rounded,
                             color: AppColors.danger,
+                            size: 22,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'PF is ${_sitePowerFactor.toStringAsFixed(3)} (below 0.95). A 5% reactive penalty applies.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.danger.withValues(alpha: 0.8),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Solution: Check APFC Panel',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.danger,
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            a.site != null && a.site!.trim().isNotEmpty
+                                ? '${a.meterName}  ·  ${a.site}'
+                                : a.meterName,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    for (final item in a.items) ...[
+                      Text(
+                        '• ${item.issue}',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.danger,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12, top: 2),
+                        child: Text(
+                          '↳ ${item.solution}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                  ],
+                ),
               ),
             ),
-          ),
-        if (hasMdIssue)
-          AppCard(
-            color: AppColors.warning.withValues(alpha: 0.05),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.trending_up_rounded,
-                    color: AppColors.warning,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Warning: Near MD Breach',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.warning,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Max demand at ${_siteMaxDemandPeak.toStringAsFixed(1)} kVA, approaching ${AppConstants.mdWarningThresholdKva.toInt()} kVA contract limit.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.warning.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
       ],
     );
   }
+
 }
 
 class _SavingOpportunityCard extends StatelessWidget {

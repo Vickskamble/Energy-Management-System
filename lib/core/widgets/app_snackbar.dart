@@ -46,7 +46,7 @@ class AppSnackbar {
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: AppColors.warning,
+        backgroundColor: AppColors.danger,
       ),
     );
   }

@@ -30,6 +30,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
 
   List<MeterModel> _meters = [];
   bool _metersLoading = true;
+  bool _metersError = false;
   bool _fetchingPrevious = false;
   bool _lastSubmitWasManual = false;
 
@@ -40,7 +41,6 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
   final _rkvarhLagCtrl = TextEditingController();
   final _rkvarhLeadCtrl = TextEditingController();
   final _mdRecordedCtrl = TextEditingController();
-  final _powerFactorCtrl = TextEditingController();
 
   /// Previous cumulative readings fetched from the DB for the selected
   /// date/meter — read-only, never editable by the client.
@@ -81,7 +81,6 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     _rkvarhLagCtrl.dispose();
     _rkvarhLeadCtrl.dispose();
     _mdRecordedCtrl.dispose();
-    _powerFactorCtrl.dispose();
     super.dispose();
   }
 
@@ -92,17 +91,37 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     return AppConfig.contractDemandKva;
   }
 
+  String? get _selectedMeterSite {
+    for (final m in _meters) {
+      if (m.name == _selectedMeter) return m.site;
+    }
+    return null;
+  }
+
   Future<void> _loadMeters() async {
-    final repo = context.read<MeterRepository>();
-    final meters = await repo.getAllMeters();
     setState(() {
-      _meters = meters;
-      _metersLoading = false;
-      if (meters.isNotEmpty) {
-        _selectedMeter = meters.first.name;
-        _fetchPreviousReading(_selectedMeter);
-      }
+      _metersLoading = true;
+      _metersError = false;
     });
+    try {
+      final repo = context.read<MeterRepository>();
+      final meters = await repo.getAllMeters();
+      if (!mounted) return;
+      setState(() {
+        _meters = meters;
+        _metersLoading = false;
+        if (meters.isNotEmpty) {
+          _selectedMeter = meters.first.name;
+          _fetchPreviousReading(_selectedMeter);
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _metersLoading = false;
+        _metersError = true;
+      });
+    }
   }
 
   Future<void> _fetchPreviousReading(String meterName) async {
@@ -162,7 +181,6 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     _rkvarhLagCtrl.clear();
     _rkvarhLeadCtrl.clear();
     _mdRecordedCtrl.clear();
-    _powerFactorCtrl.clear();
     setState(() {
       _loggedAt = DateTime.now();
       _prevCumulativeKwh = 0;
@@ -232,7 +250,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
         rkvarhLag: double.tryParse(_rkvarhLagCtrl.text.trim()) ?? 0,
         rkvarhLead: double.tryParse(_rkvarhLeadCtrl.text.trim()) ?? 0,
         mdRecorded: double.parse(_mdRecordedCtrl.text.trim()),
-        powerFactor: double.tryParse(_powerFactorCtrl.text.trim()),
+        powerFactor: null,
         loggedAt: _loggedAt,
       ),
     );
@@ -251,13 +269,19 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
             AppSnackbar.success(context, 'Reading saved successfully');
             _clearForm();
             if (currentPowerFactor < 0.95) {
-              NotificationService.instance.showPfAlert(currentPowerFactor);
+              NotificationService.instance.showPfAlert(
+                currentPowerFactor,
+                meterName: _selectedMeter,
+                site: _selectedMeterSite,
+              );
             }
             final meterContract = _selectedMeterContractKva();
             if (maxDemandPeak >= meterContract * 0.95) {
               NotificationService.instance.showMdAlert(
                 maxDemandPeak,
                 meterContract,
+                meterName: _selectedMeter,
+                site: _selectedMeterSite,
               );
             }
           case EnergyValidationError _:
@@ -282,6 +306,11 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
               ),
               if (_metersLoading)
                 const AppSkeletonCard()
+              else if (_metersError)
+                AppErrorState(
+                  message: 'Could not load meters',
+                  onRetry: _loadMeters,
+                )
               else if (_meters.isEmpty)
                 const AppEmptyState(
                   icon: Icons.speed_rounded,
@@ -291,9 +320,43 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
               else
                 Form(
                   key: _formKey,
+                  autovalidateMode:
+                      AutovalidateMode.onUserInteraction,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline_rounded,
+                              size: 18,
+                              color: AppColors.primary,
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Enter the numbers exactly as shown on the '
+                                'meter display. The app calculates consumption '
+                                'automatically from the previous reading.',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       AppCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,25 +623,6 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            AppTextField(
-                              controller: _powerFactorCtrl,
-                              label: 'Power Factor (meter display)',
-                              hint: 'e.g. 0.98 — leave blank to auto-calc',
-                              prefixIcon: Icons.waves_rounded,
-                              keyboardType: TextInputType.numberWithOptions(
-                                decimal: true,
-                              ),
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) return null;
-                                final pf = double.tryParse(v.trim());
-                                if (pf == null) return 'Enter a valid number';
-                                if (pf <= 0 || pf > 1) {
-                                  return 'Power Factor must be between 0 and 1';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 12),
                             Row(
                               children: [
                                 Expanded(
@@ -611,14 +655,13 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                             const SizedBox(height: 12),
                             AppTextField(
                               controller: _mdRecordedCtrl,
-                              label: 'MD Recorded (kVA)',
+                              label: 'MD Recorded (kVA) — optional',
+                              hint: 'Leave blank if not available',
                               prefixIcon: Icons.trending_up,
                               keyboardType: TextInputType.numberWithOptions(
                                 decimal: true,
                               ),
-                              validator: (v) => v == null || v.trim().isEmpty
-                                  ? 'Required'
-                                  : null,
+                              validator: _optionalNumberValidator,
                             ),
                           ],
                         ),

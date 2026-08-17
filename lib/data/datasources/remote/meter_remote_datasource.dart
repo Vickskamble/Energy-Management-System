@@ -48,6 +48,18 @@ class MeterRemoteDatasource {
     try {
       await _client.from(_table).upsert(meter.toJson()).select().single();
     } catch (e) {
+      // The `daily_kwh_target` column may not exist on older databases yet —
+      // retry without it so adding a meter never fails because of the new
+      // field.
+      if (e is PostgrestException && e.code == 'PGRST204') {
+        final json = meter.toJson()..remove('daily_kwh_target');
+        try {
+          await _client.from(_table).upsert(json).select().single();
+          return;
+        } catch (_) {
+          // Fall through → generic error below.
+        }
+      }
       if (e is RemoteStorageException) rethrow;
       throw const RemoteStorageException(
         'Unable to save meter. Check your connection and try again.',

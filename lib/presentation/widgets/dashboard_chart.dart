@@ -7,11 +7,31 @@ import '../../domain/entities/energy_log_entity.dart';
 class DashboardChart extends StatelessWidget {
   final List<EnergyLogEntity> logs;
 
-  const DashboardChart({super.key, required this.logs});
+  /// Called with the tapped 1-based month of the chart's max year.
+  final ValueChanged<int>? onMonthTap;
+
+  const DashboardChart({
+    super.key,
+    required this.logs,
+    this.onMonthTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final onTap = onMonthTap;
     final monthlySum = <int, double>{};
+
+    if (logs.isEmpty) {
+      return const SizedBox(
+        height: 220,
+        child: Center(
+          child: Text(
+            'No data available for chart',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
 
     final maxYear = logs
         .map((l) => l.loggedAt.year)
@@ -50,10 +70,19 @@ class DashboardChart extends StatelessWidget {
         ),
     ];
 
-    // 75% of MD — reference only (the user must stay ABOVE this level).
-    // It is never part of the bill; billing demand = max(recorded MD,
-    // preceding-11-month high).
-    final referenceDemand = AppConfig.billingDemandFloorKva;
+    // 75% of the meter's contract demand — reference only (the user must
+    // stay ABOVE this level). Uses the contract entered when the meter was
+    // added; falls back to the global setting only when no contract exists
+    // on the logs. It is never part of the bill; billing demand = max(
+    // recorded MD, preceding-11-month high).
+    var contractDemand = 0.0;
+    for (final log in logs) {
+      if (log.contractDemand > contractDemand) {
+        contractDemand = log.contractDemand;
+      }
+    }
+    final referenceDemand =
+        contractDemand > 0 ? contractDemand * 0.75 : AppConfig.billingDemandFloorKva;
     final maxAvg = spots.fold(0.0, (m, s) => s.y > m ? s.y : m);
     final mdMaxY =
         (maxAvg > referenceDemand ? maxAvg : referenceDemand) * 1.2;
@@ -65,7 +94,10 @@ class DashboardChart extends StatelessWidget {
           children: [
             _legendItem(AppColors.warning, 'Max Demand (kVA)'),
             const SizedBox(width: 16),
-            _dashedLegendItem(AppColors.danger, '75% of MD (stay above)'),
+            _dashedLegendItem(
+              AppColors.danger,
+              '75% of Contract (${referenceDemand.toInt()} kVA)',
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -159,12 +191,28 @@ class DashboardChart extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                       labelResolver: (_) =>
-                          '75% of MD (${referenceDemand.toInt()} kVA)',
+                          '75% of Contract (${referenceDemand.toInt()} kVA)',
                     ),
                   ),
                 ],
               ),
               lineTouchData: LineTouchData(
+                touchCallback:
+                    onTap == null
+                        ? null
+                        : (event, response) {
+                            if (event is FlTapUpEvent &&
+                                response != null &&
+                                response.lineBarSpots != null &&
+                                response.lineBarSpots!.isNotEmpty) {
+                              final month = response.lineBarSpots!.first.x
+                                      .toInt() +
+                                  1;
+                              if (monthlySum.containsKey(month)) {
+                                onTap(month);
+                              }
+                            }
+                          },
                 touchTooltipData: LineTouchTooltipData(
                   getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
                     return LineTooltipItem(

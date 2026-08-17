@@ -11,6 +11,9 @@ class MeterModel {
   final double ptRatio;
   final String site;
 
+  /// Client's daily average kWh consumption target — 0 = not set.
+  final double dailyKwhTarget;
+
   const MeterModel({
     required this.id,
     required this.name,
@@ -20,6 +23,7 @@ class MeterModel {
     this.ctRatio = 1.0,
     this.ptRatio = 1.0,
     this.site = 'Main Site',
+    this.dailyKwhTarget = 0.0,
   });
 
   /// Multiplying factor = CT ratio × PT ratio (defaults to 1 when unset).
@@ -34,6 +38,7 @@ class MeterModel {
     ctRatio: ctRatio,
     ptRatio: ptRatio,
     site: site,
+    dailyKwhTarget: dailyKwhTarget,
   );
 
   factory MeterModel.fromEntity(MeterEntity entity) => MeterModel(
@@ -45,6 +50,7 @@ class MeterModel {
     ctRatio: entity.ctRatio,
     ptRatio: entity.ptRatio,
     site: entity.site,
+    dailyKwhTarget: entity.dailyKwhTarget,
   );
 
   Map<String, Object?> toMap() => {
@@ -56,6 +62,7 @@ class MeterModel {
     'ct_ratio': ctRatio,
     'pt_ratio': ptRatio,
     'site': site,
+    'daily_kwh_target': dailyKwhTarget,
   };
 
   factory MeterModel.fromMap(Map<String, Object?> map) => MeterModel(
@@ -67,6 +74,7 @@ class MeterModel {
     ctRatio: (map['ct_ratio'] as num?)?.toDouble() ?? 1.0,
     ptRatio: (map['pt_ratio'] as num?)?.toDouble() ?? 1.0,
     site: map['site'] as String? ?? 'Main Site',
+    dailyKwhTarget: (map['daily_kwh_target'] as num?)?.toDouble() ?? 0.0,
   );
 
   Map<String, dynamic> toJson() => {
@@ -78,6 +86,7 @@ class MeterModel {
     'ct_ratio': ctRatio,
     'pt_ratio': ptRatio,
     'site': site,
+    'daily_kwh_target': dailyKwhTarget,
   };
 
   factory MeterModel.fromJson(Map<String, dynamic> json) => MeterModel(
@@ -89,6 +98,7 @@ class MeterModel {
     ctRatio: (json['ct_ratio'] as num?)?.toDouble() ?? 1.0,
     ptRatio: (json['pt_ratio'] as num?)?.toDouble() ?? 1.0,
     site: json['site'] as String? ?? 'Main Site',
+    dailyKwhTarget: (json['daily_kwh_target'] as num?)?.toDouble() ?? 0.0,
   );
 
   factory MeterModel.create({
@@ -98,6 +108,7 @@ class MeterModel {
     double ctRatio = 1.0,
     double ptRatio = 1.0,
     String site = 'Main Site',
+    double dailyKwhTarget = 0.0,
   }) => MeterModel(
     id: const Uuid().v4(),
     name: name,
@@ -107,5 +118,6 @@ class MeterModel {
     ctRatio: ctRatio,
     ptRatio: ptRatio,
     site: site,
+    dailyKwhTarget: dailyKwhTarget,
   );
 }
