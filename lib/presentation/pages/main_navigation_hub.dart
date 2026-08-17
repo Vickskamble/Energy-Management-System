@@ -77,7 +77,10 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
             onToggleTheme: widget.onToggleTheme,
           ),
         ),
-      ).then((_) => setState(() => _sidebarIndex = _selectedIndex));
+      ).then((_) => setState(
+        () =>
+            _sidebarIndex = _selectedIndex == 5 ? 7 : _selectedIndex,
+      ));
       setState(() => _sidebarIndex = index);
       return;
     }
@@ -85,8 +88,20 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const BillingPage()),
-      ).then((_) => setState(() => _sidebarIndex = _selectedIndex));
+      ).then((_) => setState(
+        () =>
+            _sidebarIndex = _selectedIndex == 5 ? 7 : _selectedIndex,
+      ));
       setState(() => _sidebarIndex = index);
+      return;
+    }
+    // Sidebar "Import" (7) sits at stack position 5 — Settings/Billing are
+    // pushed routes, so the IndexedStack slot is free.
+    if (index == 7) {
+      setState(() {
+        _selectedIndex = 5;
+        _sidebarIndex = 7;
+      });
       return;
     }
     setState(() {
@@ -103,8 +118,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       'Analysis',
       'Reports',
       'Meter Management',
-      '',
-      '',
       'Excel Import',
     ];
     final hubTitle = _selectedIndex < titles.length
