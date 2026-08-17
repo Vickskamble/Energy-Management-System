@@ -1,9 +1,10 @@
 # PowerEMS — User Manual
 
-**Version:** 1.2.x
+**Version:** 1.2.2
 **App:** PowerEMS (Enterprise Energy Management System)
 **Platforms:** Web (browser), Windows desktop, Android
 **Audience:** End users (site engineers, plant managers, facility teams)
+**Last updated:** 18 August 2026
 
 ---
 
@@ -37,8 +38,9 @@ PowerEMS is a cloud-connected energy management application that helps you:
 - Generate executive reports, monthly bill history, and savings opportunities
 - Estimate your electricity bill every month using tariff rules
 
-> 🖼️ **SCREENSHOT (01):** PowerEMS Login page — `docs/screenshots/01-login.png`
-> `[SCREENSHOT PLACEHOLDER — capture the Login screen]`
+![PowerEMS login page](screenshots/01-login.png)
+
+*Figure 01 — PowerEMS login page*
 
 ---
 
@@ -60,7 +62,9 @@ PowerEMS is a cloud-connected energy management application that helps you:
 4. A **verification email** is sent to you — click the link inside it.
 5. Sign in with your email and password.
 
-> 🖼️ **SCREENSHOT (02):** Registration page — `docs/screenshots/02-register.png`
+![Registration / create account page](screenshots/02-register.png)
+
+*Figure 02 — Registration / create account page*
 
 ### 2.3 Sign in / sign out
 
@@ -68,7 +72,9 @@ PowerEMS is a cloud-connected energy management application that helps you:
 - **Forgot password?** Click *Reset Password* on the login page and follow the email link.
 - Sign out from the sidebar bottom (user profile section).
 
-> 🖼️ **SCREENSHOT (03):** Signed-in main screen (sidebar + dashboard) — `docs/screenshots/03-dashboard.png`
+![Main screen — sidebar + dashboard](screenshots/03-dashboard.png)
+
+*Figure 03 — Main screen — sidebar + dashboard*
 
 ---
 
@@ -97,7 +103,9 @@ The top cards show the selected period:
 - **Monthly Consumption:** monthly kWh line chart. A red dashed line shows **daily target × days of month** — any month above the line means you crossed the daily consumption budget.
 - **Tap any point on a chart** to see the readings of that month/day (preview sheet with kWh, kVAh, MD, PF, Load Factor, MF, contract, billing MD, net bill).
 
-> 🖼️ **SCREENSHOT (04):** Trends charts with target lines — `docs/screenshots/04-trends-charts.png`
+![Trends charts with target lines](screenshots/04-trends-charts.png)
+
+*Figure 04 — Trends charts with target lines*
 
 ### 3.4 Alerts panel
 
@@ -131,7 +139,9 @@ The dashboard shows alerts such as:
 4. The difference vs the previous reading is **calculated automatically** (shown in the blue box).
 5. Click **Save**. After saving, if PF is below 0.95 or MD crossed 95% of contract, a notification alert fires.
 
-> 🖼️ **SCREENSHOT (05):** Reading Entry form — `docs/screenshots/05-reading-entry.png`
+![Reading Entry form](screenshots/05-reading-entry.png)
+
+*Figure 05 — Reading Entry form*
 
 **First reading of a meter:** since there is no previous reading, the entry is saved as the **baseline** with 0 units consumed (you confirm this in a warning dialog).
 
@@ -166,8 +176,12 @@ Click **+ / Add Your Meter** and fill:
 
 Your plan includes a number of meters (default: 1). Extra meters are billed as a monthly add-on — see [Plan & Billing](#10-plan--billing).
 
-> 🖼️ **SCREENSHOT (06):** Meter Management list — `docs/screenshots/06-meters.png`
-> 🖼️ **SCREENSHOT (07):** Add/Edit meter dialog — `docs/screenshots/07-meter-dialog.png`
+![Meter Management list](screenshots/06-meters.png)
+
+*Figure 06 — Meter Management list*
+![Add/Edit meter dialog](screenshots/07-meter-dialog.png)
+
+*Figure 07 — Add/Edit meter dialog*
 
 ---
 
@@ -185,7 +199,9 @@ When a month (or "This Month") is selected, the **kWh Consumption** and **Max De
 - **Red dashed horizontal line = your daily target (kWh/day)** — any day above the line means that day crossed the budget
 - Tap a point to preview that day's readings
 
-> 🖼️ **SCREENSHOT (08):** Analysis daily kWh chart with target line — `docs/screenshots/08-analysis-daily-target.png`
+![Analysis — daily kWh chart with dashed daily target line](screenshots/08-analysis-daily-target.png)
+
+*Figure 08 — Analysis — daily kWh chart with dashed daily target line*
 
 ### 6.3 MD breach prediction
 For the current month, PowerEMS computes the MD growth rate and predicts **when the demand will cross the breach threshold** (90% of contract) — including "no risk" confirmation.
@@ -218,7 +234,9 @@ Bar chart of the **last 12 months** — each bar shows the total bill (₹) on t
 - **PDF** — printable report of the current view
 - **Export CSV** — raw data of the filtered readings
 
-> 🖼️ **SCREENSHOT (09):** Reports page (executive summary + monthly history) — `docs/screenshots/09-reports.png`
+![Reports — executive summary + monthly bill history](screenshots/09-reports.png)
+
+*Figure 09 — Reports — executive summary + monthly bill history*
 
 ---
 
@@ -237,9 +255,15 @@ Bulk import readings from Excel — see the **Import** item in the sidebar.
 3. **Preview** — every row appears as an editable card (meter, date, kWh, kVAh, MD, PF, lag/lead). Fix values here.
 4. Click **Import N Reading(s)** — nothing is saved before you confirm.
 
-> 🖼️ **SCREENSHOT (10):** Excel Import page — `docs/screenshots/10-excel-import.png`
-> 🖼️ **SCREENSHOT (11):** Column mapping dialog — `docs/screenshots/11-column-mapping.png`
-> 🖼️ **SCREENSHOT (12):** Import preview dialog — `docs/screenshots/12-import-preview.png`
+![Excel Import page](screenshots/10-excel-import.png)
+
+*Figure 10 — Excel Import page*
+![Column mapping dialog](screenshots/11-column-mapping.png)
+
+*Figure 11 — Confirm column mapping dialog*
+![Import preview dialog](screenshots/12-import-preview.png)
+
+*Figure 12 — Import preview dialog*
 
 ---
 
@@ -256,7 +280,9 @@ PowerEMS raises alerts (in-app + system notifications on Windows):
 | **Reading reminder** | Month-end — "record today's reading" |
 | **Sync complete** | Offline readings uploaded to cloud |
 
-> 🖼️ **SCREENSHOT (13):** Notification example (MD risk) — `docs/screenshots/13-notification.png`
+![Dashboard alerts — MD risk, low PF, daily target crossed](screenshots/13-notification.png)
+
+*Figure 13 — Dashboard alerts — MD risk, low PF, daily target crossed*
 
 ---
 
@@ -271,7 +297,9 @@ Open **Plan & Billing** from the sidebar.
 - **Owner access key:** if you have the owner key, redeem it from the Plan & Billing page for full access (used in trials/demo installs).
 - When the plan ends, new readings and meter additions are locked until renewal.
 
-> 🖼️ **SCREENSHOT (14):** Plan & Billing page — `docs/screenshots/14-billing.png`
+![Plan & Billing page](screenshots/14-billing.png)
+
+*Figure 14 — Plan & Billing page*
 
 ---
 
@@ -295,8 +323,12 @@ Used for all bill estimates. Two ways:
 - **Restore from file** — replaces all current data with the backup (enter passphrase if encrypted).
 - **Reset All Data** — permanently deletes everything locally AND from Supabase (this account). Irreversible — export a backup first.
 
-> 🖼️ **SCREENSHOT (15):** Settings — tariff section — `docs/screenshots/15-settings-tariff.png`
-> 🖼️ **SCREENSHOT (16):** Settings — backup & restore — `docs/screenshots/16-settings-backup.png`
+![Settings — tariff section](screenshots/15-settings-tariff.png)
+
+*Figure 15 — Settings — tariff section*
+![Settings — backup & restore](screenshots/16-settings-backup.png)
+
+*Figure 16 — Settings — backup & restore*
 
 ---
 

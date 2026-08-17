@@ -1,7 +1,8 @@
 # PowerEMS — Operating Manual (Admin / Ops / Support)
 
-**Version:** 1.2.x
+**Version:** 1.2.2
 **Audience:** System administrators, implementation engineers, support & operations teams, client IT/security teams.
+**Last updated:** 18 August 2026
 
 ---
 
@@ -73,8 +74,8 @@ PowerEMS is a Flutter multi-platform application with a cloud backend.
 | **Supabase** | Project dashboard (see `.env` keys) | Auth, DB, RLS |
 | **Razorpay** | Razorpay dashboard | Payments, invoices, refunds |
 
-> 🖼️ **SCREENSHOT (A):** Supabase project dashboard (Auth + Table editor) — `docs/screenshots/ops-a-supabase.png`
-> 🖼️ **SCREENSHOT (B):** Vercel project (deployments list) — `docs/screenshots/ops-b-vercel.png`
+> *Figure A — Supabase project dashboard (Auth + Table editor): PENDING — requires dashboard access for capture.*
+> *Figure B — Vercel project (deployments list): PENDING — requires dashboard access for capture.*
 
 ---
 
@@ -124,8 +125,8 @@ The `Release Build` workflow then attaches to the release:
 
 Windows build takes ~15–20 min. **Secrets** are injected from GitHub Actions secrets (see §4).
 
-> 🖼️ **SCREENSHOT (C):** GitHub Actions run (workflow) — `docs/screenshots/ops-c-actions.png`
-> 🖼️ **SCREENSHOT (D):** GitHub Release with assets — `docs/screenshots/ops-d-release.png`
+> *Figure C — GitHub Actions run (workflow): PENDING — requires dashboard access for capture.*
+> *Figure D — GitHub Release with assets: PENDING — requires dashboard access for capture.*
 
 ### 3.3 Version policy
 
@@ -179,7 +180,7 @@ ALTER TABLE user_meters ADD COLUMN IF NOT EXISTS daily_kwh_target numeric DEFAUL
 
 Every table must enforce `user_id = auth.uid()` policies. Verify in Supabase → Table editor → RLS policies. Any table without RLS is a data leak risk.
 
-> 🖼️ **SCREENSHOT (E):** Supabase RLS policies — `docs/screenshots/ops-e-rls.png`
+> *Figure E — Supabase RLS policies: PENDING — requires dashboard access for capture.*
 
 ---
 
@@ -237,7 +238,7 @@ Category + version presets (MERC) fill all fields automatically. Supported: ener
 - `RAZORPAY_KEY_ID` is the **live key** in production — never point clients to a test key.
 - Owner key redemption is one-time per account (`redeemOwnerKey`); keep the key secret.
 
-> 🖼️ **SCREENSHOT (F):** Razorpay dashboard (payments/subscriptions) — `docs/screenshots/ops-f-razorpay.png`
+> *Figure F — Razorpay dashboard (payments/subscriptions): PENDING — requires dashboard access for capture.*
 
 ---
 
