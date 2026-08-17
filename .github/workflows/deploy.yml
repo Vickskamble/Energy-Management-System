@@ -11,6 +11,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: release
@@ -25,10 +26,10 @@ jobs:
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -89,15 +90,19 @@ jobs:
         if: success()
 
       - name: Upload Web Artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         if: success()
         with:
           path: build/web
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: wandalen/wretry.action@v3
         if: success()
+        with:
+          action: actions/deploy-pages@v5
+          attempt_limit: 4
+          attempt_delay: 30000
 
       - name: Security Headers Verification
         run: |
@@ -131,10 +136,10 @@ jobs:
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -178,7 +183,7 @@ jobs:
       # tooling is noisy on windows — keep stderr as success-stream output.
       PSNativeCommandUseErrorActionPreference: 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
