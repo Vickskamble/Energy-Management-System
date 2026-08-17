@@ -72,6 +72,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
   String? _selectedMeter;
   String? _selectedSite;
   Map<String, String> _meterSites = {};
+  Map<String, double> _meterKwhTargets = {};
 
   MonthFilterValue get _selection => widget.monthFilter.value;
 
@@ -114,6 +115,10 @@ class _AnalysisContentState extends State<_AnalysisContent> {
       setState(() {
         _meterSites = {
           for (final m in meters) m.name: m.site,
+        };
+        _meterKwhTargets = {
+          for (final m in meters)
+            if (m.dailyKwhTarget > 0) m.name: m.dailyKwhTarget,
         };
       });
     } catch (_) {
@@ -812,6 +817,12 @@ class _AnalysisContentState extends State<_AnalysisContent> {
         ? 'Daily — ${_selection.label}'
         : 'Monthly — all readings';
 
+    // Daily budget for the visible meters — dashed cross line on the daily
+    // kWh chart (client asked: each day's kWh against the daily target).
+    final dailyTarget = daily
+        ? names.fold(0.0, (sum, n) => sum + (_meterKwhTargets[n] ?? 0))
+        : 0.0;
+
     // Tap a trend point → preview all readings of that day / month.
     void showBucketReadings(int index) {
       if (index < 0 || index >= axisKeys.length) return;
@@ -872,6 +883,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   xLabels: xLabels,
                   xLabelStep: xLabelStep,
                   onTapPoint: showBucketReadings,
+                  targetKwhPerDay: dailyTarget,
                 ),
               ),
               const SizedBox(height: 12),
@@ -900,6 +912,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     xLabels: xLabels,
                     xLabelStep: xLabelStep,
                     onTapPoint: showBucketReadings,
+                    targetKwhPerDay: dailyTarget,
                   ),
                 ),
               ),
@@ -1147,11 +1160,17 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     List<String>? xLabels,
     int xLabelStep = 1,
     void Function(int index)? onTapPoint,
+    double targetKwhPerDay = 0,
   }) {
-    final maxY = series
+    final rawMax = series
         .expand((s) => s.values)
-        .fold(0.0, (a, b) => a > b ? a : b) *
-        1.2;
+        .fold(0.0, (a, b) => a > b ? a : b);
+    var maxY = (rawMax * 1.2).clamp(1.0, double.infinity);
+    if (targetKwhPerDay > 0) {
+      if (maxY < targetKwhPerDay * 1.18) {
+        maxY = targetKwhPerDay * 1.18;
+      }
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1235,6 +1254,18 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     ),
                   ),
               ],
+              extraLinesData: ExtraLinesData(
+                horizontalLines: targetKwhPerDay > 0
+                    ? [
+                        HorizontalLine(
+                          y: targetKwhPerDay,
+                          color: AppColors.danger,
+                          strokeWidth: 1.5,
+                          dashArray: [6, 4],
+                        ),
+                      ]
+                    : const [],
+              ),
               lineTouchData: LineTouchData(
                 touchCallback:
                     onTapPoint == null
@@ -1305,6 +1336,26 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     ),
                   ],
                 ),
+            ],
+          ),
+        ],
+        if (targetKwhPerDay > 0) ...[
+          const SizedBox(height: 6),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CustomPaint(
+                size: const Size(18, 4),
+                painter: _DashPainter(AppColors.danger),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Daily target ${targetKwhPerDay.toStringAsFixed(0)} kWh/day',
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ],
           ),
         ],
@@ -1736,4 +1787,31 @@ class _ChartSeries {
   final String label;
   final Color color;
   final List<double> values;
+}
+
+class _DashPainter extends CustomPainter {
+  final Color color;
+  _DashPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2;
+    const dash = 4.0;
+    const gap = 2.0;
+    double x = 0;
+    while (x < size.width) {
+      canvas.drawLine(
+        Offset(x, size.height / 2),
+        Offset((x + dash).clamp(0.0, size.width), size.height / 2),
+        paint,
+      );
+      x += dash + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
