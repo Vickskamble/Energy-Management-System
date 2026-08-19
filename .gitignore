@@ -54,5 +54,5 @@ ems_meta.db
 # Web deploy folder (own git repo -> powerems-web / Vercel)
 /web-deploy/
 
-# Web trial build (no-dot env copy — secrets; written by CI)
+# Web trial build (no-dot env copy - secrets; written by CI)
 assets/env
