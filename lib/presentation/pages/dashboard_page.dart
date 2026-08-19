@@ -66,6 +66,9 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _loadMeterSites();
+    // Keep the alert-attribution site map fresh when meters are added,
+    // renamed or deleted from Meter Management.
+    context.read<MeterRepository>().addListener(_loadMeterSites);
     if (widget.isActive) _startAutoRefresh();
   }
 
@@ -144,6 +147,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void dispose() {
     _stopAutoRefresh();
+    context.read<MeterRepository>().removeListener(_loadMeterSites);
     super.dispose();
   }
 
@@ -459,28 +463,22 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   /// Logs feeding the Monthly Consumption chart. Same site/meter scope as the
-  /// rest of the dashboard, aligned with the selection:
-  ///  - a specific month picked → ONLY that month's logs, so the chart shows
-  ///    exactly the same value as the Total Consumption KPI;
-  ///  - a year / current / all-time → that year's monthly trend.
+  /// rest of the dashboard, but ALWAYS the full selected year (12-month
+  /// trend): picking a month or a single day must not collapse the chart to
+  /// one point — only the year decides what gets plotted.
   List<EnergyLogEntity> get _consumptionChartLogs {
     final logs = _siteLogs;
     if (logs.isEmpty) return logs;
+    final int year;
     final m = _selection.month;
     if (m != null) {
-      return logs
-          .where(
-            (l) => l.loggedAt.year == m.year && l.loggedAt.month == m.month,
-          )
-          .toList();
-    }
-    final int year;
-    if (_selection.year != null) {
+      year = m.year;
+    } else if (_selection.year != null) {
       year = _selection.year!;
     } else if (_selection.isCurrent) {
       year = DateTime.now().year;
     } else {
-      return logs; // all-time → let the chart use its latest year
+      year = _maxYearOf(logs); // all-time → let the chart use its latest year
     }
     return logs.where((l) => l.loggedAt.year == year).toList();
   }

@@ -117,7 +117,7 @@ class _ReportsContentState extends State<_ReportsContent> {
         _meterSites = {for (final m in meters) m.name: m.site};
       });
     } catch (_) {
-      // Best-effort â€” reports still render without site filter.
+      // Best-effort — reports still render without site filter.
     }
   }
 
@@ -132,7 +132,7 @@ class _ReportsContentState extends State<_ReportsContent> {
     super.dispose();
   }
 
-  /// Distinct months present in the data â€” drives the shared filter bar.
+  /// Distinct months present in the data — drives the shared filter bar.
   List<DateTime> get _monthKeys {
     final keys = <String, DateTime>{};
     for (final e in _allEntities) {
@@ -166,7 +166,7 @@ class _ReportsContentState extends State<_ReportsContent> {
   }
 
   /// Meters for the dropdown: every meter registered for the selected site
-  /// (even without readings) plus any meter still present in log data â€” so
+  /// (even without readings) plus any meter still present in log data — so
   /// added meters always appear in the selector.
   List<String> get _meterNames {
     final names = <String>{
@@ -188,7 +188,7 @@ class _ReportsContentState extends State<_ReportsContent> {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFmt = NumberFormat.currency(symbol: 'â‚¹', decimalDigits: 0);
+    final currencyFmt = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
     final entityLogs = _visibleLogs;
     final breakdown = BillCalculator.calculate(
       logs: entityLogs,
@@ -218,7 +218,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                             logs: entities,
                             title: 'Energy Management Report',
                             subtitle:
-                                '${entities.length} reading(s) â€” '
+                                '${entities.length} reading(s) — '
                                 '${_selection.label}${_meter != null ? ', $_meter' : ''}',
                           );
                         } catch (e) {
@@ -261,7 +261,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                         logs: entities,
                         title: 'Energy Management Report',
                         subtitle:
-                            '${entities.length} reading(s) â€” '
+                            '${entities.length} reading(s) — '
                             '${_selection.label}${_meter != null ? ', $_meter' : ''}',
                       );
                     } catch (e) {
@@ -558,7 +558,7 @@ class _ReportsContentState extends State<_ReportsContent> {
     } else {
       final diff = actual - estimated;
       final pct = estimated > 0 ? (diff / estimated).abs() * 100 : 0;
-      final sign = diff > 0 ? '+' : (diff < 0 ? '-' : 'Â±');
+      final sign = diff > 0 ? '+' : (diff < 0 ? '-' : '±');
       diffText =
           '$sign${currencyFmt.format(diff.abs())} '
           '(${pct.toStringAsFixed(1)}%)';
@@ -603,7 +603,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                     Expanded(
                       child: Text(
                         actual == null
-                            ? 'â€”'
+                            ? '—'
                             : 'Actual ${currencyFmt.format(actual)}',
                         style: const TextStyle(
                           fontSize: 12,
@@ -649,7 +649,7 @@ class _ReportsContentState extends State<_ReportsContent> {
               Expanded(
                 child: Text(
                   actual == null
-                      ? 'â€”'
+                      ? '—'
                       : 'Actual ${currencyFmt.format(actual)}',
                   style: const TextStyle(
                     fontSize: 12,
@@ -709,7 +709,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                 controller: amountCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Bill amount (â‚¹)',
+                  labelText: 'Bill amount (₹)',
                   isDense: true,
                 ),
                 validator: (v) {
@@ -728,7 +728,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                 ),
                 decoration: InputDecoration(
                   labelText:
-                      'FAC rate (â‚¹/unit) â€” optional',
+                      'FAC rate (₹/unit) — optional',
                   hintText: AppConfig.facRateForMonth(selectedKey)
                       .toStringAsFixed(2),
                   isDense: true,
@@ -788,32 +788,45 @@ class _ReportsContentState extends State<_ReportsContent> {
 
   String _monthKey(int year, int month) => '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
 
-  /// Compact â‚¹ label for bar tops: â‚¹950, â‚¹1.2k, â‚¹3.4L, â‚¹1.1Cr.
+  /// Compact ₹ label for bar tops: ₹950, ₹1.2k, ₹3.4L, ₹1.1Cr.
   String _compactInr(double v) {
-    if (v >= 10000000) return 'â‚¹${(v / 10000000).toStringAsFixed(1)}Cr';
-    if (v >= 100000) return 'â‚¹${(v / 100000).toStringAsFixed(1)}L';
-    if (v >= 1000) return 'â‚¹${(v / 1000).toStringAsFixed(1)}k';
-    return 'â‚¹${v.toStringAsFixed(0)}';
+    if (v >= 10000000) return '₹${(v / 10000000).toStringAsFixed(1)}Cr';
+    if (v >= 100000) return '₹${(v / 100000).toStringAsFixed(1)}L';
+    if (v >= 1000) return '₹${(v / 1000).toStringAsFixed(1)}k';
+    return '₹${v.toStringAsFixed(0)}';
   }
 
-  /// Last 12 months bill trend â€” bar chart (Issue 6).
+  /// Last 12 months bill trend — bar chart (Issue 6). Scope follows the
+  /// meter dropdown (site scope stays), and each bar is a real monthly
+  /// breakdown (FAC-rate aware) so the top label matches the Bill Accuracy
+  /// rows instead of a sum of per-reading estimates.
   Widget _buildMonthlyHistory() {
     final now = DateTime.now();
+    final scope = _meter == null
+        ? _entities
+        : _entities.where((e) => e.meterName == _meter).toList();
     final monthDates = <DateTime>[];
     for (var i = 11; i >= 0; i--) {
       monthDates.add(DateTime(now.year, now.month - i, 1));
     }
     final monthBills = <double>[];
     for (final date in monthDates) {
-      var total = 0.0;
-      for (final e in _entities) {
-        if (e.loggedAt.year == date.year && e.loggedAt.month == date.month) {
-          total += e.netBill > 0 ? e.netBill : e.estimatedBill;
-        }
+      final monthLogs = scope
+          .where(
+            (e) => e.loggedAt.year == date.year && e.loggedAt.month == date.month,
+          )
+          .toList();
+      var bill = 0.0;
+      if (monthLogs.isNotEmpty) {
+        bill = BillCalculator.calculate(
+          logs: monthLogs,
+          ratchetLogs: _allEntities,
+          facRate: AppConfig.facRateForMonth(_monthKey(date.year, date.month)),
+        ).netBill;
       }
-      monthBills.add(total);
+      monthBills.add(bill);
     }
-    final maxBill = monthBills.reduce((a, b) => a > b ? a : b);
+    final maxBill = monthBills.fold(0.0, (a, b) => a > b ? a : b);
 
     return AppCard(
       child: Column(
@@ -825,7 +838,7 @@ class _ReportsContentState extends State<_ReportsContent> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Last 12 months â€” estimated bill (â‚¹)',
+            'Last 12 months — estimated bill (₹)',
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
@@ -840,7 +853,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       return BarTooltipItem(
                         '${DateFormat('MMM yy').format(monthDates[group.x])}: '
-                        'â‚¹${rod.toY.toStringAsFixed(0)}',
+                        '₹${rod.toY.toStringAsFixed(0)}',
                         const TextStyle(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.bold,
@@ -981,7 +994,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                     width: width,
                     child: _summaryItem(
                       'Avg Unit Cost',
-                      'â‚¹${breakdown.averageUnitCost.toStringAsFixed(2)}',
+                      '₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
                       AppColors.kpiCost,
                     ),
                   ),
@@ -1084,21 +1097,21 @@ class _ReportsContentState extends State<_ReportsContent> {
             Text(
               log.currentKwh != null
                   ? log.currentKwh!.toStringAsFixed(1)
-                  : 'â€”',
+                  : '—',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             Text(log.kwh.toStringAsFixed(1)),
             Text(
               log.currentKvah != null
                   ? log.currentKvah!.toStringAsFixed(1)
-                  : 'â€”',
+                  : '—',
             ),
             Text(log.kvah.toStringAsFixed(1)),
             Text(log.powerFactor.toStringAsFixed(3)),
             Text(
               (log.mdRecorded * log.multiplyingFactor).toStringAsFixed(1),
             ),
-            Text('â‚¹ ${log.estimatedBill.toStringAsFixed(0)}'),
+            Text('₹ ${log.estimatedBill.toStringAsFixed(0)}'),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
