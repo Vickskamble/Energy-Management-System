@@ -636,8 +636,12 @@ class _DashboardContentState extends State<_DashboardContent> {
     return lines.join('\n');
   }
 
-  /// Today's usage (current month), the selected month's daily average, or
-  /// the selected day's total in Daily mode.
+  /// Daily-average consumption for the visible period. The same label, value
+  /// and semantics on every platform regardless of the selected filter:
+  ///  - a selected day → that day's total (Day mode);
+  ///  - the live (current) month → month-to-date average per elapsed day;
+  ///  - a past month → month total ÷ days in that month;
+  ///  - a year / all-time → total ÷ 365 (or log count, capped).
   double get _todayUnits {
     if (_isDayMode) {
       return _selectedLogs.fold(
@@ -645,39 +649,26 @@ class _DashboardContentState extends State<_DashboardContent> {
         (s, l) => s + l.kwh * l.multiplyingFactor,
       );
     }
-    if (_selection.isCurrent) {
-      final now = DateTime.now();
-      final todays = _siteLogs
-          .where(
-            (l) =>
-                l.loggedAt.year == now.year &&
-                l.loggedAt.month == now.month &&
-                l.loggedAt.day == now.day,
-          )
-          .toList();
-      if (todays.isNotEmpty) {
-        return todays.fold(0.0, (s, l) => s + l.kwh * l.multiplyingFactor);
-      }
-      if (_siteLogs.isEmpty) return 0.0;
-      final last = _siteLogs.last;
-      return last.kwh * last.multiplyingFactor;
-    }
     final monthLogs = _selectedMonthLogs;
     if (monthLogs.isEmpty) return 0.0;
     final total = monthLogs.fold(
       0.0,
       (s, l) => s + l.kwh * l.multiplyingFactor,
     );
-    final year = _selection.year;
-    final days = year != null
-        ? 365
-        : (_selection.allTime
-              ? _siteLogs.length.clamp(1, 365)
-              : DateTime(
-                  _selection.month!.year,
-                  _selection.month!.month + 1,
-                  0,
-                ).day);
+    final int days;
+    if (_selection.isCurrent) {
+      days = DateTime.now().day.clamp(1, 31);
+    } else if (_selection.year != null) {
+      days = 365;
+    } else if (_selection.allTime) {
+      days = _siteLogs.length.clamp(1, 365);
+    } else {
+      days = DateTime(
+        _selection.month!.year,
+        _selection.month!.month + 1,
+        0,
+      ).day;
+    }
     return (total / days * 100).roundToDouble() / 100;
   }
 
@@ -1120,9 +1111,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     : 'Improve load smoothing',
               ),
               AppKpiCard(
-                title: _isDayMode
-                    ? 'Readings'
-                    : (_selection.isCurrent ? 'Latest Reading' : 'Daily Avg'),
+                title: _isDayMode ? 'Readings' : 'Daily Avg',
                 value: _isDayMode
                     ? _selectedLogs.length.toDouble()
                     : _todayUnits,
@@ -1132,7 +1121,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                 description: _isDayMode
                     ? 'Readings logged on ${DateFormat('d MMM yyyy').format(_selectedDate!)}'
                     : _selection.isCurrent
-                    ? 'Last reading — consumption in units (kWh × MF)'
+                    ? 'Month-to-date average per day (kWh × MF)'
                     : '${_selection.label} average per day (kWh × MF)',
               ),
             ],

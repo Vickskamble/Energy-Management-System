@@ -102,6 +102,15 @@ class _AppShellState extends State<AppShell> {
                   widget.onItemSelected(i);
                 },
               ),
+            ListTile(
+              selected: widget.selectedIndex == 7,
+              leading: const Icon(Icons.file_upload_outlined),
+              title: const Text('Excel Import'),
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onItemSelected(7);
+              },
+            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.workspace_premium_outlined),
@@ -138,7 +147,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   /// Compact user chip shown in the top bar (desktop: avatar + name/email,
-  /// mobile: avatar only to save space).
+  /// mobile: avatar + name with ellipsis — never clipped mid-character).
   Widget _buildUserChip(BuildContext context, {bool compact = false}) {
     final initial = widget.userName.isNotEmpty
         ? widget.userName.trim()[0].toUpperCase()
@@ -156,7 +165,30 @@ class _AppShellState extends State<AppShell> {
       ),
     );
     if (compact) {
-      return Padding(padding: const EdgeInsets.only(right: 4), child: avatar);
+      final showName = MediaQuery.of(context).size.width >= 400;
+      return Padding(
+        padding: const EdgeInsets.only(right: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            avatar,
+            if (showName) ...[
+              const SizedBox(width: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 120),
+                child: Text(
+                  widget.userName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
     }
     return Padding(
       padding: const EdgeInsets.only(right: AppSpacing.sm),
@@ -165,19 +197,30 @@ class _AppShellState extends State<AppShell> {
         children: [
           avatar,
           const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                widget.userName,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-              Text(
-                widget.userEmail,
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-              ),
-            ],
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 170),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.userName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  widget.userEmail,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
