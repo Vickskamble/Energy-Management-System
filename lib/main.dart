@@ -81,6 +81,11 @@ void main() async {
   };
 
   await dotenv.load(fileName: '.env', isOptional: true);
+  // GitHub Pages drops dotfiles (`,env` is never served) — fall back to the
+  // no-dot bundle `assets/env` (same content, written by the deploy workflow).
+  if ((dotenv.env['SUPABASE_URL'] ?? '').isEmpty) {
+    await dotenv.load(fileName: 'assets/env', isOptional: true);
+  }
 
   try {
     await SupabaseClientManager.initialize();
