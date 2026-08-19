@@ -133,6 +133,25 @@ class AppConfig {
     if (value.length == 4) _todMultipliers = value;
   }
 
+  static Map<String, double> _todZoneShares = AppConstants.todZoneShares;
+  static Map<String, double> _todZoneSharesWinter =
+      AppConstants.todZoneSharesWinter;
+
+  /// Use winter (Oct–Mar) zone shares for the current bill month.
+  static bool useWinterTod = false;
+
+  /// Slot-wise ToD shares per zone (A/B/C/D) — share of the energy rate.
+  static Map<String, double> get todZoneShares =>
+      Map.unmodifiable(_todZoneShares);
+  static set todZoneShares(Map<String, double> value) {
+    _todZoneShares = Map.of(value);
+  }
+  static Map<String, double> get todZoneSharesWinter =>
+      Map.unmodifiable(_todZoneSharesWinter);
+  static set todZoneSharesWinter(Map<String, double> value) {
+    _todZoneSharesWinter = Map.of(value);
+  }
+
   /// Electricity duty as % of energy charges (0 = exempt).
   static double get dutyPercent => _dutyPercent;
   static set dutyPercent(double value) {
@@ -236,7 +255,9 @@ class AppConfig {
     _electricityDutyPerUnit = 0.0;
     _fixedCharge = preset.fixedCharge;
     _energySlabs = List.of(preset.slabs);
-    _todMultipliers = List.of(preset.todMultipliers);
+    // Slot-wise ToD — zone shares supersede the legacy multiplier list.
+    _todZoneShares = Map.of(preset.todZoneShares);
+    _todZoneSharesWinter = Map.of(preset.todZoneSharesWinter);
     _contractDemandKva = preset.defaultContractDemand;
     return preset;
   }
@@ -254,6 +275,9 @@ class AppConfig {
     _regionSubsidyAmount = 0.0;
     _rebateSection106 = 0.0;
     _todMultipliers = [1.0, 1.0, 1.0, 1.0];
+    _todZoneShares = AppConstants.todZoneShares;
+    _todZoneSharesWinter = AppConstants.todZoneSharesWinter;
+    useWinterTod = false;
     _dutyPercent = 0.0;
     _fixedCharge = 0.0;
     _energySlabs = const [];
@@ -377,6 +401,19 @@ class TariffStore {
     if (todRaw is List && todRaw.length == 4) {
       AppConfig.todMultipliers = todRaw.map((e) => (e as num).toDouble()).toList();
     }
+    final zoneRaw = map['tod_zone_shares'];
+    if (zoneRaw is Map<String, Object?>) {
+      AppConfig.todZoneShares =
+          zoneRaw.map((k, v) => MapEntry(k, (v as num).toDouble()));
+    }
+    final zoneWinterRaw = map['tod_zone_shares_winter'];
+    if (zoneWinterRaw is Map<String, Object?>) {
+      AppConfig.todZoneSharesWinter =
+          zoneWinterRaw.map((k, v) => MapEntry(k, (v as num).toDouble()));
+    }
+    if (map['use_winter_tod'] is bool) {
+      AppConfig.useWinterTod = map['use_winter_tod'] as bool;
+    }
   }
 
   static Future<void> saveAll({
@@ -424,6 +461,9 @@ class TariffStore {
         'region_subsidy_amount': regionSubsidyAmount,
         'rebate_section_106': rebateSection106,
         'tod_multipliers': todMultipliers ?? AppConfig.todMultipliers,
+        'tod_zone_shares': AppConfig.todZoneShares,
+        'tod_zone_shares_winter': AppConfig.todZoneSharesWinter,
+        'use_winter_tod': AppConfig.useWinterTod,
       };
       await SupabaseClientManager.client.from(_table).upsert({
         'user_id': uid,

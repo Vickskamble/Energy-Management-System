@@ -11,14 +11,21 @@ class EnergyCalculator {
   }
 
   /// Billing demand = max(recorded MD, 11-month preceding high).
-  /// The 75% of contract value is NOT part of the bill — it is only a
-  /// reference level the user should stay above (shown on charts).
+  /// Billing demand = the largest of: recorded demand, the ratchet peak,
+  /// and the floor — never below 75% of the contract demand, and never
+  /// below 75% of the ratchet peak (official MSEDCL rule).
   static double calculateBillingDemand(
     double mdRecorded,
     double contractDemand, {
     double ratchetPeak = 0,
+    double floorPercentOfContract =
+        AppConstants.billingDemandFloorPercent,
+    double floorPercentOfRatchet =
+        AppConstants.billingDemandFloorPercentOfRatchet,
   }) {
-    return max(mdRecorded, ratchetPeak);
+    final floor = max(contractDemand * floorPercentOfContract,
+        ratchetPeak * floorPercentOfRatchet);
+    return max(max(mdRecorded, ratchetPeak), floor).ceilToDouble();
   }
 
   /// Energy charges with slab-wise official rates. [slabs] is a list of

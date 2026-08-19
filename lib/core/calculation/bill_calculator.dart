@@ -4,6 +4,7 @@ import '../config/tariff_presets.dart';
 import '../constants/app_constants.dart';
 import 'bill_breakdown.dart';
 import 'energy_calculator.dart';
+import 'tod_calculator.dart';
 
 class BillCalculator {
   BillCalculator._();
@@ -30,6 +31,9 @@ class BillCalculator {
     List<EnergySlab>? slabs,
     double fixedCharge = 0,
     List<double>? todMultipliers,
+    Map<String, double>? todZoneShares,
+    Map<String, double>? todZoneSharesWinter,
+    bool? useWinterTod,
     double regionSubsidy = 0,
     double rebateSection106 = 0,
     List<EnergyLogEntity>? ratchetLogs,
@@ -52,12 +56,15 @@ class BillCalculator {
     final effectiveBulkPercent =
         bulkRebatePercent ?? AppConfig.bulkRebatePercent;
     final effectiveArrears = arrearsDpcAmount ?? AppConfig.arrearsDpcAmount;
-    final effectiveRoundToTen = roundToTen ?? AppConfig.roundToTen;
     final effectiveBillOnKvah = billOnKvah ?? AppConfig.billOnKvah;
     final effectiveSlabs = slabs ?? AppConfig.energySlabs;
     final effectiveFixedCharge =
         fixedCharge > 0 ? fixedCharge : AppConfig.fixedCharge;
     final effectiveTod = todMultipliers ?? AppConfig.todMultipliers;
+    final effectiveZoneShares = todZoneShares ?? AppConfig.todZoneShares;
+    final effectiveZoneSharesWinter =
+        todZoneSharesWinter ?? AppConfig.todZoneSharesWinter;
+    final effectiveUseWinterTod = useWinterTod ?? AppConfig.useWinterTod;
     if (logs.isEmpty) return _emptyBreakdown(effectiveContractDemand);
 
     double totalKwh = 0;
@@ -122,11 +129,24 @@ class BillCalculator {
       effectiveWheelingRate,
     );
 
-    // TOD charges
-    final todCharges = EnergyCalculator.calculateTodCharges(
-      energyCharges,
-      effectiveTod,
-    );
+    // TOD charges — slot-wise engine (6-hour zones) when zone shares are
+    // configured; legacy multiplier average otherwise.
+    final bool useSlotTod = effectiveZoneShares.isNotEmpty;
+    final TodZoneResult? zoneResult = useSlotTod
+        ? TodCalculator.calculate(
+            logs: logs,
+            energyRatePerUnit: effectiveEnergyRate,
+            onKvah: effectiveBillOnKvah,
+            zoneShares: effectiveZoneShares,
+            winterZoneShares: effectiveZoneSharesWinter,
+            useWinter: effectiveUseWinterTod,
+          )
+        : null;
+    final todCharges = zoneResult?.netCharges ??
+        EnergyCalculator.calculateTodCharges(
+          energyCharges,
+          effectiveTod,
+        );
 
     // Electricity duty = % of energy charges (official model, HT exempt);
     // flat per-unit × units only as legacy fallback.
@@ -222,16 +242,20 @@ class BillCalculator {
       arrearsDpc: effectiveArrears,
     );
 
-    // Round the final bill to the nearest ₹10 (MSEDCL practice).
-    final roundingAdjustment = effectiveRoundToTen
-        ? (rawNet / 10).roundToDouble() * 10 - rawNet
-        : 0.0;
-    final netBill = rawNet + roundingAdjustment;
+    // Rounding model: the bill total stays exact (matches the discom's
+    // printed total); only the payable columns floor down to ₹10.
+    final roundingAdjustment = 0.0;
+    final netBill = rawNet;
 
     final averageUnitCost = EnergyCalculator.calculateAverageUnitCost(
       netBill,
       totalUnits,
     );
+
+    // Payable amounts (₹, floored to the nearest ₹10) — the arithmetic bill
+    // stays exact; only the payable columns are rounded like the paper bill.
+    final payableEarlyBase = netBill - ppdRebate;
+    final payableAfterDpcBase = netBill;
 
     return BillBreakdown(
       totalUnits: totalUnits,
@@ -256,11 +280,15 @@ class BillCalculator {
       roundingAdjustment:
           (roundingAdjustment * 100).roundToDouble() / 100,
       netBill: (netBill * 100).roundToDouble() / 100,
+      todZoneUnits: zoneResult?.zoneUnits ?? const {},
+      todZoneCharges: zoneResult?.zoneCharges ?? const {},
       billingDemand: (billingDemand * 100).roundToDouble() / 100,
       contractDemand: effectiveContractDemand,
       powerFactor: (powerFactor * 1000).roundToDouble() / 1000,
       loadFactor: (loadFactor * 1000).roundToDouble() / 1000,
       averageUnitCost: (averageUnitCost * 100).roundToDouble() / 100,
+      payableEarly: BillBreakdown.roundToTen(payableEarlyBase),
+      payableAfterDpc: BillBreakdown.roundToTen(payableAfterDpcBase),
     );
   }
 

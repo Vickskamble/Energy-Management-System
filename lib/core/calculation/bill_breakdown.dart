@@ -20,11 +20,20 @@ class BillBreakdown {
   final double arrearsDpc;
   final double roundingAdjustment;
   final double netBill;
+  final Map<String, double> todZoneUnits;
+  final Map<String, double> todZoneCharges;
   final double billingDemand;
   final double contractDemand;
   final double powerFactor;
   final double loadFactor;
   final double averageUnitCost;
+
+  /// Payable in time (after PPD) — floored to the nearest ₹10 like the
+  /// printed bill. 0 when the calculator did not produce one.
+  final double payableEarly;
+
+  /// Payable after the due-date (DPC paid) — floored to the nearest ₹10.
+  final double payableAfterDpc;
 
   const BillBreakdown({
     required this.totalUnits,
@@ -47,6 +56,10 @@ class BillBreakdown {
     this.bulkRebate = 0,
     this.arrearsDpc = 0,
     this.roundingAdjustment = 0,
+    this.todZoneUnits = const {},
+    this.todZoneCharges = const {},
+    this.payableEarly = 0,
+    this.payableAfterDpc = 0,
     required this.netBill,
     required this.billingDemand,
     required this.contractDemand,
@@ -54,6 +67,10 @@ class BillBreakdown {
     required this.loadFactor,
     required this.averageUnitCost,
   });
+
+  /// Floor `amount` down to the nearest ₹10 (MSEDCL payable columns).
+  static double roundToTen(double amount) =>
+      (amount / 10).floorToDouble() * 10;
 
   double get energyChargesPercent =>
       netBill > 0 ? (energyCharges / netBill * 100) : 0;

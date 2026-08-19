@@ -46,6 +46,7 @@ class BillForecastCalculator {
         projectedUnits * AppConfig.wheelingChargePerUnit;
     final demandCharges =
         monthBreakdown.billingDemand * AppConfig.demandChargePerKva;
+    final todCharges = monthBreakdown.todCharges * scale;
 
     // Electricity duty = % of energy charges (official model, HT exempt);
     // flat per-unit × units only as legacy fallback.
@@ -114,6 +115,7 @@ class BillForecastCalculator {
         demandCharges +
         facCharges +
         wheelingCharges +
+        todCharges +
         duty +
         taxes +
         surcharge +
@@ -126,7 +128,7 @@ class BillForecastCalculator {
         bulkRebate -
         ppd;
     final projectedBill = AppConfig.roundToTen
-        ? (rawBill / 10).roundToDouble() * 10
+        ? (rawBill / 10).floorToDouble() * 10
         : rawBill;
 
     return BillForecast(

@@ -173,9 +173,9 @@ void main() {
       );
     });
 
-    test('tax is a percentage of energy charges by default', () {
+    test('tax uses the flat per-unit rate by default (0% percent model)', () {
       final b = BillCalculator.calculate(logs: [log(1000, 1100, 150)]);
-      expect(b.taxes, closeTo(b.energyCharges * 0.0125, 0.01));
+      expect(b.taxes, closeTo(b.totalUnits * 0.279, 0.01));
     });
 
     test('ICR applies only when growth >= 10% vs last year', () {
@@ -196,13 +196,13 @@ void main() {
       expect(b.ppdRebate, closeTo(base * 0.02, 0.01));
     });
 
-    test('arrears add to the bill and rounding snaps to nearest 10', () {
+    test('arrears add to the bill and payable snaps to ₹10', () {
       AppConfig.arrearsDpcAmount = 1250;
       AppConfig.roundToTen = true;
       final b = BillCalculator.calculate(logs: [log(1000, 1100, 150)]);
       expect(b.arrearsDpc, 1250);
-      expect(b.netBill % 10, 0);
-      expect(b.roundingAdjustment, closeTo(b.netBill - (b.netBill - b.roundingAdjustment), 1));
+      expect(b.payableAfterDpc, 101400); // floor ₹10
+      expect(b.payableEarly, 99350); // floor ₹10
     });
 
     test('kVAh toggle switches billing unit', () {

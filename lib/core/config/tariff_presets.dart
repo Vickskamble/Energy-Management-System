@@ -71,10 +71,13 @@ class TariffPreset {
   /// Suggested sanctioned/contract demand in kVA for this category.
   final double defaultContractDemand;
 
-  /// ToD multipliers [ZoneA 00-06, ZoneB 06-18, ZoneC 09-18, ZoneD 17-24]
-  /// — revised ToD (Case 75/2025): night 0%, solar −15% (Apr–Sep) /
-  /// −25% (Oct–Mar), peak +20% of EC. Equal-weight average used in bills.
-  final List<double> todMultipliers;
+  /// Slot-wise ToD engine — share of the energy rate (₹/u) charged per
+  /// zone A/B/C/D (6 h each). C = solar-window rebate, D = peak surcharge
+  /// (Case 75/2025). Defaults follow AppConstants.todZoneShares.
+  final Map<String, double> todZoneShares;
+
+  /// Winter (Oct–Mar) zone shares — C rebate deepens to −25%.
+  final Map<String, double> todZoneSharesWinter;
 
   const TariffPreset({
     required this.category,
@@ -86,7 +89,9 @@ class TariffPreset {
     required this.dutyPercent,
     this.fixedCharge = 0,
     required this.defaultContractDemand,
-    this.todMultipliers = const [1.0, 1.0, 0.85, 1.20],
+    this.todZoneShares = const {'A': 0.0, 'B': 0.0, 'C': -0.15, 'D': 0.25},
+    this.todZoneSharesWinter =
+        const {'A': 0.0, 'B': 0.0, 'C': -0.25, 'D': 0.25},
   });
 
   /// Energy charge rate used when the user does not have a stored override.
@@ -148,6 +153,9 @@ class TariffPresets {
           dutyPercent: ltDuty,
           fixedCharge: ltFixed,
           defaultContractDemand: 10.0,
+          todZoneShares: const {'A': 0.0, 'B': 0.0, 'C': -0.20, 'D': 0.20},
+          todZoneSharesWinter:
+              const {'A': 0.0, 'B': 0.0, 'C': -0.25, 'D': 0.20},
         );
       case TariffCategory.ltIndustrial:
         return TariffPreset(
@@ -159,6 +167,9 @@ class TariffPresets {
           dutyPercent: ltDuty,
           fixedCharge: ltIndFixed,
           defaultContractDemand: 20.0,
+          todZoneShares: const {'A': 0.0, 'B': 0.0, 'C': -0.20, 'D': 0.20},
+          todZoneSharesWinter:
+              const {'A': 0.0, 'B': 0.0, 'C': -0.25, 'D': 0.20},
         );
     }
   }

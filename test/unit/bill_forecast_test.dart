@@ -62,9 +62,10 @@ void main() {
       expect(forecast.projectedBill, greaterThan(0));
       expect(forecast.dailyAverageBill, greaterThan(0));
       // 7750 kVAh units: energy 65410 + demand 975000 + FAC 2325 + wheeling
-      // 6277.5 + duty 2131.25 + tax 817.63 (1.25% of EC) + surcharge 52020.5
-      // − PPD 21039.23 (2%) → 1082942.65 → rounded to ₹10
-      expect(forecast.projectedBill, closeTo(1082940, 0.01));
+      // 6277.5 + TOD 4088.13 (D zone 625 u × 25% × 8.44 × 3.1) + duty 0 +
+      // tax 2162.25 (0.279/u) + surcharge 52020.5 − PPD 21023.50 (2%)
+      // → 1086259.88 → floored to ₹10
+      expect(forecast.projectedBill, closeTo(1086250, 0.01));
     });
 
     test('scales by the number of days in the reference month', () {

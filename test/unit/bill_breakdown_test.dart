@@ -40,11 +40,15 @@ void main() {
       expect(breakdown.demandCharges, closeTo(975000, 0.01)); // 1500 × 650
       expect(breakdown.facCharges, closeTo(375, 0.01)); // 1250 × 0.30
       expect(breakdown.wheelingCharges, closeTo(1012.5, 0.01)); // 1250 × 0.81
-      expect(breakdown.electricityDuty, closeTo(343.75, 0.01)); // 1250 × 0.275
-      expect(breakdown.taxes, closeTo(131.88, 0.01)); // 1.25% of 10550 energy
+      expect(breakdown.electricityDuty, 0); // 0.0/u — official model
+      expect(breakdown.taxes, closeTo(348.75, 0.01)); // 1250 × 0.279 per-unit
       expect(breakdown.pfSurcharge, closeTo(49277.5, 0.01)); // PF 0.8 < 0.9 → 5%
       expect(breakdown.pfRebate, 0);
       expect(breakdown.loadFactor, 1.0);
+      expect(breakdown.todZoneUnits['A'], closeTo(937.5, 0.01)); // 00:00 → A 6/8
+      expect(breakdown.todZoneUnits['D'], closeTo(312.5, 0.01)); // D 2/8
+      expect(breakdown.payableEarly, 997700); // floor ₹10
+      expect(breakdown.payableAfterDpc, 1017460); // floor ₹10
     });
 
     test('applies PF rebate when power factor >= threshold', () {
@@ -55,6 +59,8 @@ void main() {
       expect(breakdown.powerFactor, 1.0);
       expect(breakdown.pfRebate, closeTo(9834.4, 0.01)); // 1% of (8440+975000)
       expect(breakdown.pfSurcharge, 0);
+      expect(breakdown.payableEarly, 936500); // floor ₹10
+      expect(breakdown.payableAfterDpc, 956010); // floor ₹10
     });
 
     test('respects a custom energy rate', () {
@@ -66,13 +72,13 @@ void main() {
       expect(breakdown.energyCharges, closeTo(12500, 0.01)); // 1250 kVAh × 10
     });
 
-    test('billing demand uses recorded MD — 75% is reference only', () {
+    test('billing demand never falls below 75% of the contract demand', () {
       final breakdown = BillCalculator.calculate(
         logs: [_log(kwh: 100, kvah: 120, md: 50)],
         contractDemand: 400,
       );
 
-      expect(breakdown.billingDemand, 250); // 50 × 5 MF — no contract floor
+      expect(breakdown.billingDemand, 300); // 75% × 400 = 300 beats 250
     });
 
     test('ratchet: preceding month peak (MD × MF) is considered', () {
@@ -147,7 +153,7 @@ void main() {
         ],
       );
 
-      expect(breakdown.billingDemand, 50); // 10 × 5 MF — no floor, no ratchet
+      expect(breakdown.billingDemand, 300); // floor 75%×400=300 beats 50
     });
 
     test('returns zeroed breakdown for empty logs', () {

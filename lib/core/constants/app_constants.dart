@@ -22,7 +22,7 @@ class AppConstants {
   static const double demandChargePerKva = 650.00;
   static const double facRatePerUnit = 0.30;
   static const double wheelingChargePerUnit = 0.81;
-  static const double electricityDutyPerUnit = 0.275;
+  static const double electricityDutyPerUnit = 0.0;
   static const double taxPerUnit = 0.279;
   static const double pfRebatePercent = 1.0;
   static const double pfSurchargePercent = 5.0;
@@ -37,9 +37,14 @@ class AppConstants {
   /// Tolerance (%) for actual vs estimated bill reconciliation (Issue 7B).
   static const double billAccuracyTolerancePercent = 10.0;
 
-  /// Tax as % of energy charges (official ~1.25%; used instead of the flat
-  /// per-unit [taxPerUnit] whenever > 0).
-  static const double taxPercent = 1.25;
+  /// Billing-demand floor — always at least this fraction of the ratchet
+  /// peak (75% official MSEDCL rule; the contract-demand floor uses
+  /// [billingDemandFloorPercent]).
+  static const double billingDemandFloorPercentOfRatchet = 0.75;
+
+  /// Tax as % of energy charges (official model; 0 = use the flat per-unit
+  /// [taxPerUnit], which matches the verified MSEDCL HT bill ~27.6 Ps/u).
+  static const double taxPercent = 0.0;
 
   /// Incremental Consumption Rebate (ICR) — ₹ per unit on the incremental
   /// consumption when it grows ≥ 10% vs the same month last year.
@@ -57,6 +62,23 @@ class AppConstants {
 
   /// Arrears / DPC flat amount in ₹ (added to the bill).
   static const double arrearsDpcAmount = 0.0;
+
+  /// Slot-wise ToD engine — share of the energy rate (₹/u) charged per
+  /// zone. C = solar window rebate (Apr–Sep), D = peak surcharge.
+  static const Map<String, double> todZoneShares = {
+    'A': 0.0,
+    'B': 0.0,
+    'C': -0.15,
+    'D': 0.25,
+  };
+
+  /// Winter (Oct–Mar): solar-window rebate deepens to −25% of EC.
+  static const Map<String, double> todZoneSharesWinter = {
+    'A': 0.0,
+    'B': 0.0,
+    'C': -0.25,
+    'D': 0.25,
+  };
 
   /// Round the final bill to the nearest ₹10 (MSEDCL practice).
   static const bool roundToTen = true;

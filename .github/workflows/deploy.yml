@@ -2,7 +2,7 @@ name: Release Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/tod-slot-engine-v125]
     tags:
       - 'v*.*.*'
   workflow_dispatch:
