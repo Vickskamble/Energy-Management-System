@@ -20,6 +20,7 @@ import '../../core/calculation/bill_calculator.dart';
 import '../../data/repositories/meter_repository.dart';
 import '../../domain/entities/energy_log_entity.dart';
 import '../bloc/energy_bloc.dart';
+import '../widgets/tour_keys.dart';
 import '../bloc/energy_event.dart';
 import '../bloc/energy_state.dart';
 
@@ -197,7 +198,9 @@ class _ReportsContentState extends State<_ReportsContent> {
     final kpis = BillCalculator.calculateKpis(breakdown);
 
     final isNarrow = MediaQuery.of(context).size.width < 600;
-    return ListView(
+    return KeyedSubtree(
+      key: kTourReportsKey,
+      child: ListView(
       padding: const EdgeInsets.all(AppSpacing.page),
       children: [
         AppSectionHeader(
@@ -447,6 +450,7 @@ class _ReportsContentState extends State<_ReportsContent> {
           ),
         ],
       ],
+      ),
     );
   }
 

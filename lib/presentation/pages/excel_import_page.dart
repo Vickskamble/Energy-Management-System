@@ -17,6 +17,7 @@ import '../../data/repositories/energy_repository.dart';
 import '../../data/repositories/meter_repository.dart';
 import '../bloc/energy_bloc.dart';
 import '../bloc/energy_event.dart';
+import '../widgets/tour_keys.dart';
 
 /// Bulk Excel import moved into the main navigation (client asked: import +
 /// sample format should be visible from the menu, not hidden in Reports).
@@ -133,7 +134,9 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
   @override
   Widget build(BuildContext context) {
     final isNarrow = MediaQuery.of(context).size.width < 600;
-    return ListView(
+    return KeyedSubtree(
+      key: kTourImportKey,
+      child: ListView(
       padding: const EdgeInsets.all(AppSpacing.page),
       children: [
         AppSectionHeader(
@@ -258,6 +261,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
           ),
         ),
       ],
+      ),
     );
   }
 }

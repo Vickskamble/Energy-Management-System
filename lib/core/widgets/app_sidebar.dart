@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../presentation/widgets/tour_keys.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_shadows.dart';
@@ -169,6 +170,7 @@ class _AppSidebarState extends State<AppSidebar> {
                 final item = items[index];
                 final selected = widget.selectedIndex == item.index;
                 return _SidebarItem(
+                  key: tourSidebarKey(item.index),
                   item: item,
                   selected: selected,
                   isCollapsed: widget.isCollapsed,
@@ -319,6 +321,7 @@ class _SidebarItem extends StatelessWidget {
   final VoidCallback onTap;
 
   const _SidebarItem({
+    super.key,
     required this.item,
     required this.selected,
     required this.isCollapsed,

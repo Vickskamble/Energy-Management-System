@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/reading_reminder.dart';
 import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/month_filter_bar.dart';
@@ -15,6 +16,8 @@ import 'meter_management_page.dart';
 import 'billing_page.dart';
 import 'excel_import_page.dart';
 import '../pages/settings_page.dart';
+import '../widgets/app_tour.dart';
+import '../widgets/tour_keys.dart';
 
 class MainNavigationHub extends StatefulWidget {
   final VoidCallback? onToggleTheme;
@@ -38,6 +41,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
   @override
   void dispose() {
+    TourLauncher.request.removeListener(_onTourRequested);
     _monthFilter.dispose();
     super.dispose();
   }
@@ -47,6 +51,8 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     super.initState();
     context.read<EnergyBloc>().add(const LoadInitialDashboardData());
     _checkReadingReminder();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStartTour());
+    TourLauncher.request.addListener(_onTourRequested);
   }
 
   /// Month-end reading reminder (Issue 7F) — fire once per month.
@@ -110,6 +116,52 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     });
   }
 
+  static const _tourPrefsKey = 'ems_tour_seen_v1';
+
+  /// First-run guided tour — fires once per install/device.
+  Future<void> _maybeStartTour() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seen = prefs.getBool(_tourPrefsKey) ?? false;
+      if (seen) return;
+      await prefs.setBool(_tourPrefsKey, true);
+      if (!mounted) return;
+      _startTour();
+    } catch (e) {
+      // Tour is best-effort; never block startup on it.
+    }
+  }
+
+  /// Replay requested from Settings → "Show App Tour". Pops any pushed
+  /// routes (Settings / Billing) so the tour runs over the hub.
+  void _onTourRequested() {
+    Navigator.of(context, rootNavigator: true)
+        .popUntil((route) => route.isFirst);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startTour());
+  }
+
+  void _startTour() {
+    showAppTour(
+      context: context,
+      steps: kAppTourSteps,
+      switchTab: _switchTabForTour,
+    );
+  }
+
+  void _switchTabForTour(int tab) {
+    if (tab == 5) {
+      setState(() {
+        _selectedIndex = 5;
+        _sidebarIndex = 7;
+      });
+      return;
+    }
+    setState(() {
+      _selectedIndex = tab;
+      _sidebarIndex = tab;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final titles = [
@@ -170,6 +222,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         FloatingActionButton.extended(
+          key: kTourFabReadingKey,
           heroTag: 'fab-reading',
           icon: const Icon(Icons.edit_note_rounded),
           label: const Text('Reading Entry'),
@@ -177,6 +230,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         ),
         const SizedBox(height: 12),
         FloatingActionButton.extended(
+          key: kTourFabMeterKey,
           heroTag: 'fab-add-meter',
           icon: const Icon(Icons.add),
           label: const Text('Add Your Meter'),
