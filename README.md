@@ -52,6 +52,7 @@ Every metric includes business meaning:
 - Backup & Restore as single JSON (device-to-device migration)
 - Data Reset (Danger Zone) — clears local + Supabase
 - Data validation engine
+- Time-of-Day (TOD) 3-shift demo data seeder (`tool/seed_tod_data.dart`) — creates a TOD meter + 90 days of 06:00/14:00/22:00 readings
 
 ### Platform & Session
 - Email/password auth with email verification + password reset
@@ -68,7 +69,7 @@ Every metric includes business meaning:
 | Analysis | Bill breakdown, trends, MD breach prediction, anomalies, reading log edit/delete |
 | Reports | Executive summary, bill accuracy, history, PDF/CSV export, Excel import |
 | Meter Management | Add/edit/delete meters with contract demand, CT/PT, site config |
-| Settings | Account, appearance (dark mode), tariff editor, backup & restore, reset data |
+| Settings | Tabs: Account, Appearance (dark mode), Billing (tariff editor), System (backup & restore, reset data, help) |
 
 ## Tech Stack
 
@@ -82,7 +83,7 @@ Every metric includes business meaning:
 | PDF | pdf, share_plus |
 | Excel | excel, file_picker |
 | Notifications | flutter_local_notifications |
-| Other | intl, uuid, connectivity_plus, flutter_dotenv, decimal, google_fonts |
+| Other | intl, uuid, flutter_dotenv, decimal, google_fonts, flutter_secure_storage, shared_preferences, cryptography, crypto, url_launcher, webview_flutter |
 
 ## Architecture
 
@@ -135,8 +136,13 @@ Active tables (all RLS-scoped to the signed-in user):
 | `user_settings` | Per-user tariff configuration |
 | `bill_reconcile` | Actual bill amounts for Bill Accuracy report |
 | `user_sessions` | Single-device login enforcement |
+| `subscriptions` | Razorpay subscription / payment state + payment-link columns |
 
-> Legacy tables (`sites`, `panels`, `meters`, `readings`, `contract_demands`, `analysis_results`) are still defined in `supabase_schema.sql` but are **not used** by the current app.
+> Canonical schema migrations live in `supabase/migrations/` (run in filename order in the
+> Supabase SQL Editor). Legacy root scripts (`supabase_schema.sql`,
+> `supabase_cloud_data_migration.sql`, `supabase_single_device_migration.sql`) are kept for
+> reference only — legacy tables (`sites`, `panels`, `meters`, `readings`,
+> `contract_demands`, `analysis_results`) are **not used** by the current app.
 
 ## Getting Started
 
@@ -163,10 +169,8 @@ Active tables (all RLS-scoped to the signed-in user):
 
 3. **Create Supabase tables**
    - Open your Supabase project → SQL Editor
-   - Run the SQL scripts in this order:
-     1. `supabase_schema.sql` — base tables + RLS policies
-     2. `supabase_cloud_data_migration.sql` — `user_meters`, `user_settings`, `bill_reconcile`
-     3. `supabase_single_device_migration.sql` — `user_sessions` (single-device login)
+   - Run the scripts in `supabase/migrations/` in filename order
+     (`20260811_session_revocation.sql` → `20260817_data_governance.sql`)
    - Enable Email auth provider in Supabase → Authentication → Providers
 
 4. **Configure email confirmation redirects**
@@ -189,17 +193,73 @@ Active tables (all RLS-scoped to the signed-in user):
 ### Initial Login
 - Register a new account from the Login screen
 - No pre-seeded data required — add meters via Meter Management, then enter readings
+- For a ready-made demo dataset (TOD / Time-of-Day 3-shift), see
+  [Demo / Seed Data](#demo--seed-data-tod-3-shift)
 
-## Deployment (GitHub Pages)
+## Demo / Seed Data (TOD 3-shift)
 
-The repo has a CI workflow (`.github/workflows/deploy.yml`) that runs on every push to
-`main`:
+`tool/seed_tod_data.dart` seeds a complete industrial demo dataset for any account via
+Supabase's own auth + PostgREST API (no app UI needed):
+
+```bash
+dart run tool/seed_tod_data.dart
+```
+
+It creates **one meter + 90 days of readings** (3 readings/day):
+
+| Item | Value |
+|------|-------|
+| Meter | `TODMeter` — contract 400 kVA, site "Main Site", MF 1 |
+| Shifts | 06:00 Day (45% load) / 14:00 Evening (35%) / 22:00 Night (20%) |
+| Date range | Today − 90 days → yesterday, IST timestamps |
+| Profile | ~600–700 kWh/day, weekend dip, slow growth trend |
+| Power Factor | Day 0.96–0.98, Evening 0.92–0.96, Night 0.87–0.94 (nights include PF < 0.95 penalty + < 0.90 surcharge cases) |
+| Max Demand | 260–425 kVA — readings above 380 kVA (95% of contract) trigger MD breach alerts |
+| Bill columns | Computed with the app's exact engine math (energy/demand/FAC/wheeling/duty/taxes, PF rebate/surcharge, net bill, load factor, avg unit cost) |
+
+Notes:
+- Prints existing row counts before and after (verified via `Prefer: count=exact` + `Content-Range`); **only inserts new rows** — existing data is never modified or deleted.
+- Login credentials are hard-coded at the top of the script (edit before committing).
+- Deterministic RNG — re-running generates the same data (timestamp collision avoided by unique UUIDs).
+
+## Deployment
+
+### Production — Web (Vercel)
+
+The live web app runs at **https://app.brilliants.in** via a separate deploy repo
+(`Vickskamble/powerems-web`), which Vercel auto-deploys from on push:
+
+```bash
+build_web.bat          # reads version from pubspec, runs flutter build web --release,
+                       # syncs build/web -> web-deploy/ (base-href "/")
+cd web-deploy
+git add -A && git commit -m "PowerEMS web vX.Y.Z" && git push origin master
+```
+
+### Production — Desktop & Mobile (GitHub Releases)
+
+Windows installer and Android APK are built locally and published as GitHub Release
+assets (`app-release.apk`, `EMS.Setup.vX.Y.Z.exe`, `Energy-Management-System-Windows-vX.Y.Z.zip`):
+
+```bash
+flutter build apk --release                       # -> build/app/outputs/flutter-apk/app-release.apk
+build_windows.bat                                 # clean + release build + VC runtime staging +
+                                                  # self-signed signing + Inno Setup
+                                                  # -> dist\PowerEMS_Setup_vX.Y.Z.exe
+```
+
+Upload the three artifacts to a new release at
+`https://github.com/Vickskamble/Energy-Management-System/releases`.
+
+### CI — GitHub Pages (org repo)
+
+The repo also has a CI workflow (`.github/workflows/deploy.yml`) on every push to `main`:
 
 1. **Test** — `flutter test`
 2. **Build** — `flutter build web --release`
 3. **Deploy** — static site pushed to GitHub Pages (Actions `deploy-pages`)
 
-### Secrets
+### Secrets (CI)
 
 Configure these in **GitHub → Settings → Secrets and variables → Actions**:
 
@@ -296,7 +356,8 @@ Planned Phase 2 features (from `ISSUES_AND_SOLUTIONS.md`):
 
 ## Version
 
-1.0.0+1
+1.2.3+23 (see `pubspec.yaml` — keep in sync with `AppConfig.appVersion` in
+`lib/core/config/app_config.dart`)
 
 ## License
 
