@@ -18,7 +18,6 @@ import '../../data/repositories/energy_repository.dart';
 import '../../data/repositories/meter_repository.dart';
 import '../../domain/entities/energy_log_entity.dart';
 import '../bloc/energy_bloc.dart';
-import '../widgets/tour_keys.dart';
 import '../bloc/energy_event.dart';
 import '../bloc/energy_state.dart';
 import '../widgets/readings_preview_sheet.dart';
@@ -184,19 +183,14 @@ class _AnalysisContentState extends State<_AnalysisContent> {
   Widget build(BuildContext context) {
     // No meters and no readings at all → nothing to show.
     if (_entities.isEmpty && _siteNames.isEmpty) {
-      return KeyedSubtree(
-        key: kTourAnalysisKey,
-        child: const AppEmptyState(
-          icon: Icons.analytics_rounded,
-          title: 'No readings recorded yet',
-          subtitle: 'Add a meter and readings to see analysis',
-        ),
+      return const AppEmptyState(
+        icon: Icons.analytics_rounded,
+        title: 'No readings recorded yet',
+        subtitle: 'Add a meter and readings to see analysis',
       );
     }
 
-    return KeyedSubtree(
-      key: kTourAnalysisKey,
-      child: RefreshIndicator(
+    return RefreshIndicator(
       onRefresh: () async {
         context.read<EnergyBloc>().add(const LoadInitialDashboardData());
       },
@@ -262,7 +256,6 @@ class _AnalysisContentState extends State<_AnalysisContent> {
               ),
             ),
         ],
-      ),
       ),
     );
   }

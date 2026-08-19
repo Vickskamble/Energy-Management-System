@@ -17,7 +17,6 @@ import '../../data/repositories/meter_repository.dart';
 import '../bloc/energy_bloc.dart';
 import '../bloc/energy_event.dart';
 import '../bloc/energy_state.dart';
-import '../widgets/tour_keys.dart';
 
 class ReadingEntryPage extends StatefulWidget {
   const ReadingEntryPage({super.key});
@@ -259,9 +258,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return KeyedSubtree(
-      key: kTourEntryKey,
-      child: BlocListener<EnergyBloc, EnergyState>(
+    return BlocListener<EnergyBloc, EnergyState>(
       listener: (context, state) {
         switch (state) {
           case EnergySuccess(:final currentPowerFactor, :final maxDemandPeak):
@@ -683,7 +680,6 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
             ],
           );
         },
-      ),
       ),
     );
   }

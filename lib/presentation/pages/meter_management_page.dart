@@ -11,7 +11,6 @@ import '../../core/widgets/app_states.dart';
 import '../../data/models/meter_model.dart';
 import '../../data/repositories/energy_repository.dart';
 import '../../data/repositories/meter_repository.dart';
-import '../widgets/tour_keys.dart';
 import 'billing_page.dart';
 
 class MeterManagementPage extends StatelessWidget {
@@ -352,16 +351,11 @@ class _MeterListState extends State<_MeterList> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return KeyedSubtree(
-        key: kTourMetersKey,
-        child: const Center(child: CircularProgressIndicator()),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_meters.isEmpty) {
-      return KeyedSubtree(
-        key: kTourMetersKey,
-        child: Stack(
+      return Stack(
         children: [
           const AppEmptyState(
             icon: Icons.speed_rounded,
@@ -374,13 +368,10 @@ class _MeterListState extends State<_MeterList> {
             child: _addMeterFab(context),
           ),
         ],
-        ),
       );
     }
 
-    return KeyedSubtree(
-      key: kTourMetersKey,
-      child: Stack(
+    return Stack(
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -546,7 +537,6 @@ class _MeterListState extends State<_MeterList> {
           child: _addMeterFab(context),
         ),
       ],
-      ),
     );
   }
 

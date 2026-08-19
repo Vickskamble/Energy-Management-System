@@ -13,7 +13,6 @@ import '../../core/utils/validation_rules.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_section.dart';
-import '../widgets/app_tour.dart';
 import '../../data/repositories/meter_repository.dart';
 import '../auth_bloc/auth_bloc.dart';
 import '../bloc/energy_bloc.dart';
@@ -839,32 +838,6 @@ class _SettingsScreenState extends State<SettingsScreen>
                 Icons.auto_awesome_outlined,
                 'Analysis Engine',
                 'Rule-based',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        AppSectionHeader(
-          title: 'Help & Support',
-          subtitle: 'Guided tour, user guide and support contact',
-        ),
-        AppCard(
-          child: Column(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.tour_rounded),
-                title: const Text('Show App Tour'),
-                subtitle: const Text('Replay the guided walkthrough'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: TourLauncher.start,
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.help_outline_rounded),
-                title: const Text('Help & User Guide'),
-                subtitle: const Text('Feature guide and expert support'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => showHelpDialog(context),
               ),
             ],
           ),

@@ -9,7 +9,6 @@ import '../../core/theme/app_typography.dart';
 import '../../core/utils/notification_service.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_kpi_card.dart';
-import '../widgets/tour_keys.dart';
 import '../../core/widgets/app_section.dart';
 import '../../core/widgets/app_states.dart';
 import '../../core/widgets/month_filter_bar.dart';
@@ -936,10 +935,7 @@ class _DashboardContentState extends State<_DashboardContent> {
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.page),
         children: [
-          KeyedSubtree(
-            key: kTourFilterBarKey,
-            child: _buildDropdownFilterBar(),
-          ),
+          _buildDropdownFilterBar(),
           const SizedBox(height: AppSpacing.lg),
           _buildAllAlertsSection(context),
           const SizedBox(height: AppSpacing.lg),
@@ -1037,9 +1033,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             const SizedBox(height: AppSpacing.lg),
           ],
 
-          KeyedSubtree(
-            key: kTourDashboardKpisKey,
-            child: _kpiGrid(
+          _kpiGrid(
             cards: [
               AppKpiCard(
                 title: _isDayMode ? 'Day Bill (est.)' : 'Est. Monthly Bill',
@@ -1089,12 +1083,9 @@ class _DashboardContentState extends State<_DashboardContent> {
                     : _powerFactorBreakdown,
               ),
             ],
-            ),
           ),
           const SizedBox(height: AppSpacing.md),
-          KeyedSubtree(
-            key: kTourBillingKpisKey,
-            child: _kpiGrid(
+          _kpiGrid(
             cards: [
               AppKpiCard(
                 title: 'Bill Health Score',
@@ -1145,7 +1136,6 @@ class _DashboardContentState extends State<_DashboardContent> {
                     : '${_selection.label} average per day (kWh × MF)',
               ),
             ],
-            ),
           ),
           const SizedBox(height: AppSpacing.lg),
 
