@@ -10,7 +10,7 @@ class AppConfig {
   AppConfig._();
 
   /// Current app version, shown in Settings > System. Keep in sync with pubspec.
-  static const String appVersion = '1.1.17';
+  static const String appVersion = '1.2.3';
 
   static double _tariffPerUnit = AppConstants.tariffPerUnit;
   static double _demandChargePerKva = AppConstants.demandChargePerKva;
