@@ -3,15 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/notification_service.dart';
 import '../../core/widgets/app_card.dart';
-import '../../core/widgets/app_kpi_card.dart';
 import '../../core/widgets/app_section.dart';
 import '../../core/widgets/app_states.dart';
 import '../../core/widgets/month_filter_bar.dart';
+import '../../core/widgets/trial_kpi_card.dart';
 import '../../core/calculation/bill_breakdown.dart';
 import '../../core/calculation/bill_calculator.dart';
 import '../../core/calculation/bill_forecast.dart';
@@ -590,6 +591,60 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
+  double get _sitePowerFactor => _breakdown?.powerFactor ?? 0;
+
+  /// Sign-aware Indian-grouped money like the trial UI's `money()` helper:
+  /// ₹1,08,273.44 / −₹1,234.56.
+  String _money(double v) {
+    final nf = NumberFormat('#,##,##0.00', 'en_IN');
+    return (v < 0 ? '−₹' : '₹') + nf.format(v.abs());
+  }
+
+  /// Highest monthly demand in the 11 months before the visible period —
+  /// the same ratchet window the billing engine uses. Mirrors
+  /// [BillCalculator._ratchetPeak] so the Billed Demand card can show the
+  /// "· ratchet" part of the HTML trial card.
+  double _ratchetPeakKva(
+    List<EnergyLogEntity> logs,
+    List<EnergyLogEntity> ratchetLogs,
+  ) {
+    DateTime? latestMonth;
+    for (final log in logs) {
+      final m = DateTime(log.loggedAt.year, log.loggedAt.month);
+      if (latestMonth == null || m.isAfter(latestMonth)) latestMonth = m;
+    }
+    if (latestMonth == null) return 0;
+    final windowStart = DateTime(
+      latestMonth.year,
+      latestMonth.month - AppConstants.ratchetWindowMonths,
+      1,
+    );
+    final windowEnd = DateTime(latestMonth.year, latestMonth.month + 1, 1);
+    final monthlyMax = <int, double>{};
+    for (final log in ratchetLogs) {
+      if (log.loggedAt.isBefore(windowStart) ||
+          !log.loggedAt.isBefore(windowEnd)) {
+        continue;
+      }
+      final key = log.loggedAt.year * 12 + (log.loggedAt.month - 1);
+      final actualMd = log.mdRecorded * log.multiplyingFactor;
+      monthlyMax.update(
+        key,
+        (v) => actualMd > v ? actualMd : v,
+        ifAbsent: () => actualMd,
+      );
+    }
+    var peak = 0.0;
+    for (final v in monthlyMax.values) {
+      if (v > peak) peak = v;
+    }
+    final manual = AppConfig.precedingDemandKva.fold(
+      0.0,
+      (p, v) => v > p ? v : p,
+    );
+    return manual > peak ? manual : peak;
+  }
+
   /// Distinct days in the visible period with any shift reading whose
   /// MD × MF crosses 95% of the contract demand — same rule as the trial UI.
   int _mdBreachDays(
@@ -961,67 +1016,60 @@ class _DashboardContentState extends State<_DashboardContent> {
 
           _kpiGrid(
             cards: [
-              AppKpiCard(
-                title: _isDayMode ? 'Day Bill (est.)' : 'Est. Monthly Bill',
-                value: _siteEstimatedBill,
-                suffix: '₹',
-                icon: Icons.account_balance_wallet_rounded,
-                color: AppColors.kpiCost,
-                decimals: 0,
-                description: _isDayMode
-                    ? 'Demand charge excluded — avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}'
-                    : '${_kpiMonthLabel}Avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
+              TrialKpiCard(
+                title: 'Estimated bill (due)',
+                value: _money(_siteEstimatedBill),
+                sub: 'last 30d · ${_siteNames.length == 1 ? _siteNames.first : 'All Sites'} · ${AppConfig.billOnKvah ? 'kVAh' : 'kWh'}',
+                color: AppColors.success,
+                pct: 88,
               ),
-              AppKpiCard(
+              TrialKpiCard(
                 title: 'Net ToD (slot-wise)',
-                value: breakdown.todCharges,
-                suffix: '₹',
-                icon: Icons.swap_vert_rounded,
+                value: _money(breakdown.todCharges),
+                sub: 'C rebate ${_money(breakdown.todZoneCharges['C'] ?? 0)} · D surcharge ${_money(breakdown.todZoneCharges['D'] ?? 0)}',
                 color: breakdown.todCharges <= 0
                     ? AppColors.success
                     : AppColors.danger,
-                decimals: 0,
-                description: (breakdown.todZoneCharges['C'] ?? 0) == 0 &&
-                        (breakdown.todZoneCharges['D'] ?? 0) == 0
-                    ? 'No ToD zone data — slot engine not applied'
-                    : 'C rebate −₹${((breakdown.todZoneCharges['C'] ?? 0)).abs().toStringAsFixed(0)} · D surcharge +₹${(breakdown.todZoneCharges['D'] ?? 0).toStringAsFixed(0)}',
+                pct: 15,
+                badgeNew: true,
               ),
-              AppKpiCard(
-                title: 'Billed Demand',
-                value: breakdown.billingDemand,
-                suffix: 'kVA',
-                icon: Icons.trending_up_rounded,
+              TrialKpiCard(
+                title: 'Billed demand',
+                value: '${breakdown.billingDemand.round()} kVA',
+                sub: 'Recorded ${_siteMaxDemandPeak.round()} · floor ${(breakdown.contractDemand * AppConstants.billingDemandFloorPercent).round()} · ratchet ${(_ratchetPeakKva(periodLogs, entityLogs) * AppConstants.billingDemandFloorPercentOfRatchet).round()}',
                 color: AppColors.warning,
-                decimals: 1,
-                description:
-                    'Recorded ${_siteMaxDemandPeak.toStringAsFixed(1)} kVA · CD floor ${(breakdown.contractDemand * AppConstants.billingDemandFloorPercent).ceil().toStringAsFixed(0)} kVA',
+                pct: (breakdown.billingDemand / 5).clamp(0.0, 100.0),
+                badgeNew: true,
               ),
-              AppKpiCard(
-                title: 'Load Factor',
-                value: breakdown.loadFactor * 100,
-                suffix: '%',
-                icon: Icons.speed_rounded,
-                color:
-                    breakdown.loadFactor >= AppConstants.loadFactorThresholdGood
-                    ? AppColors.kpiEfficiency
-                    : AppColors.warning,
-                decimals: 0,
-                description:
-                    breakdown.loadFactor >= AppConstants.loadFactorThresholdGood
-                    ? 'Efficient usage'
-                    : 'Improve load smoothing',
-              ),
-              AppKpiCard(
-                title: 'MD Breaches',
-                value: _mdBreachDays(periodLogs, breakdown).toDouble(),
-                suffix: 'days',
-                icon: Icons.warning_amber_rounded,
-                color: _mdBreachDays(periodLogs, breakdown) > 0
+              TrialKpiCard(
+                title: 'Power factor',
+                value: '${(_sitePowerFactor * 100).toStringAsFixed(1)}%',
+                sub: _sitePowerFactor >= AppConstants.pfRebateThreshold
+                    ? 'rebate zone'
+                    : _sitePowerFactor < AppConstants.pfSurchargeThreshold
+                    ? 'penalty zone'
+                    : 'no charge',
+                color: _sitePowerFactor >= AppConstants.pfRebateThreshold
+                    ? AppColors.success
+                    : _sitePowerFactor < AppConstants.pfSurchargeThreshold
                     ? AppColors.danger
-                    : AppColors.success,
-                decimals: 0,
-                description:
-                    'Shift MD above 95% CD · peak ${_siteMaxDemandPeak.toStringAsFixed(1)} kVA',
+                    : AppColors.warning,
+                pct: (_sitePowerFactor * 100).clamp(0.0, 100.0),
+              ),
+              TrialKpiCard(
+                title: 'Load factor',
+                value: '${(breakdown.loadFactor * 100).round()}%',
+                sub: 'LF incentive 75% · sealing 15%',
+                color: AppColors.warning,
+                pct: (breakdown.loadFactor * 100).clamp(6.0, 100.0),
+              ),
+              TrialKpiCard(
+                title: 'MD breaches',
+                value: '${_mdBreachDays(periodLogs, breakdown)} days',
+                sub: 'shift MD > ${(breakdown.contractDemand * 0.95).round()} (95% CD) · peak ${_siteMaxDemandPeak.round()}',
+                color: AppColors.danger,
+                pct: 70,
+                badgeNew: true,
               ),
             ],
           ),
@@ -1293,19 +1341,18 @@ class _DashboardContentState extends State<_DashboardContent> {
   Widget _kpiGrid({required List<Widget> cards}) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const spacing = 12.0;
-        final width = MediaQuery.of(context).size.width;
-        final columns = width < 600 ? 2 : 4;
+        const gap = 14.0;
+        final columns =
+            ((constraints.maxWidth + gap) / (168 + gap)).floor().clamp(1, 6);
         final cardWidth =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-        return GridView.count(
-          crossAxisCount: columns,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: spacing,
-          mainAxisSpacing: spacing,
-          childAspectRatio: cardWidth / 180,
-          children: cards,
+            (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final card in cards)
+              SizedBox(width: cardWidth, child: card),
+          ],
         );
       },
     );
