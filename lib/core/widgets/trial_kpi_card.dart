@@ -33,7 +33,9 @@ class TrialKpiCard extends StatelessWidget {
         dark ? AppColors.primaryLight : AppColors.primaryDark;
     final badgeBg =
         AppColors.primary.withValues(alpha: 0.15);
-    const cardFont = 'Segoe UI';
+    // Status colors are vivid (good on dark) but fail AA on white — switch to
+    // the darker text variants on light surfaces for the headline value.
+    final valueColor = AppColors.statusText(color, dark);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -55,8 +57,7 @@ class TrialKpiCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontFamily: cardFont,
-                    fontSize: 11.5,
+                    fontSize: 12,
                     color: dim,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.6,
@@ -76,8 +77,7 @@ class TrialKpiCard extends StatelessWidget {
                   child: Text(
                     'NEW',
                     style: TextStyle(
-                      fontFamily: cardFont,
-                      fontSize: 10,
+                      fontSize: 11,
                       color: badgeColor,
                       fontWeight: FontWeight.w700,
                       height: 1,
@@ -88,25 +88,26 @@ class TrialKpiCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: cardFont,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: color,
-              fontFeatures: const [FontFeature.tabularFigures()],
-              height: 1.15,
+          Tooltip(
+            message: value,
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: valueColor,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                height: 1.15,
+              ),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             sub,
             style: TextStyle(
-              fontFamily: cardFont,
-              fontSize: 11,
+              fontSize: 12,
               color: dim,
               height: 1.5,
             ),

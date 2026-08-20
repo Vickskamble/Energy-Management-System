@@ -77,7 +77,8 @@ void main() {
               b.facCharges +
               b.wheelingCharges +
               b.taxes -
-              b.icrRebate, 0.05));
+              b.icrRebate -
+              b.lfIncentive, 0.05));
       expect(b.payableAfterDpc % 10, 0);
       expect(b.payableEarly % 10, 0);
     });

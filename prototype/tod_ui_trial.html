@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PowerEMS v1.2.5 — UI Trial (TOD + Preset Engine)</title>
+<style>
+  :root{
+    --bg:#0f1520; --panel:#17202e; --panel2:#1d2736; --line:#2a3546;
+    --txt:#e8eef7; --dim:#8fa0b5; --acc:#3b82f6; --grn:#22c55e; --red:#ef4444;
+    --amb:#f59e0b; --purp:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;display:flex;min-height:100vh}
+  /* ---------- sidebar ---------- */
+  aside{width:210px;background:#0b111b;border-right:1px solid var(--line);padding:16px 10px;position:sticky;top:0;height:100vh;overflow:auto}
+  aside .logo{font-weight:700;font-size:16px;padding:0 8px 14px;color:#dbe6f5;letter-spacing:.3px}
+  aside .logo b{color:var(--acc)}
+  nav button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--dim);padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13.5px;margin-bottom:2px}
+  nav button:hover{background:var(--panel2);color:var(--txt)}
+  nav button.on{background:var(--acc);color:#fff;font-weight:600}
+  .pill{font-size:10px;background:var(--acc);color:#fff;border-radius:9px;padding:1px 6px;margin-left:6px;vertical-align:1px}
+  /* ---------- main ---------- */
+  main{flex:1;padding:20px 26px;overflow:auto}
+  h1{font-size:20px;margin-bottom:2px}
+  .sub{color:var(--dim);font-size:12.5px;margin-bottom:18px}
+  .tab{display:none}.tab.on{display:block}
+  .grid{display:grid;gap:14px}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card h3{font-size:13px;color:var(--dim);font-weight:600;margin-bottom:10px;letter-spacing:.4px;text-transform:uppercase}
+  .big{font-size:24px;font-weight:700}
+  .mono{font-variant-numeric:tabular-nums}
+  .pos{color:var(--grn)} .neg{color:var(--red)} .amb{color:var(--amb)}
+  .badge{display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:10px;background:var(--line);color:var(--dim);margin-left:6px}
+  .badge.grn{background:#123321;color:var(--grn)}
+  .badge.blu{background:#122a4d;color:#7cb3ff}
+  .badge.amb{background:#3d2f12;color:var(--amb)}
+  .row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #243041;font-size:13.5px}
+  .row:last-child{border:0}
+  .row .l{color:var(--dim)}
+  .row b{font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{color:var(--dim);text-align:left;font-weight:600;padding:7px 8px;border-bottom:1px solid var(--line)}
+  td{padding:7px 8px;border-bottom:1px solid #223048}
+  tr.total td{font-weight:700;border-top:2px solid var(--acc);border-bottom:0}
+  /* ---------- controls ---------- */
+  .btn{background:var(--acc);color:#fff;border:0;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px}
+  .btn.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+  .seg{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{background:none;border:0;color:var(--dim);padding:7px 13px;cursor:pointer;font-size:12.5px}
+  .seg button.on{background:var(--acc);color:#fff}
+  input,select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:13px;width:90px}
+  label.f{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed #243041;font-size:13px;color:var(--dim)}
+  label.f span{color:var(--txt)}
+  canvas{width:100%;height:280px;display:block}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--dim);margin:8px 2px}
+  .sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:5px}
+  .bar i{display:block;height:100%;border-radius:4px}
+  .note{background:#122a4d;border:1px solid #1d3a63;color:#9fc2ff;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
+  .kpi{font-size:11px;color:var(--dim);margin-top:4px}
+  .preset{display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer}
+  .preset:hover{border-color:var(--acc)}
+  .preset.on{border-color:var(--acc);background:#0f1c33}
+  .preset b{display:block;font-size:13.5px}
+  .preset small{color:var(--dim)}
+  @media(max-width:900px){aside{display:none}}
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="logo">⚡ Power<b>EMS</b></div>
+  <nav id="nav">
+    <button data-t="dash" class="on">Dashboard</button>
+    <button data-t="bill">Bill Breakdown<span class="pill">NEW</span></button>
+    <button data-t="tod">ToD / Shift Analysis<span class="pill">NEW</span></button>
+    <button data-t="set">Settings · Billing<span class="pill">NEW</span></button>
+  </nav>
+</aside>
+
+<main>
+  <h1>v1.2.5 UI Trial <span style="font-size:12px;color:var(--dim)">— preset-driven engine + ToD slots + shift analysis</span></h1>
+  <div class="sub">Verified real data: G K Healthcare bills (Jun/Jul-2026, MSEDCL HT-I A) + TODMeter seed (90 days × 3 shifts). Sab fields trial me editable hain — edits pe bill recompute hota hai.</div>
+
+  <!-- ================= DASHBOARD ================= -->
+  <section class="tab on" id="tab-dash">
+    <div class="grid g3">
+      <div class="card">
+        <h3>This Month Bill (Jul-26)</h3>
+        <div class="big mono">₹2,62,350</div>
+        <div class="kpi">vs Jun-26 ₹2,98,220 <span class="pos">▼ 12.0%</span> · avg unit cost ₹14.63</div>
+        <div class="bar"><i style="width:88%;background:var(--grn)"></i></div>
+      </div>
+      <div class="card">
+        <h3>Net ToD Saving</h3>
+        <div class="big mono neg">−₹9,000</div>
+        <div class="kpi">Solar rebate −15,649 · Evening surcharge +6,649</div>
+        <div class="bar"><i style="width:24%;background:var(--grn)"></i></div>
+      </div>
+      <div class="card">
+        <h3>Billed Demand</h3>
+        <div class="big mono">151 kVA</div>
+        <div class="kpi">Recorded MD 109 · <span class="badge amb">75% CD floor = 151</span></div>
+        <div class="kpi amb" style="color:var(--amb)">💡 CD 201→150 = ₹16,250/mo bachat (ratchet 135 Nov'26 tak)</div>
+      </div>
+      <div class="card">
+        <h3>Power Factor</h3>
+        <div class="big mono pos">0.99</div>
+        <div class="kpi">No penalty · no rebate bracket (MSEDCL)</div>
+        <div class="bar"><i style="width:99%;background:var(--grn)"></i></div>
+      </div>
+      <div class="card">
+        <h3>Load Factor</h3>
+        <div class="big mono">11.9%</div>
+        <div class="kpi">LF incentive threshold 75% — <b class="neg">₹0</b> (MPERC: 12/24/36 Ps tiers available)</div>
+        <div class="bar"><i style="width:16%;background:var(--amb)"></i><i style="display:block;height:2px;background:var(--red);width:100%;margin-top:-4px"></i></div>
+      </div>
+      <div class="card">
+        <h3>MD Breach Alerts (TODMeter)</h3>
+        <div class="big mono neg">14 days</div>
+        <div class="kpi">Evening shift MD > 380 kVA (95% of CD 400) — breache-flagging engine</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= BILL BREAKDOWN ================= -->
+  <section class="tab" id="tab-bill">
+    <div class="note">✅ Engine ab real bill ko reproduce karta hai: <b>2,62,355.12 → ₹2,62,350</b> (exact Jul-26 match). Naye features highlighted.</div>
+    <div class="grid g2">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3 style="margin:0">Bill Breakdown — G K Healthcare HT-I A</h3>
+          <div class="seg" id="monthSeg">
+            <button data-m="jul" class="on">Jul-26</button>
+            <button data-m="jun">Jun-26</button>
+          </div>
+        </div>
+        <table id="billTable"></table>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="card">
+          <h3>Engine features in this bill</h3>
+          <div class="row"><span class="l">1 · Billing demand floor</span><span class="badge grn">75% × CD — applied</span></div>
+          <div class="row"><span class="l">2 · ToD slot-wise (4 zones)</span><span class="badge blu">−1.266 / +2.11 Ps·u</span></div>
+          <div class="row"><span class="l">3 · Excess demand (>120% CD)</span><span class="badge">1.3× / 2× rules</span></div>
+          <div class="row"><span class="l">4 · PF incentive tables</span><span class="badge blu">per-preset</span></div>
+          <div class="row"><span class="l">5 · LF incentive</span><span class="badge blu">75% threshold</span></div>
+          <div class="row"><span class="l">6 · Per-unit tax (27.9 Ps)</span><span class="badge grn">flat model ✓</span></div>
+          <div class="row"><span class="l">7 · Subsidy fixed + ToD-linked</span><span class="badge grn">slot engine se</span></div>
+        </div>
+        <div class="card">
+          <h3>ToD effect — load shift karo</h3>
+          <div class="row"><span class="l">Abhi C-zone (09–17) me</span><span class="mono">12,361 u × −1.266</span></div>
+          <div class="row"><span class="l">Is zone me 10% aur load</span><span class="mono pos">+₹1,565 rebate</span></div>
+          <div class="row"><span class="l">D-zone (17–24) me 10% kam</span><span class="mono pos">+₹1,686 save</span></div>
+          <div class="row"><span class="l">Shifted total bachat</span><span class="mono neg" style="color:var(--grn)">~₹3,250/mo</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TOD / SHIFT ANALYSIS ================= -->
+  <section class="tab" id="tab-tod">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      <div class="seg" id="modeSeg">
+        <button data-mode="ps" class="on">Ps/unit mode</button>
+        <button data-mode="pct">% of EC mode</button>
+      </div>
+      <div class="seg" id="seasonSeg">
+        <button data-s="ss" class="on">Apr–Sep</button>
+        <button data-s="wm">Oct–Mar</button>
+      </div>
+      <span class="badge blu" style="margin-left:auto">TODMeter · demo@powerems.com · 270 readings</span>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>2nd shift zones (editable — recompute demo)</h3>
+        <table id="zoneTable"></table>
+        <div style="margin-top:8px"><button class="btn" onclick="recalcTod()">Recompute ToD ₹</button></div>
+        <div id="todResult" class="row" style="margin-top:10px"><span class="l">Net ToD charges</span><b class="mono" id="todNet">—</b></div>
+      </div>
+      <div class="card">
+        <h3>Daily consumption by shift (90 days)</h3>
+        <canvas id="stackChart"></canvas>
+        <div class="legend"><span><span class="sw" style="background:#3b82f6"></span>Day (06–14)</span><span><span class="sw" style="background:#f59e0b"></span>Evening (14–22)</span><span><span class="sw" style="background:#a78bfa"></span>Night (22–06)</span></div>
+      </div>
+      <div class="card">
+        <h3>Shift-wise MD — breach flags</h3>
+        <table id="mdTable"></table>
+      </div>
+      <div class="card">
+        <h3>Shift analysis summary (current month)</h3>
+        <table id="shiftSummary"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section class="tab" id="tab-set">
+    <div class="grid g2">
+      <div class="card">
+        <h3>Tariff presets (verified)</h3>
+        <div class="preset on" onclick="pickPreset(this,'msedcl')"><div><b>MSEDCL HT-I A (legacy, aapka bill)</b><small>8.44 ₹/u · 650 ₹/kVA · kVAh · ₹10 round</small></div><span class="badge grn">ACTIVE</span></div>
+        <div class="preset" onclick="pickPreset(this,'msedcl26')"><div><b>MSEDCL HT-I A (FY 26-27 official)</b><small>8.68 ₹/u · 600 ₹/kVA · kVAh · ₹10 round</small></div></div>
+        <div class="preset" onclick="pickPreset(this,'mperc')"><div><b>MPERC LV-4 LT Industrial (FY 25-26)</b><small>6.76 ₹/u · 261 ₹/kVA · kWh · ₹1 round · kWh slabs</small></div></div>
+      </div>
+      <div class="card">
+        <h3>Billing demand & unit rules</h3>
+        <label class="f">Billing demand floor <span><input type="number" value="75" min="0" max="100"> % of CD</span></label>
+        <label class="f">Ratchet — 75% of prev-11m high <span><input type="checkbox" checked></span></label>
+        <label class="f">Billing unit <span><select><option>kVAh (official)</option><option>kWh</option></select></span></label>
+        <label class="f">Round bill to <span><select><option>₹10 (MSEDCL)</option><option>₹1 (MPERC)</option></select></span></label>
+        <label class="f">Excess demand rules <span><select><option>1.3× / 2× (MPERC)</option><option>MSEDCL %</option></select></span></label>
+      </div>
+      <div class="card">
+        <h3>LF incentive (per-preset)</h3>
+        <label class="f">Threshold <span><input type="number" value="75"> % LF</span></label>
+        <label class="f">Rate per 1% LF <span><input type="number" value="0.06"> % of EC</span></label>
+        <label class="f">Cap (sealing) <span><input type="number" value="15"> %</span></label>
+        <div class="kpi">MPERC preset: 12/24/36 Ps/u tiers automatic</div>
+      </div>
+      <div class="card">
+        <h3>PF incentive / surcharge (MPERC table)</h3>
+        <div class="row"><span class="l">86–100% → 0.5–10% rebate</span><span class="pos">tiered ✓</span></div>
+        <div class="row"><span class="l">&lt;80% → 1–10% surcharge</span><span class="neg">tiered ✓</span></div>
+        <div class="kpi" style="margin-top:8px">MSEDCL preset: rebate ≥0.95 (1%), penalty &lt;0.90 (5%) — bill se verified (PF 0.94/0.99 → no charge)</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------------- DATA (verified) ---------------- */
+const BILLS = {
+  jul:{m:'JUL-2026',units:17932,kwh:17809,md:109,cd:201,floor75:151,ratchet:135,
+    slots:[{z:'A',t:'00–06',u:1628,ps:0},{z:'B',t:'06–09',u:791,ps:0},{z:'C',t:'09–17',u:12361,ps:-1.266},{z:'D',t:'17–24',u:3151,ps:2.11}],
+    ec:8.44,dc:650,facPs:35,taxPs:27.9,wheeling:0.81,icrUnits:5193,icrRate:0.75,ppdPct:0.95,
+    subFixed:8069.40,subTod:189.15,round:10},
+  jun:{m:'JUN-2026',units:22325,kwh:21193,md:126,cd:201,floor75:151,ratchet:135,
+    slots:[{z:'A',t:'00–06',u:1903,ps:0},{z:'B',t:'06–09',u:939,ps:0},{z:'C',t:'09–17',u:15788,ps:-1.266},{z:'D',t:'17–24',u:3695,ps:2.11}],
+    ec:8.44,dc:650,facPs:26.22,taxPs:30,wheeling:0.81,icrUnits:9069,icrRate:0.75,ppdPct:0.95,
+    subFixed:10046.25,subTod:221.60,round:10}
+};
+let cur='jul', todMode='ps', season='ss';
+
+/* ---------------- Bill table ---------------- */
+function renderBill(){
+  const b=BILLS[cur]; const r=b.round;
+  const energy=b.units*b.ec, demand=b.floor75*b.dc;
+  const tod=b.slots.reduce((s,x)=>s+x.u*(x.ps/100),0);
+  const fac=b.units*(b.facPs/100), wheel=b.units*b.wheeling, tax=b.units*(b.taxPs/100);
+  const icr=(b.units-b.icrUnits)*b.icrRate;
+  const sub=b.subFixed+b.subTod;
+  const base=energy+demand+tod+fac+wheel+tax-icr;
+  const ppd=base*b.ppdPct/100;
+  const total=base-ppd-sub;
+  const rounded=Math.round(total/r)*r;
+  const rows=[
+    ['Energy charges',money(energy),`${b.units.toLocaleString('en-IN')} kVAh × ${b.ec}`,''],
+    ['Demand charges',money(demand),`billed ${b.floor75} kVA × ${b.dc}`,'<span class="badge amb">75% CD floor</span>'],
+    ...b.slots.map(s=>['ToD zone '+s.z+' ('+s.t+')',money(s.u*s.ps/100),`${s.u.toLocaleString('en-IN')} u × ${s.ps} Ps`,'<span class="badge blu">slot-wise</span>']),
+    ['Net ToD',money(tod),'',''],
+    ['FAC',money(fac),`${b.facPs} Ps/u`,''],
+    ['Wheeling',money(wheel),`${b.wheeling} ₹/u`,''],
+    ['Tax on Sale',money(tax),`${b.taxPs} Ps/u (flat)`,'<span class="badge grn">flat ✓</span>'],
+    ['Electricity Duty',money(0),'exempt till 31-Mar-29',''],
+    ['Excess demand',money(0),'MD < CD',''],
+    ['ICR rebate',money(-icr),`${b.icrUnits.toLocaleString('en-IN')} u × 0.75`,''],
+    ['PPD',money(-ppd),b.ppdPct+'%',''],
+    ['Subsidy (fixed)',money(-b.subFixed),'Vidarbha',''],
+    ['Subsidy (ToD-linked)',money(-b.subTod),'slot engine','<span class="badge grn">NEW</span>'],
+    ['DPC (if late)',money(base*0.0125),'1.25%/month',''],
+    ['Rounding',money(rounded-total),`nearest ₹${r}`,''],
+  ];
+  const totalRow='<tr class="total"><td>Total bill</td><td class="mono">'+money(rounded)+'</td><td>'+money(total).slice(1)+' → rounded</td><td></td></tr>';
+  document.getElementById('billTable').innerHTML='<tr><th>Line</th><th style="text-align:right">₹</th><th>Math</th><th></th></tr>'
+    +rows.map(rr=>`<tr><td>${rr[0]}</td><td class="mono ${rr[1].startsWith('−')?'neg':''}" style="text-align:right">${rr[1]}</td><td style="color:var(--dim);font-size:12px">${rr[2]}</td><td>${rr[3]}</td></tr>`).join('')+totalRow;
+}
+function money(v){const s=v.toFixed(2);return (v<0?'−₹':'₹')+Math.abs(v).toLocaleString('en-IN',{minimumFractionDigits:2});}
+
+/* ---------------- zones / ToD recalc ---------------- */
+function renderZones(){
+  const b=BILLS[cur];
+  const body=b.slots.map(s=>`<tr><td><b>${s.z}</b></td><td>${s.t}</td>
+    <td><input id="zu_${s.z}" type="number" step="1" value="${s.u}" style="width:80px"></td>
+    <td><input id="zp_${s.z}" type="number" step="0.001" value="${todMode==='ps'?s.ps:(s.ps/(b.ec*0.01)).toFixed(2)}" style="width:80px"></td>
+    <td class="mono" id="za_${s.z}" style="text-align:right"></td><td class="kpi">${todMode==='ps'?'Ps/u':'% of EC'}</td></tr>`).join('');
+  const modeNote = todMode==='ps' ? '−1.266 Ps/u = −15% of 8.44 (verified)' : 'MSEDCL: solar −15% (Apr–Sep) / −25% (Oct–Mar), peak +25% · MPERC: solar −20%, peak +20%';
+  document.getElementById('zoneTable').innerHTML='<tr><th>Zone</th><th>Time</th><th>Units</th><th>Rate</th><th style="text-align:right">₹</th><th></th></tr>'+body
+    +`<tr><td colspan="6" style="color:var(--dim);font-size:11.5px">${modeNote}</td></tr>`;
+}
+function recalcTod(){
+  const b=BILLS[cur]; let net=0;
+  b.slots.forEach(s=>{
+    const u=+document.getElementById('zu_'+s.z).value||0;
+    const rate=todMode==='ps' ? +document.getElementById('zp_'+s.z).value||0 : (+document.getElementById('zp_'+s.z).value||0)*(b.ec*0.01);
+    const amt=u*rate/100;
+    net+=amt;
+    const el=document.getElementById('za_'+s.z); if(el){el.textContent=money(amt); el.className='mono'+' '+(amt<0?'neg':'')+(amt>0?'pos':''); el.style.textAlign='right';}
+  });
+  document.getElementById('todNet').textContent=money(net);
+  document.getElementById('todNet').className='mono '+(net<0?'neg':'pos');
+}
+
+/* ---------------- TODMeter data ---------------- */
+function todData(){
+  const d=[]; let rng=42; const rnd=()=>{rng=(rng*1103515245+12345)%2147483648;return rng/2147483648;};
+  const splits=[.45,.35,.20], pf=[.97,.94,.90], mdR=[350,390,290];
+  for(let day=0;day<90;day++){
+    const dow=(day+1)%7+1, wf=(dow===6?0.78:dow===7?0.52:1);
+    const base=1050*wf*(1+0.0015*day)*(1+(rnd()-.5)*.14);
+    const row=[];
+    for(let s=0;s<3;s++){row.push({kwh:Math.max(8,base*splits[s]*(1+(rnd()-.5)*.10)),md:mdR[s]+rnd()*60,blip:rnd()>0.78});}
+    d.push(row);
+  }
+  return d;
+}
+const TOD=todData();
+
+/* ---------------- stacked chart (canvas) ---------------- */
+function drawChart(){
+  const cv=document.getElementById('stackChart'); const ctx=cv.getContext('2d');
+  const W=cv.clientWidth, H=290; cv.width=W*2; cv.height=H*2; ctx.scale(2,2);
+  ctx.clearRect(0,0,W,H);
+  const max=Math.max(...TOD.map(r=>r[0].kwh+r[1].kwh+r[2].kwh))*1.05;
+  const left=34,bottom=18,step=(W-left-6)/90;
+  ctx.strokeStyle='#2a3546'; ctx.fillStyle='#8fa0b5'; ctx.font='10px sans-serif';
+  for(let g=0;g<=4;g++){const y=H-bottom-(H-bottom-14)*g/4;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(W-4,y);ctx.stroke();ctx.fillText(Math.round(max*g/4),4,y+3);}
+  const cols=['#3b82f6','#f59e0b','#a78bfa'];
+  TOD.forEach((r,i)=>{
+    const x=left+i*step, w=Math.max(1.6,step*0.72); let y=0;
+    for(let s=0;s<3;s++){y+=H-bottom-14-(H-bottom-14)*r[s].kwh/max;const y2=y+(H-bottom-14)*r[s].kwh/max;
+      ctx.fillStyle=cols[s];ctx.fillRect(x,y,w,y2-y);y=y2;}
+  });
+}
+
+/* ---------------- MD breaches ---------------- */
+function renderMd(){
+  const rows=TOD.map((r,i)=>({d:i+1,night:r[2].md,eve:r[1].md,day:r[0].md}));
+  const breaches=rows.filter(r=>r.eve>380||r.day>380||r.night>380);
+  const top=[...rows].sort((a,b)=>Math.max(b.eve,b.day,b.night)-Math.max(a.eve,a.day,a.night)).slice(0,5);
+  const body=breaches.slice(-8).map(r=>`<tr><td>Day ${r.d}</td>
+    <td class="mono">${Math.max(r.day,r.eve,r.night).toFixed(0)} kVA</td>
+    <td class="${r.eve>380?'neg':''}">${r.eve>380?'<span class="badge grn" style="background:#3d1a1a;color:var(--red)">BREACH</span>':'—'}</td></tr>`).join('');
+  document.getElementById('mdTable').innerHTML=
+    `<tr><th>Recent breach (>380 kVA)</th><th style="text-align:right">Max MD</th><th>Shift</th></tr>`+body+
+    `<tr><td colspan="3" class="kpi">Total: <b>${breaches.length}</b> days of ${rows.length} · peak: <b>${Math.max(...rows.map(r=>Math.max(r.day,r.eve,r.night))).toFixed(0)} kVA</b> (CD 400 · 120% = 480)</td></tr>`;
+}
+
+/* ---------------- shift summary ---------------- */
+function renderShift(){
+  const day=TOD.reduce((a,r)=>a+r[0].kwh,0), eve=TOD.reduce((a,r)=>a+r[1].kwh,0), night=TOD.reduce((a,r)=>a+r[2].kwh,0);
+  const tot=day+eve+night;
+  // rates: Day=3h B(0)+5h C(-1.266) → 62.5% of C rate; Eve=3h C+5h D(2.11) → 37.5% C + 62.5% D; Night=A(0)
+  const rDay=day*0.625*(-1.266)/100, rEve=(eve*0.375*(-1.266)+eve*0.625*2.11)/100, rNight=0;
+  const rows=[['Day (06–14)',day.toFixed(0),'37.5% B (0) + 62.5% C rebate',money(rDay),'#3b82f6'],
+    ['Evening (14–22)',eve.toFixed(0),'37.5% C rebate + 62.5% D surcharge',money(rEve),'#f59e0b'],
+    ['Night (22–06)',night.toFixed(0),'A-zone @ 0',money(rNight),'#a78bfa']];
+  document.getElementById('shiftSummary').innerHTML='<tr><th>Shift</th><th style="text-align:right">kWh (90d)</th><th>ToD attribution</th><th style="text-align:right">ToD ₹</th></tr>'
+    +rows.map(r=>`<tr><td><span class="sw" style="background:${r[4]}"></span>${r[0]}</td><td class="mono" style="text-align:right">${r[1]}</td><td style="color:var(--dim);font-size:11.5px">${r[2]}</td><td class="mono ${r[3].startsWith('−')?'neg':'pos'}" style="text-align:right">${r[3]}</td></tr>`).join('')
+    +`<tr class="total"><td>Total ToD</td><td></td><td>shift-splitting engine</td><td class="mono" style="text-align:right">${money(rDay+rEve)}</td></tr>`;
+}
+
+/* ---------------- nav / preset ---------------- */
+document.getElementById('nav').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='tab-'+b.dataset.t));
+});
+document.getElementById('monthSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  cur=b.dataset.m; document.querySelectorAll('#monthSeg button').forEach(x=>x.classList.toggle('on',x===b));
+  renderBill(); renderZones(); recalcTod();
+});
+document.getElementById('modeSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  todMode=b.dataset.mode; document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b));
+  renderZones(); recalcTod();
+});
+document.getElementById('seasonSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  season=b.dataset.s; document.querySelectorAll('#seasonSeg button').forEach(x=>x.classList.toggle('on',x===b));
+  if(todMode==='ps'){
+    const b=BILLS[cur]; const c=b.slots.find(s=>s.z==='C');
+    const el=document.getElementById('zp_C'); if(el){el.value=season==='ss'?c.ps:(-(b.ec*0.25)).toFixed(3);}
+  }
+  recalcTod();
+});
+function pickPreset(el,name){
+  document.querySelectorAll('.preset').forEach(p=>p.classList.toggle('on',p===el));
+  document.querySelectorAll('.preset .badge').forEach(x=>x.textContent='');
+  const b=el.querySelector('.badge'); if(b)b.textContent='ACTIVE';
+}
+
+renderBill(); renderZones(); recalcTod(); drawChart(); renderMd(); renderShift();
+window.addEventListener('resize',drawChart);
+</script>
+</body>
+</html>

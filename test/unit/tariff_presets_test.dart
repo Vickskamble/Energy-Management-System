@@ -201,8 +201,8 @@ void main() {
       AppConfig.roundToTen = true;
       final b = BillCalculator.calculate(logs: [log(1000, 1100, 150)]);
       expect(b.arrearsDpc, 1250);
-      expect(b.payableAfterDpc, 101400); // floor ₹10
-      expect(b.payableEarly, 99350); // floor ₹10
+      expect(b.payableAfterDpc, 101260); // floor ₹10
+      expect(b.payableEarly, 99220); // floor ₹10
     });
 
     test('kVAh toggle switches billing unit', () {

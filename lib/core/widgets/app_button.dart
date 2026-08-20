@@ -29,7 +29,9 @@ class AppButton extends StatelessWidget {
       style: FilledButton.styleFrom(
         backgroundColor: color ?? AppColors.primary,
         foregroundColor: textColor ?? AppColors.textOnPrimary,
-        minimumSize: expanded ? const Size(double.infinity, 48) : null,
+        minimumSize: expanded
+            ? const Size(double.infinity, 48)
+            : const Size(64, 48),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.xl,
           vertical: 14,
@@ -72,6 +74,11 @@ class AppButtonOutline extends StatelessWidget {
       onPressed: onPressed,
       icon: icon != null ? Icon(icon, size: 18) : null,
       label: Text(label),
+      style: OutlinedButton.styleFrom(
+        minimumSize: expanded
+            ? const Size(double.infinity, 48)
+            : const Size(64, 44),
+      ),
     );
     if (expanded) return SizedBox(width: double.infinity, child: btn);
     return btn;

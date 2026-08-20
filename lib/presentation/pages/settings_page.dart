@@ -49,8 +49,19 @@ class _SettingsScreenState extends State<SettingsScreen>
   final _precedingCtrls = List.generate(11, (_) => TextEditingController());
   final _tariffFormKey = GlobalKey<FormState>();
 
+  final _floorCtrl = TextEditingController();
+  final _ratchetCtrl = TextEditingController();
+  final _facPsCtrl = TextEditingController();
+  final _lfTCtrl = TextEditingController();
+  final _lfRCtrl = TextEditingController();
+  final _lfSCtrl = TextEditingController();
+
   bool _roundToTen = AppConstants.roundToTen;
   bool _billOnKvah = AppConstants.billOnKvah;
+
+  Color get _dim => widget.isDark
+      ? AppColors.textSecondary
+      : const Color(0xFF475569);
 
   /// Labels for the preceding 11 months (oldest → most recent).
   List<String> get _precedingMonthLabels {
@@ -87,6 +98,14 @@ class _SettingsScreenState extends State<SettingsScreen>
         : AppConfig.arrearsDpcAmount.toStringAsFixed(0);
     _roundToTen = AppConfig.roundToTen;
     _billOnKvah = AppConfig.billOnKvah;
+    _floorCtrl.text =
+        AppConfig.billingDemandFloorPct.toStringAsFixed(0);
+    _ratchetCtrl.text =
+        AppConfig.ratchetFloorPctOfRatchet.toStringAsFixed(0);
+    _facPsCtrl.text = (AppConfig.facRatePerUnit * 100).toStringAsFixed(2);
+    _lfTCtrl.text = AppConfig.lfThresholdPct.toStringAsFixed(0);
+    _lfRCtrl.text = AppConfig.lfRatePct.toStringAsFixed(3);
+    _lfSCtrl.text = AppConfig.lfSealingPct.toStringAsFixed(0);
     final preceding = AppConfig.precedingDemandKva;
     for (var i = 0; i < 11; i++) {
       if (preceding[i] > 0) {
@@ -163,7 +182,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           isScrollable: true,
           tabAlignment: TabAlignment.start,
           labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
+          unselectedLabelColor: _dim,
           indicatorColor: AppColors.primary,
           tabs: const [
             Tab(text: 'Account', icon: Icon(Icons.person_outline, size: 18)),
@@ -305,6 +324,157 @@ class _SettingsScreenState extends State<SettingsScreen>
     return null;
   }
 
+  Widget _buildBillingRulesCard() {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Billing rules',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                'applies to every estimate instantly',
+                style: TextStyle(fontSize: 11, color: _dim),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'These rules feed the billing engine directly — dashboard, '
+            'analysis and reports all recompute with the saved tariff.',
+            style: TextStyle(fontSize: 11, color: _dim),
+          ),
+          const SizedBox(height: 14),
+          _ruleField(
+            _floorCtrl,
+            'Minimum billable demand (floor)',
+            '% of Contract Demand',
+            onChanged: (v) {
+              final d = double.tryParse(v);
+              if (d != null && d >= 0 && d <= 100) {
+                AppConfig.billingDemandFloorPct = d;
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          _ruleField(
+            _ratchetCtrl,
+            'Ratchet floor',
+            '% of the highest of the preceding 11 months',
+            onChanged: (v) {
+              final d = double.tryParse(v);
+              if (d != null && d >= 0 && d <= 100) {
+                AppConfig.ratchetFloorPctOfRatchet = d;
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          _ruleField(
+            _facPsCtrl,
+            'Fuel Adjustment Charge (FAC)',
+            'paise per unit (e.g. 15.37)',
+            onChanged: (v) {
+              final d = double.tryParse(v);
+              if (d != null && d >= 0) {
+                AppConfig.facRatePerUnit = d / 100;
+                _facCtrl.text = (d / 100).toStringAsFixed(2);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Load Factor incentive',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: _dim,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _ruleField(
+                  _lfTCtrl,
+                  'Threshold LF',
+                  '%',
+                  onChanged: (v) {
+                    final d = double.tryParse(v);
+                    if (d != null && d >= 0) AppConfig.lfThresholdPct = d;
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ruleField(
+                  _lfRCtrl,
+                  'Rate / 1% above',
+                  '% of Energy Charges',
+                  onChanged: (v) {
+                    final d = double.tryParse(v);
+                    if (d != null && d >= 0) AppConfig.lfRatePct = d;
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ruleField(
+                  _lfSCtrl,
+                  'Sealing cap',
+                  '%',
+                  onChanged: (v) {
+                    final d = double.tryParse(v);
+                    if (d != null && d >= 0) AppConfig.lfSealingPct = d;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Zero your Load Factor fields → incentive switches off. '
+            'Floor / Ratchet 0 → switches off too.',
+            style: TextStyle(fontSize: 11, color: _dim),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _ruleField(
+    TextEditingController controller,
+    String label,
+    String hint, {
+    ValueChanged<String>? onChanged,
+    bool optional = false,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        isDense: true,
+        border: const OutlineInputBorder(),
+      ),
+      onChanged: onChanged,
+      validator: optional
+          ? null
+          : (v) {
+              if (v == null || v.trim().isEmpty) return null;
+              return _rateValidator(v, mustBePositive: false);
+            },
+    );
+  }
+
   Widget _rateField(
     TextEditingController controller,
     String label,
@@ -404,6 +574,13 @@ class _SettingsScreenState extends State<SettingsScreen>
       _roundToTen = AppConfig.roundToTen;
       _billOnKvah = AppConfig.billOnKvah;
       _subsidyCtrl.text = AppConfig.subsidyPercent.toStringAsFixed(2);
+      _floorCtrl.text = AppConfig.billingDemandFloorPct.toStringAsFixed(0);
+      _ratchetCtrl.text =
+          AppConfig.ratchetFloorPctOfRatchet.toStringAsFixed(0);
+      _facPsCtrl.text = (AppConfig.facRatePerUnit * 100).toStringAsFixed(2);
+      _lfTCtrl.text = AppConfig.lfThresholdPct.toStringAsFixed(0);
+      _lfRCtrl.text = AppConfig.lfRatePct.toStringAsFixed(3);
+      _lfSCtrl.text = AppConfig.lfSealingPct.toStringAsFixed(0);
     });
     for (final c in _precedingCtrls) {
       c.clear();
@@ -429,6 +606,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           title: 'Billing',
           subtitle: 'Tariff configuration used for all bill estimates',
         ),
+        _buildBillingRulesCard(),
         AppCard(
           child: Form(
             key: _tariffFormKey,
@@ -440,7 +618,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: _dim,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -487,7 +665,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: _dim,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -503,7 +681,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: _dim,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -572,7 +750,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: _dim,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -592,7 +770,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ],
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Billing demand = max(recorded MD, highest demand of the '
                   'preceding 11 months). 75% of MD is only a REFERENCE level '
                   'to stay above — it is never used in the bill. Recorded '
@@ -602,7 +780,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   'app data — empty fields are ignored.',
                   style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.textSecondary,
+                    color: _dim,
                   ),
                 ),
                 ExpansionTile(
@@ -651,7 +829,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: _dim,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -676,13 +854,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ],
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Incremental Consumption Rebate — applies ₹/unit on the '
                   'consumption growth when it exceeds last year\u2019s same '
                   'month by ≥ 10%.',
                   style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.textSecondary,
+                    color: _dim,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -754,9 +932,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ],
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Saving updates the tariff used for all future bill estimates.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 12, color: _dim),
                 ),
                 const SizedBox(height: 8),
                 AppButton(
@@ -794,11 +972,11 @@ class _SettingsScreenState extends State<SettingsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '75% of MD (auto)',
             style: TextStyle(
               fontSize: 11,
-              color: AppColors.textSecondary,
+              color: _dim,
             ),
           ),
           const SizedBox(height: 2),
@@ -1197,7 +1375,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: AppColors.textSecondary),
+          Icon(icon, size: 20, color: _dim),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1205,9 +1383,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: _dim,
                   ),
                 ),
                 const SizedBox(height: 2),

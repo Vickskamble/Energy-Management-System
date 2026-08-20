@@ -51,7 +51,6 @@ class BillCalculator {
     final effectiveTaxPercent = taxPercent ?? AppConfig.taxPercent;
     final effectiveIcrRate = icrRate ?? AppConfig.icrRatePerUnit;
     final effectiveIcrLastYear = icrLastYearUnits ?? AppConfig.icrLastYearUnits;
-    final effectiveLfPercent = lfIncentivePercent ?? AppConfig.lfIncentivePercent;
     final effectivePpdPercent = ppdPercent ?? AppConfig.ppdPercent;
     final effectiveBulkPercent =
         bulkRebatePercent ?? AppConfig.bulkRebatePercent;
@@ -106,6 +105,8 @@ class BillCalculator {
       ratchetPeak: _ratchetPeak(logs, ratchetLogs, ratchetMonths,
           manualRatchetDemandKva:
               manualRatchetDemandKva ?? AppConfig.precedingDemandKva),
+      floorPercentOfContract: AppConfig.billingDemandFloorPct / 100,
+      floorPercentOfRatchet: AppConfig.ratchetFloorPctOfRatchet / 100,
     );
     final avgDemand = mdCount > 0 ? sumMd / mdCount.toDouble() : 0.0;
     final loadFactor = EnergyCalculator.calculateLoadFactor(avgDemand, peakMd);
@@ -174,10 +175,15 @@ class BillCalculator {
         ? (totalUnits - effectiveIcrLastYear) * effectiveIcrRate
         : 0.0;
 
-    // Load Factor incentive — % of (energy + demand) charges.
-    final lfIncentive = effectiveLfPercent > 0
-        ? (energyCharges + demandCharges) * effectiveLfPercent / 100
+    // Load Factor incentive — HTML trial rules: rate per 1% of energy charges
+    // for every % of LF above the threshold, capped at the sealing %.
+    final lfPct = loadFactor * 100;
+    final lfPotPct = AppConfig.lfSealingPct > 0 &&
+            lfPct > AppConfig.lfThresholdPct
+        ? (lfPct - AppConfig.lfThresholdPct) * AppConfig.lfRatePct
+            .clamp(0.0, AppConfig.lfSealingPct)
         : 0.0;
+    final lfIncentive = lfPotPct > 0 ? energyCharges * lfPotPct / 100 : 0.0;
 
     // Bulk consumption rebate — % of energy charges.
     final bulkRebate = effectiveBulkPercent > 0

@@ -516,11 +516,11 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
               ),
               const Spacer(),
-              const Padding(
-                padding: EdgeInsets.only(right: 8),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
                 child: Text(
                   'pro-rata split engine',
-                  style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 10, color: _dim),
                 ),
               ),
               const Spacer(),

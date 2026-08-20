@@ -17,6 +17,24 @@ class AppColors {
   static const Color danger = Color(0xFFEF4444);
   static const Color info = Color(0xFF3B82F6);
 
+  // On-light status text — the base status colors fail WCAG AA contrast on
+  // white (green ≈2.3:1, amber ≈2.1:1, red ≈3.6:1). These darker variants
+  // are for text/icon use on light backgrounds; the vivid colors stay for
+  // fills, chips and dark-mode text.
+  static const Color successText = Color(0xFF15803D);
+  static const Color warningText = Color(0xFFB45309);
+  static const Color dangerText = Color(0xFFB91C1C);
+
+  /// Resolves a status color for text use on the current surface: the vivid
+  /// brand color in dark mode, the darker AA-compliant variant on light.
+  static Color statusText(Color color, bool dark) {
+    if (dark) return color;
+    if (color == success) return successText;
+    if (color == warning) return warningText;
+    if (color == danger) return dangerText;
+    return color;
+  }
+
   // Backgrounds
   static const Color backgroundLight = Color(0xFFF8FAFC);
   static const Color surfaceLight = Color(0xFFFFFFFF);

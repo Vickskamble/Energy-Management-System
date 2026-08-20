@@ -441,6 +441,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                     'Status',
                   ],
                   rows: _buildTableRows(currencyFmt),
+                  columnWidth: 92,
                 ),
               ],
             ),
@@ -1066,6 +1067,7 @@ class _ReportsContentState extends State<_ReportsContent> {
   }
 
   Widget _summaryItem(String label, String value, Color color) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1079,7 +1081,7 @@ class _ReportsContentState extends State<_ReportsContent> {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: color,
+            color: AppColors.statusText(color, dark),
           ),
         ),
       ],

@@ -53,6 +53,12 @@ class AppConstants {
   /// Load Factor incentive — % of (energy + demand) charges.
   static const double lfIncentivePercent = 0.0;
 
+  /// LF incentive rule (trial HTML defaults): threshold % LF, rate per 1% of
+  /// energy charges, and the sealing cap %.
+  static const double lfThresholdPercent = 75.0;
+  static const double lfRatePercent = 0.06;
+  static const double lfSealingPercent = 15.0;
+
   /// Prompt Payment Discount — % of the bill (energy + demand + FAC +
   /// wheeling + TOD + duty + taxes) when paid on time.
   static const double ppdPercent = 2.0;

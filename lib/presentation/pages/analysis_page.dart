@@ -4,12 +4,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../core/calculation/bill_calculator.dart';
 import '../../core/calculation/energy_calculator.dart';
+import '../../core/config/app_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_logger.dart';
 import '../../core/utils/pdf_report_service.dart';
-import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_section.dart';
 import '../../core/widgets/app_states.dart';
@@ -77,6 +77,13 @@ class _AnalysisContentState extends State<_AnalysisContent> {
   Map<String, double> _meterKwhTargets = {};
 
   MonthFilterValue get _selection => widget.monthFilter.value;
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+
+  Color get _dimText =>
+      _isDark ? AppColors.textDarkSecondary : AppColors.textSecondary;
+
+  Color get _line => _isDark ? AppColors.borderDark : AppColors.borderLight;
 
   @override
   void initState() {
@@ -199,20 +206,16 @@ class _AnalysisContentState extends State<_AnalysisContent> {
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.page),
         children: [
-          if (_siteNames.isNotEmpty) ...[
-            _buildSiteSelector(),
+          if (_siteNames.isNotEmpty || _meterNames.isNotEmpty) ...[
+            _buildFilterRow(),
             const SizedBox(height: 12),
           ],
           if (_meterNames.isNotEmpty) ...[
-            _buildMeterSelector(),
-            const SizedBox(height: 12),
-            _buildMonthSelector(),
-            const SizedBox(height: 12),
             _buildMeterTrends(),
             const SizedBox(height: 24),
             _buildMdBreachPrediction(),
             const SizedBox(height: 24),
-            _buildAnomalyHighlights(),
+            _buildSystemIssues(),
             const SizedBox(height: 24),
           ],
           if (_filtered.isNotEmpty) ...[
@@ -238,7 +241,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     'No readings found for this period',
                     style: TextStyle(
                       fontSize: 12.5,
-                      color: AppColors.textSecondary,
+                      color: _dimText,
                     ),
                   ),
                 ),
@@ -269,140 +272,138 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     );
   }
 
-  // ── Site selector dropdown (Issue 7E) ────────────────────────────────
-  Widget _buildSiteSelector() {
-    final names = _siteNames;
-    final value =
-        (_selectedSite != null && names.contains(_selectedSite))
-        ? _selectedSite!
-        : 'All Sites';
-    return AppCard(
-      child: Row(
-        children: [
-          const Icon(
-            Icons.location_on_outlined,
-            size: 20,
-            color: AppColors.textSecondary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Site',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-              ),
-              child: DropdownButton<String>(
-                value: value,
-                isExpanded: true,
-                underline: const SizedBox.shrink(),
-                items: [
-                  'All Sites',
-                  for (final site in names) site,
-                ]
-                    .map(
-                      (s) => DropdownMenuItem(value: s, child: Text(s)),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() {
-                  _selectedSite = (v == 'All Sites') ? null : v;
-                  _selectedMeter = null;
-                }),
-              ),
-            ),
-          ),
-        ],
+  // ── Compact site + meter + month filters (one compact row) ────────────────
+  Widget _compactDropdown({
+    required String label,
+    required IconData icon,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    int flex = 2,
+  }) {
+    return Expanded(
+      flex: flex,
+      child: DropdownButtonFormField<String>(
+        initialValue: value,
+        isExpanded: true,
+        isDense: true,
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          prefixIcon: Icon(icon, size: 18),
+          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        ),
+        items: [for (final item in items) DropdownMenuItem(value: item, child: Text(item, overflow: TextOverflow.ellipsis))],
+        onChanged: onChanged,
       ),
     );
   }
 
-  // ── Meter selector dropdown ──────────────────────────────────────────
-  Widget _buildMeterSelector() {
-    final names = _meterNames;
-    final value = (_selectedMeter != null && names.contains(_selectedMeter))
-        ? _selectedMeter!
-        : 'All Meters';
-    return AppCard(
-      child: Row(
-        children: [
-          const Icon(
-            Icons.speed_rounded,
-            size: 20,
-            color: AppColors.textSecondary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Meter',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-              ),
-              child: DropdownButton<String>(
-                value: value,
-                isExpanded: true,
-                underline: const SizedBox.shrink(),
-                items: [
-                  'All Meters',
-                  for (final name in names) name,
-                ]
-                    .map(
-                      (m) => DropdownMenuItem(value: m, child: Text(m)),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() {
-                  _selectedMeter = (v == 'All Meters') ? null : v;
-                }),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Month filter + export (Issue 4F / 5) ──────────────────────────────
-  Widget _buildMonthSelector() {
-    return Row(
-      children: [
-        Expanded(
-          child: MonthFilterBar(
+  Widget _buildFilterRow() {
+    final children = <Widget>[
+      if (_siteNames.isNotEmpty)
+        _compactDropdown(
+          label: 'Site',
+          icon: Icons.location_on_outlined,
+          value: (_selectedSite != null && _siteNames.contains(_selectedSite))
+              ? _selectedSite!
+              : 'All Sites',
+          items: ['All Sites', ..._siteNames],
+          onChanged: (v) => setState(() {
+            _selectedSite = (v == 'All Sites') ? null : v;
+            _selectedMeter = null;
+          }),
+          flex: 2,
+        ),
+      if (_meterNames.isNotEmpty)
+        _compactDropdown(
+          label: 'Meter',
+          icon: Icons.speed_rounded,
+          value: (_selectedMeter != null && _meterNames.contains(_selectedMeter))
+              ? _selectedMeter!
+              : 'All Meters',
+          items: ['All Meters', ..._meterNames],
+          onChanged: (v) => setState(() {
+            _selectedMeter = (v == 'All Meters') ? null : v;
+          }),
+          flex: 2,
+        ),
+      Expanded(
+        flex: 3,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: MonthFilterDropdown(
             controller: widget.monthFilter,
             availableMonths: _monthKeys,
           ),
         ),
-        const SizedBox(width: 12),
-        AppButtonOutline(
-          label: 'Export PDF',
-          icon: Icons.picture_as_pdf_outlined,
-          onPressed: () async {
-            try {
-              await PdfReportService.exportPdf(
-                logs: _filtered,
-                title: 'Analysis Report',
-                subtitle:
-                    '${_filtered.length} reading(s) — ${_selection.label}',
-              );
-            } catch (e) {
-              AppLogger.e('Analysis PDF export failed', e);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text(
-                      'Could not generate the PDF report. Please try again.',
-                    ),
-                    backgroundColor: Colors.red.shade700,
+      ),
+      IconButton.outlined(
+        tooltip: 'Export PDF',
+        icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+        onPressed: () async {
+          try {
+            await PdfReportService.exportPdf(
+              logs: _filtered,
+              title: 'Analysis Report',
+              subtitle:
+                  '${_filtered.length} reading(s) — ${_selection.label}',
+            );
+          } catch (e) {
+            AppLogger.e('Analysis PDF export failed', e);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text(
+                    'Could not generate the PDF report. Please try again.',
                   ),
-                );
-              }
+                  backgroundColor: Colors.red.shade700,
+                ),
+              );
             }
-          },
-        ),
-      ],
+          }
+        },
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tight = constraints.maxWidth < 560;
+        Widget row(List<Widget> items) => Row(
+              children: [
+                for (var i = 0; i < items.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 10),
+                  items[i],
+                ],
+              ],
+            );
+        if (tight) {
+          return AppCard(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                row([...children.take(children.length - 1).take(2)]),
+                const SizedBox(height: 8),
+                row([...children.skip(2)]),
+              ],
+            ),
+          );
+        }
+        return AppCard(
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+          child: row(children),
+        );
+      },
     );
   }
 
   // ── Bill breakdown (Issue 5 — was only on Dashboard) ──────────────────
+  static const _zoneTime = {
+    'A': '00–06',
+    'B': '06–09',
+    'C': '09–17',
+    'D': '17–24',
+  };
+
   Widget _buildBillAnalysis() {
     final breakdown = BillCalculator.calculate(
       logs: _filtered,
@@ -410,16 +411,28 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     );
     if (breakdown.totalUnits <= 0) return const SizedBox.shrink();
     final currencyFmt = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
+    final dim = _dimText;
+    Color zoneCol(double amt) =>
+        amt < 0 ? AppColors.success : amt > 0 ? AppColors.kpiEnergy : dim;
     final rows = <(String, double, Color)>[
       ('Energy Charges', breakdown.energyCharges, AppColors.kpiEnergy),
       ('Demand Charges', breakdown.demandCharges, AppColors.kpiDemand),
-      ('FAC', breakdown.facCharges, AppColors.textPrimary),
-      ('Wheeling', breakdown.wheelingCharges, AppColors.textPrimary),
-      ('Electricity Duty', breakdown.electricityDuty, AppColors.textPrimary),
-      ('Taxes', breakdown.taxes, AppColors.textPrimary),
+      for (final z in const ['A', 'B', 'C', 'D'])
+        if ((breakdown.todZoneCharges[z] ?? 0) != 0)
+          ('ToD $z (${_zoneTime[z]})', breakdown.todZoneCharges[z]!, zoneCol(breakdown.todZoneCharges[z]!)),
+      ('Net ToD (slot engine)', breakdown.todCharges,
+          breakdown.todCharges <= 0 ? AppColors.success : AppColors.danger),
+      ('FAC', breakdown.facCharges, dim),
+      ('Wheeling', breakdown.wheelingCharges, dim),
+      ('Electricity Duty', breakdown.electricityDuty, dim),
+      ('Taxes', breakdown.taxes, dim),
+      if (breakdown.fixedCharge > 0)
+        ('Fixed Charge', breakdown.fixedCharge, dim),
       ('PF Rebate', -breakdown.pfRebate, AppColors.kpiSavings),
       ('PF Surcharge', breakdown.pfSurcharge, AppColors.danger),
       ('Subsidy', -breakdown.subsidy, AppColors.kpiSavings),
+      if (breakdown.rebateSection106 > 0)
+        ('Rebate u/s 106', -breakdown.rebateSection106, AppColors.kpiSavings),
       if (breakdown.icrRebate > 0)
         ('ICR Rebate', -breakdown.icrRebate, AppColors.kpiSavings),
       if (breakdown.lfIncentive > 0)
@@ -431,7 +444,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
       if (breakdown.arrearsDpc > 0)
         ('Arrears/DPC', breakdown.arrearsDpc, AppColors.danger),
       if (breakdown.roundingAdjustment != 0)
-        ('Rounding', breakdown.roundingAdjustment, AppColors.textPrimary),
+        ('Rounding', breakdown.roundingAdjustment, dim),
     ];
     return AppCard(
       child: Column(
@@ -443,8 +456,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
           ),
           const SizedBox(height: 4),
           Text(
-            '${_filtered.length} reading(s) — detailed breakdown',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            '${_filtered.length} reading(s) — detailed breakdown incl. slot-wise ToD',
+            style: TextStyle(fontSize: 12, color: dim),
           ),
           const Divider(height: 24),
           for (final (label, amount, color) in rows)
@@ -452,14 +465,20 @@ class _AnalysisContentState extends State<_AnalysisContent> {
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Row(
                 children: [
-                  Text(label, style: const TextStyle(fontSize: 12)),
-                  const Spacer(),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                   Text(
                     '${amount < 0 ? '−' : ''}${currencyFmt.format(amount.abs())}',
                     style: TextStyle(
                       fontSize: 12,
                       color: color,
                       fontWeight: FontWeight.w600,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                 ],
@@ -483,12 +502,55 @@ class _AnalysisContentState extends State<_AnalysisContent> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              for (final (label, amount) in [
+                ('Pay early (PPD ${AppConfig.ppdPercent.toStringAsFixed(0)}%)', breakdown.payableEarly),
+                ('Due', breakdown.netBill),
+                ('After DPC', breakdown.payableAfterDpc),
+              ]) ...[
+                if (label != 'Due') const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _isDark
+                          ? AppColors.surface2Dark
+                          : AppColors.surface2Light,
+                      border: Border.all(color: _line),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(fontSize: 10.5, color: dim),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '₹${amount.round()}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
           Text(
-            'Total Units: ${breakdown.totalUnits.toStringAsFixed(0)} kWh'
+            'Total Units: ${breakdown.totalUnits.toStringAsFixed(0)} ${AppConfig.billOnKvah ? 'kVAh' : 'kWh'}'
             '  ·  Billing Demand: ${breakdown.billingDemand.toStringAsFixed(1)} kVA'
-            '  ·  Avg Unit Cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
-            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            '  ·  Avg Unit Cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}'
+            '  ·  PF: ${(breakdown.powerFactor * 100).toStringAsFixed(1)}%'
+            '  ·  LF: ${(breakdown.loadFactor * 100).toStringAsFixed(1)}%',
+            style: TextStyle(fontSize: 11, color: dim),
           ),
         ],
       ),
@@ -1061,7 +1123,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   body,
                   style: TextStyle(
                     fontSize: 11.5,
-                    color: AppColors.textSecondary,
+                    color: _dimText,
                   ),
                 ),
               ],
@@ -1074,91 +1136,263 @@ class _AnalysisContentState extends State<_AnalysisContent> {
 
   // ── Rule-based anomaly highlights (Issue 5) ───────────────────────────
   /// Month-level consumption spike/dip vs pichle months ka average.
-  Widget _buildAnomalyHighlights() {
-    final scope = _selectedMeter != null
-        ? _siteEntities.where((e) => e.meterName == _selectedMeter).toList()
-        : _siteEntities;
-    if (scope.length < 2) return const SizedBox.shrink();
+  Widget _buildSystemIssues() {
+    if (_filtered.isEmpty) return const SizedBox.shrink();
+    final breakdown = BillCalculator.calculate(
+      logs: _filtered,
+      ratchetLogs: _entities,
+    );
+    if (breakdown.totalUnits <= 0) return const SizedBox.shrink();
 
-    final monthlyUnits = <String, double>{};
-    for (final e in scope) {
-      final key =
-          '${e.loggedAt.year.toString().padLeft(4, '0')}-${e.loggedAt.month.toString().padLeft(2, '0')}';
-      monthlyUnits[key] =
-          (monthlyUnits[key] ?? 0) + e.kwh * e.multiplyingFactor;
+    final issues =
+        <({String title, String what, String how, int sev, double impact})>[];
+    final cd = breakdown.contractDemand;
+    final bd = breakdown.billingDemand;
+    final pf = breakdown.powerFactor;
+    final lf = breakdown.loadFactor;
+    final tot = breakdown.totalUnits;
+    final c = breakdown.todZoneCharges['C'] ?? 0;
+    final d = breakdown.todZoneCharges['D'] ?? 0;
+    final dUnits = breakdown.todZoneUnits['D'] ?? 0;
+    final dc = AppConfig.demandChargePerKva;
+
+    if (cd > 0 && bd >= cd) {
+      issues.add((
+        title: 'MD ceiling breach',
+        what: 'Billed demand ${bd.round()} kVA ≥ contract demand ${cd.round()} kVA — '
+            'excess-demand charge lagne laga hai.',
+        how: 'Peak demand 10% shave karo: heavy loads 6–10 PM se hatao, critical '
+            'loads backup/diesel pe le jao, warna CD badhwao.',
+        sev: 3,
+        impact: (bd - cd) * dc,
+      ));
+    } else if (cd > 0 && bd >= cd * 0.95) {
+      issues.add((
+        title: 'MD breach risk',
+        what: 'Billed demand ${bd.round()} kVA CD ke 95% (${(cd * 0.95).round()} kVA) '
+            'ke andar hai — ek hi spike breach kar sakta hai.',
+        how: 'Peaking loads ko non-peak hours me shift karo; peak shaving/'
+            'scheduling se next month MD breach mat hone do.',
+        sev: 2,
+        impact: cd * dc * 0.05,
+      ));
     }
-
-    final months = monthlyUnits.keys.toList()..sort();
-    if (months.length < 2) return const SizedBox.shrink();
-
-    final anomalies = <({String label, double deviation, bool up})>[];
-    for (var i = 0; i < months.length; i++) {
-      final others = <double>[
-        for (var j = 0; j < months.length; j++)
-          if (j != i) monthlyUnits[months[j]]!,
-      ];
-      final avg = others.reduce((a, b) => a + b) / others.length;
-      if (avg <= 0) continue;
-      final deviation = (monthlyUnits[months[i]]! - avg) / avg * 100;
-      if (deviation.abs() >= 30) {
-        final parts = months[i].split('-');
-        final label = DateFormat(
-          'MMM yyyy',
-        ).format(DateTime(int.parse(parts[0]), int.parse(parts[1]), 1));
-        anomalies.add(
-          (label: label, deviation: deviation, up: deviation > 0),
-        );
+    if (tot > 0 && dUnits / tot >= 0.25) {
+      issues.add((
+        title: 'Peak-hour (D zone) overuse',
+        what: '${(dUnits / tot * 100).toStringAsFixed(0)}% units D zone (17–24) me — '
+            'peak surcharge ₹${d.round()} us par.',
+        how: 'Heavy loads ko day me le aao (C zone solar rebate ₹${c.round()}). '
+            'D se C shift = har unit par surcharge se rebate tak.',
+        sev: 2,
+        impact: d,
+      ));
+    }
+    if (pf > 0 && pf < AppConstants.pfSurchargeThreshold) {
+      issues.add((
+        title: 'Power factor penalty',
+        what: 'PF ${(pf * 100).toStringAsFixed(1)}% < 90% — penalty ${breakdown.pfSurcharge.round()} '
+            'aur kVAh basis pe units bhi badhe.',
+        how: 'Capacitor bank / APFC install karo. PF ≥ 0.95 target rakho — '
+            'rebate milti hai (energy + demand ka 1%).',
+        sev: 3,
+        impact: breakdown.pfSurcharge,
+      ));
+    } else if (pf >= AppConstants.pfSurchargeThreshold &&
+        pf < AppConstants.pfRebateThreshold) {
+      issues.add((
+        title: 'PF rebate miss',
+        what: 'PF ${(pf * 100).toStringAsFixed(1)}% 90–95% ke beech — penalty nahi, '
+            'lekin rebate bhi nahi mil rahi.',
+        how: 'Thoda capacitor compensation badhao → PF ≥ 0.95 karo, rebate '
+            'energy+demand ka 1% milne lagega.',
+        sev: 1,
+        impact: (breakdown.energyCharges + breakdown.demandCharges) * 0.01,
+      ));
+    }
+    if (lf > 0 && lf < AppConstants.loadFactorThresholdGood) {
+      issues.add((
+        title: 'Low load factor',
+        what: 'LF ${(lf * 100).toStringAsFixed(1)}% — demand charge har unit pe '
+            'zyada pad raha hai (avg cost ₹${breakdown.averageUnitCost.toStringAsFixed(2)}/u).',
+        how: 'Load smoothing karo: schedule 24×7 spread, ek saath chalu hone '
+            'wale bade motors stagger karo.',
+        sev: 2,
+        impact: 0,
+      ));
+    }
+    if (cd > 0 &&
+        bd <= (cd * AppConstants.billingDemandFloorPercent).roundToDouble() &&
+        cd * AppConstants.billingDemandFloorPercent > 0) {
+      issues.add((
+        title: 'Demand floor trap',
+        what: 'Billed demand ${bd.round()} kVA CD ke 75% floor pe ghusa hai — '
+            'poora CD ₹${(cd * dc).round()}/month demand me de rahe ho.',
+        how: '12 mahine peak CD × 75% se neeche rahe to CD kam karwane ka review '
+            'karo — saving ₹${((cd - bd) * dc).round()}/month.',
+        sev: 1,
+        impact: (cd - bd) * dc,
+      ));
+    }
+    if (_meterKwhTargets.isNotEmpty) {
+      final dailyTarget = _meterKwhTargets.values.fold(0.0, (a, b) => a + b);
+      final days = (DateTime.now().difference(_filtered.first.loggedAt).inDays)
+          .clamp(1, 31);
+      final avgDaily = tot / days;
+      if (avgDaily > dailyTarget * 1.05) {
+        issues.add((
+          title: 'Over-target consumption',
+          what: 'Avg ${avgDaily.round()} kWh/day apne ${dailyTarget.round()} '
+              'kWh/day target se 5%+ upar hai.',
+          how: 'Non-essential loads off karo, peak window me consumption band '
+              'karo, target ke andar aao.',
+          sev: 1,
+          impact: (avgDaily - dailyTarget) * AppConfig.tariffPerUnit * days,
+        ));
       }
     }
-    if (anomalies.isEmpty) return const SizedBox.shrink();
+
+    issues.sort((a, b) {
+      final s = b.sev.compareTo(a.sev);
+      return s != 0 ? s : b.impact.compareTo(a.impact);
+    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppSectionHeader(
-          title: 'Anomaly Highlights',
-          subtitle: 'Months jahan consumption average se 30%+ deviate hua',
+          title: 'System Issues',
+          subtitle:
+              'kya galat hai + kaise theek karein — priority order (P1 sabse pehle)',
         ),
         const SizedBox(height: 8),
-        for (final a in anomalies) ...[
+        if (issues.isEmpty)
           AppCard(
-            color: (a.up ? AppColors.warning : AppColors.kpiEnergy).withValues(
-              alpha: 0.05,
-            ),
+            color:
+                AppColors.success.withValues(alpha: 0.05),
             child: Row(
               children: [
-                Icon(
-                  a.up
-                      ? Icons.arrow_upward_rounded
-                      : Icons.arrow_downward_rounded,
+                const Icon(
+                  Icons.check_circle_rounded,
                   size: 18,
-                  color: a.up ? AppColors.warning : AppColors.kpiEnergy,
+                  color: AppColors.success,
                 ),
                 const SizedBox(width: 10),
-                Expanded(
+                const Expanded(
                   child: Text(
-                    '${a.label} — ${a.deviation.toStringAsFixed(0)}% ${a.up ? 'zyada' : 'kam'} consumption',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Text(
-                  a.up ? 'SPIKE' : 'DIP',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                    color: a.up ? AppColors.warning : AppColors.kpiEnergy,
+                    'System theek hai — koi critical issue nahi',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 8),
-        ],
+          )
+        else
+          for (final (i, a) in issues.indexed) ...[
+            _issueCard(a, i),
+            const SizedBox(height: 8),
+          ],
       ],
+    );
+  }
+
+  Widget _issueCard(
+    ({String title, String what, String how, int sev, double impact}) a,
+    int index,
+  ) {
+    final color = switch (a.sev) {
+      3 => AppColors.danger,
+      2 => AppColors.warning,
+      _ => AppColors.info,
+    };
+    return AppCard(
+      color: color.withValues(alpha: 0.05),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                a.sev >= 3
+                    ? Icons.error_rounded
+                    : a.sev == 2
+                        ? Icons.warning_amber_rounded
+                        : Icons.info_outline_rounded,
+                size: 16,
+                color: color,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  a.title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'P${a.sev}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            a.what,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.5,
+              color: _dimText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.build_circle_outlined,
+                  size: 14, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  a.how,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.45,
+                    color: _isDark
+                        ? AppColors.textOnDark
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (a.impact > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Impact (approx): ₹${a.impact.round()}',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.success,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -1227,9 +1461,9 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           xLabels[i],
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 9,
-                            color: AppColors.textSecondary,
+                            color: _dimText,
                           ),
                         ),
                       );
@@ -1338,9 +1572,9 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     const SizedBox(width: 4),
                     Text(
                       s.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
-                        color: AppColors.textSecondary,
+                        color: _dimText,
                       ),
                     ),
                   ],
@@ -1360,10 +1594,10 @@ class _AnalysisContentState extends State<_AnalysisContent> {
               const SizedBox(width: 6),
               Text(
                 'Daily target ${targetKwhPerDay.toStringAsFixed(0)} kWh/day',
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppColors.textSecondary,
-                ),
+style: TextStyle(
+                      fontSize: 10,
+                      color: _dimText,
+                    ),
               ),
             ],
           ),
@@ -1421,7 +1655,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                                 dateFmt.format(log.loggedAt),
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.textSecondary,
+                                  color: _dimText,
                                 ),
                               ),
                               if (log.currentKwh != null ||
@@ -1433,7 +1667,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                                   '${log.currentKvah?.toStringAsFixed(1) ?? '—'} kVAh',
                                   style: TextStyle(
                                     fontSize: 11.5,
-                                    color: AppColors.textSecondary,
+                                    color: _dimText,
                                     fontStyle: FontStyle.italic,
                                   ),
                                 ),

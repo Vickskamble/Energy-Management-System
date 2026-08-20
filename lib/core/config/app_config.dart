@@ -152,6 +152,21 @@ class AppConfig {
     _todZoneSharesWinter = Map.of(value);
   }
 
+  /// Billing-demand floor / ratchet rules (editable via Settings → Billing).
+  static double _billingDemandFloorPct =
+      AppConstants.billingDemandFloorPercent * 100;
+  static double _ratchetFloorPctOfRatchet =
+      AppConstants.billingDemandFloorPercentOfRatchet * 100;
+  static double get billingDemandFloorPct => _billingDemandFloorPct;
+  static set billingDemandFloorPct(double v) =>
+      _billingDemandFloorPct = v.clamp(0.0, 100.0);
+  static double get ratchetFloorPctOfRatchet => _ratchetFloorPctOfRatchet;
+  static set ratchetFloorPctOfRatchet(double v) =>
+      _ratchetFloorPctOfRatchet = v.clamp(0.0, 100.0);
+  static double lfThresholdPct = AppConstants.lfThresholdPercent;
+  static double lfRatePct = AppConstants.lfRatePercent;
+  static double lfSealingPct = AppConstants.lfSealingPercent;
+
   /// Electricity duty as % of energy charges (0 = exempt).
   static double get dutyPercent => _dutyPercent;
   static set dutyPercent(double value) {
@@ -278,6 +293,12 @@ class AppConfig {
     _todZoneShares = AppConstants.todZoneShares;
     _todZoneSharesWinter = AppConstants.todZoneSharesWinter;
     useWinterTod = false;
+    _billingDemandFloorPct = AppConstants.billingDemandFloorPercent * 100;
+    _ratchetFloorPctOfRatchet =
+        AppConstants.billingDemandFloorPercentOfRatchet * 100;
+    lfThresholdPct = AppConstants.lfThresholdPercent;
+    lfRatePct = AppConstants.lfRatePercent;
+    lfSealingPct = AppConstants.lfSealingPercent;
     _dutyPercent = 0.0;
     _fixedCharge = 0.0;
     _energySlabs = const [];
@@ -414,6 +435,13 @@ class TariffStore {
     if (map['use_winter_tod'] is bool) {
       AppConfig.useWinterTod = map['use_winter_tod'] as bool;
     }
+    setDouble('billing_demand_floor_pct',
+        (v) => AppConfig.billingDemandFloorPct = v);
+    setDouble('ratchet_floor_pct_of_ratchet',
+        (v) => AppConfig.ratchetFloorPctOfRatchet = v);
+    setDouble('lf_threshold_pct', (v) => AppConfig.lfThresholdPct = v);
+    setDouble('lf_rate_pct', (v) => AppConfig.lfRatePct = v);
+    setDouble('lf_sealing_pct', (v) => AppConfig.lfSealingPct = v);
   }
 
   static Future<void> saveAll({
@@ -464,6 +492,11 @@ class TariffStore {
         'tod_zone_shares': AppConfig.todZoneShares,
         'tod_zone_shares_winter': AppConfig.todZoneSharesWinter,
         'use_winter_tod': AppConfig.useWinterTod,
+        'billing_demand_floor_pct': AppConfig.billingDemandFloorPct,
+        'ratchet_floor_pct_of_ratchet': AppConfig.ratchetFloorPctOfRatchet,
+        'lf_threshold_pct': AppConfig.lfThresholdPct,
+        'lf_rate_pct': AppConfig.lfRatePct,
+        'lf_sealing_pct': AppConfig.lfSealingPct,
       };
       await SupabaseClientManager.client.from(_table).upsert({
         'user_id': uid,

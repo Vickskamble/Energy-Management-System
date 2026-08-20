@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ems/core/calculation/bill_calculator.dart';
+import 'package:ems/core/config/app_config.dart';
 import 'package:ems/domain/entities/energy_log_entity.dart';
 
 EnergyLogEntity _log({
@@ -28,6 +29,8 @@ EnergyLogEntity _log({
 
 void main() {
   group('BillCalculator.calculate', () {
+    setUp(() => AppConfig.reset());
+
     test('computes charges for a single reading', () {
       final breakdown = BillCalculator.calculate(
         logs: [_log(kwh: 200, kvah: 250, md: 300)],
@@ -47,8 +50,8 @@ void main() {
       expect(breakdown.loadFactor, 1.0);
       expect(breakdown.todZoneUnits['A'], closeTo(937.5, 0.01)); // 00:00 → A 6/8
       expect(breakdown.todZoneUnits['D'], closeTo(312.5, 0.01)); // D 2/8
-      expect(breakdown.payableEarly, 997700); // floor ₹10
-      expect(breakdown.payableAfterDpc, 1017460); // floor ₹10
+      expect(breakdown.payableEarly, 997550); // floor ₹10
+      expect(breakdown.payableAfterDpc, 1017300); // floor ₹10
     });
 
     test('applies PF rebate when power factor >= threshold', () {
@@ -59,8 +62,8 @@ void main() {
       expect(breakdown.powerFactor, 1.0);
       expect(breakdown.pfRebate, closeTo(9834.4, 0.01)); // 1% of (8440+975000)
       expect(breakdown.pfSurcharge, 0);
-      expect(breakdown.payableEarly, 936500); // floor ₹10
-      expect(breakdown.payableAfterDpc, 956010); // floor ₹10
+      expect(breakdown.payableEarly, 936370); // floor ₹10
+      expect(breakdown.payableAfterDpc, 955880); // floor ₹10
     });
 
     test('respects a custom energy rate', () {

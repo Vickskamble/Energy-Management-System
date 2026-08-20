@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PowerEMS v1.2.5 — UI/UX Trial (actual app, your data)</title>
+<style>
+  :root{
+    --bg:#0F172A; --surface:#1E293B; --surface2:#16203a; --line:#334155;
+    --text:#F1F5F9; --dim:#94A3B8;
+    --primary:#2563EB; --primaryLight:#3B82F6; --primaryDark:#1D4ED8;
+    --success:#22C55E; --warning:#F59E0B; --danger:#EF4444; --info:#3B82F6;
+    --activebg:#1E3A5F;
+  }
+  body.light{
+    --bg:#F8FAFC; --surface:#FFFFFF; --surface2:#F1F5F9; --line:#E2E8F0;
+    --text:#0F172A; --dim:#64748B; --activebg:#EFF6FF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;display:flex;height:100vh;overflow:hidden}
+  svg{display:block}
+  .ic{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  aside{width:248px;background:var(--bg);border-right:1px solid var(--line);display:flex;flex-direction:column;flex:none}
+  .logo{display:flex;align-items:center;gap:10px;height:64px;padding:0 16px;border-bottom:1px solid var(--line);flex:none}
+  .logo .bolt{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--primaryLight));display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
+  .logo b{font-size:18px;font-weight:700}
+  nav{flex:1;overflow:auto;padding:10px 8px}
+  nav button{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;color:var(--dim);padding:11px 12px;border-radius:12px;cursor:pointer;font-size:14px;font-weight:500;margin-bottom:2px;text-align:left;position:relative;font-family:inherit}
+  nav button:hover{background:var(--surface2);color:var(--text)}
+  nav button.on{background:var(--activebg);color:var(--primary);font-weight:600}
+  nav button.on::after{content:'';position:absolute;right:-8px;top:50%;transform:translateY(-50%);height:20px;width:3px;background:var(--primary);border-radius:2px}
+  .pill{font-size:9.5px;background:var(--primary);color:#fff;border-radius:9px;padding:1.5px 7px;margin-left:auto;font-weight:700;letter-spacing:.4px}
+  .profile{border-top:1px solid var(--line);padding:12px;flex:none}
+  .profile .who{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .avatar{width:36px;height:36px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex:none}
+  .profile .who b{font-size:13px;display:block}
+  .profile .who small{font-size:11px;color:var(--dim);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+  .logout{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:8px;background:none;border:1px solid rgba(239,68,68,.35);color:var(--danger);border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit}
+  main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{height:64px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 22px;gap:14px;flex:none}
+  .topbar h1{font-size:18px;font-weight:600;line-height:1.1}
+  .topbar .sub{font-size:12.5px;color:var(--dim)}
+  .topbar .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .bell{position:relative;background:var(--surface2);border:1px solid var(--line);border-radius:10px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--dim)}
+  .bell .dot{position:absolute;top:7px;right:8px;background:var(--danger);color:#fff;font-size:9px;font-weight:700;border-radius:8px;min-width:15px;height:15px;display:flex;align-items:center;justify-content:center;padding:0 3px}
+  .iconbtn{background:var(--surface2);border:1px solid var(--line);border-radius:10px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--dim)}
+  .chip{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border:1px solid var(--line);border-radius:24px;background:var(--surface2)}
+  .chip .avatar{width:30px;height:30px;font-size:13px}
+  .chip small{color:var(--dim);font-size:11px;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .content{flex:1;overflow:auto;padding:22px}
+  .tab{display:none}.tab.on{display:block}
+  .wrapper{max-width:1240px;margin:0 auto}
+  .grid{display:grid;gap:14px}
+  .g6{grid-template-columns:repeat(auto-fit,minmax(168px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .card h3{font-size:11.5px;color:var(--dim);font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px}
+  .big{font-size:22px;font-weight:800}
+  .mono{font-variant-numeric:tabular-nums}
+  .pos{color:var(--success)} .neg{color:var(--danger)} .amb{color:var(--warning)} .blu{color:#7CB3FF}
+  body.light .blu{color:#2563EB}
+  .badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--line);color:var(--dim);margin-left:6px;vertical-align:1px;white-space:nowrap}
+  .badge.new{background:rgba(37,99,235,.15);color:var(--primaryLight)}
+  body.light .badge.new{color:#1D4ED8}
+  .badge.ok{background:rgba(34,197,94,.14);color:var(--success)}
+  .badge.warn{background:rgba(245,158,11,.14);color:var(--warning)}
+  .badge.neutral{background:var(--line);color:var(--dim)}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6.5px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .row:last-child{border:0}
+  .row .l{color:var(--dim)}
+  .kpi{font-size:11px;color:var(--dim);margin-top:4px;line-height:1.5}
+  table{width:100%;border-collapse:collapse;font-size:12.8px}
+  th{color:var(--dim);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);font-size:11px;letter-spacing:.3px;text-transform:uppercase}
+  td{padding:6.5px 8px;border-bottom:1px solid var(--line)}
+  tr.total td{font-weight:700;border-top:2px solid var(--primary)}
+  .right{text-align:right}
+  .note{background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.3);color:var(--blu);border-radius:12px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
+  .bar{height:7px;border-radius:4px;background:var(--surface2);overflow:hidden;margin-top:6px}
+  .bar i{display:block;height:100%;border-radius:4px}
+  .seg{display:inline-flex;background:var(--surface2);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .seg button{background:none;border:0;color:var(--dim);padding:6px 12px;cursor:pointer;font-size:12.5px;font-family:inherit}
+  .seg button.on{background:var(--primary);color:#fff}
+  input,select{background:var(--surface2);border:1px solid var(--line);color:var(--text);border-radius:7px;padding:6px 8px;font-size:12.5px;width:84px;font-family:inherit}
+  canvas{width:100%;height:270px;display:block}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--dim);margin:8px 2px;flex-wrap:wrap}
+  .sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .preset{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;cursor:pointer}
+  .preset:hover{border-color:var(--primary)}
+  .preset.on{border-color:var(--primary);background:rgba(37,99,235,.08)}
+  .preset b{display:block;font-size:13.5px}
+  .preset small{color:var(--dim)}
+  label.f{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px;color:var(--dim)}
+  label.f span{color:var(--text)}
+  .hint{color:var(--dim);font-size:11.5px;line-height:1.5}
+  .split{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+  .split .s{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+  .split .s small{display:block;color:var(--dim);font-size:10.5px;margin-bottom:2px}
+  .split .s b{font-size:13.5px}
+  details{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-top:14px}
+  summary{cursor:pointer;font-weight:600;font-size:13px}
+  .insight{display:flex;gap:11px;align-items:flex-start;padding:12px 13px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+  .insight .ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none}
+  .insight b{font-size:13px;display:block}
+  .insight p{margin:3px 0 0;font-size:12px;color:var(--dim);line-height:1.55}
+  .insight .res{margin-left:auto;text-align:right;flex:none;padding-left:10px}
+  .insight .res b{font-size:13.5px}
+  .insight .res small{color:var(--dim);font-size:10px;display:block;margin-top:2px}
+  .insight.ok .ico{background:rgba(34,197,94,.15)}
+  .insight.warn .ico{background:rgba(245,158,11,.15)}
+  .insight.bad .ico{background:rgba(239,68,68,.12)}
+  @media(max-width:860px){aside{width:64px}.logo b,.navlabel,.profile{display:none}nav button{justify-content:center;padding:11px 0}.pill{display:none}}
+</style>
+</head>
+<body>
+<aside>
+  <div class="logo"><span class="bolt"><svg class="ic" style="stroke:#fff" viewBox="0 0 24 24"><path d="M13 2 L4 14 h6 l-1 8 9-12 h-6 z"/></svg></span><b>PowerEMS</b></div>
+  <nav id="nav">
+    <button data-t="dash" class="on"><svg class="ic"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg><span class="navlabel">Dashboard</span></button>
+    <button data-t="entry"><svg class="ic"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></svg><span class="navlabel">Entry</span></button>
+    <button data-t="analysis"><svg class="ic"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span class="navlabel">Analysis</span><span class="pill">NEW</span></button>
+    <button data-t="reports"><svg class="ic"><path d="M6 2h9l4 4v16H6z"/><path d="M15 2v4h4"/><path d="M9 12h6M9 16h6"/></svg><span class="navlabel">Reports</span><span class="pill">NEW</span></button>
+    <button data-t="meters"><svg class="ic"><path d="M12 14l3-5"/><circle cx="12" cy="14" r="8"/><path d="M4 14H2M22 14h-2M12 2v2"/></svg><span class="navlabel">Meters</span></button>
+    <button data-t="import"><svg class="ic"><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/><path d="M12 3v12M8 11l4 4 4-4"/></svg><span class="navlabel">Import</span></button>
+    <button data-t="plan"><svg class="ic"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M12 21 8 9l4-6 4 6z"/></svg><span class="navlabel">Plan &amp; Billing</span></button>
+    <button data-t="settings"><svg class="ic"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .33 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.33 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .33-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.33-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.33h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.33 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg><span class="navlabel">Settings</span><span class="pill">NEW</span></button>
+  </nav>
+  <div class="profile">
+    <div class="who"><span class="avatar">D</span><div><b>Demo User</b><small>demo@powerems.com</small></div></div>
+    <button class="logout" id="logoutBtn"><svg class="ic" style="width:15px;height:15px"><path d="M9 3H4v18h5"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg><span>Logout</span></button>
+  </div>
+</aside>
+
+<main>
+  <div class="topbar">
+    <div>
+      <h1 id="pageTitle">Dashboard</h1>
+      <div class="sub" id="pageSub">v1.2.5 UI/UX trial — same app, upgraded billing + ToD engine</div>
+    </div>
+    <div class="right">
+      <button class="bell" id="bellBtn"><svg class="ic"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot">3</span></button>
+      <button class="iconbtn" id="themeBtn" title="Toggle theme"><svg class="ic" id="themeIcon"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg></button>
+      <div class="chip"><span class="avatar" style="color:#0F172A;background:#BFDBFE">D</span><div><small>demo@powerems.com</small></div>
+        <svg class="ic" style="width:16px;height:16px;color:var(--dim)"><path d="M6 9l6 6 6-6"/></svg></div>
+    </div>
+  </div>
+
+  <div class="content">
+
+  <!-- ================= DASHBOARD ================= -->
+  <section class="tab on" id="tab-dash">
+    <div class="wrapper">
+      <div class="note">🎯 <b>v1.2.5 — ab analytics bhi:</b> charts + insights is account ke readings (TODMeter · 90 days · CD 400 kVA) se auto-compute hote hain. App decision bataata hai — aapko numbers khud padhne nahi padte.</div>
+      <div class="grid g6" id="dashKpis"></div>
+
+      <div class="card" style="margin-top:16px"><h3>💡 Smart insights — auto from your data <span class="badge new">NEW</span></h3>
+        <div id="insights" style="display:grid;gap:10px;margin-top:10px"></div>
+      </div>
+
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card"><h3>Consumption trend — last 30 days <span class="badge ok">live</span></h3><canvas id="trendChart"></canvas></div>
+        <div class="card"><h3>Weekday vs weekend — 90-day avg <span class="badge ok">live</span></h3><canvas id="wvChart"></canvas></div>
+      </div>
+
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card"><h3>Bill at a glance <span class="badge ok">live from readings</span></h3><div id="dashBill"></div></div>
+        <div class="card"><h3>What the new engine gives you</h3><div id="engineFeat"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ENTRY ================= -->
+  <section class="tab" id="tab-entry">
+    <div class="wrapper">
+      <div class="note">Reading Entry page stays as it is — trial only shows upgraded <b>Analysis → ToD/Shift</b>, <b>Reports → Bill</b> and <b>Settings → Billing rules</b>.</div>
+      <div class="card"><h3>Reading entry (current app)</h3>
+        <div class="hint">Meter readings entry, monthly batch add — unchanged. Engine changes automatically apply to all old readings: har reading ka timestamp hota hai, isliye slot-detection purane data pe bhi kaam karta hai.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ANALYSIS ================= -->
+  <section class="tab" id="tab-analysis">
+    <div class="wrapper">
+      <div class="note">📈 <b>Analysis → ToD / Shift (NEW).</b> Pehle ToD flat 4-multiplier average tha (hour kabhi dekha hi nahi). Ab har reading uske hour ke hisaab se zone (A/B/C/D) me aa jaati hai — bilkul discom jaisa. Zone rate editable hain → recompute karke dekh sakte ho.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+        <div class="seg" id="modeSeg"><button data-mode="ru" class="on">₹/u (bill style)</button><button data-mode="pct">% of energy rate</button></div>
+        <div class="seg" id="seasonSeg"><button data-s="ss" class="on">Apr–Sep</button><button data-s="wm">Oct–Mar</button></div>
+        <span class="badge ok" style="margin-left:auto;padding:4px 10px">TODMeter · 90 days × 3 shifts · 270 readings</span>
+      </div>
+      <div class="grid g2">
+        <div class="card"><h3>Zone table — units auto from your readings <span class="badge new">editable rates → recompute</span></h3>
+          <table id="zoneTable"></table>
+          <div style="margin-top:8px"><button onclick="recalcTod()" style="background:var(--primary);color:#fff;border:0;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:inherit">Recompute ToD ₹</button></div>
+          <div class="row" style="margin-top:10px"><span class="l">Net ToD (slot engine)</span><b class="mono" id="todNet">—</b></div>
+        </div>
+        <div class="card"><h3>Daily consumption by shift (90 days)</h3>
+          <canvas id="stackChart"></canvas>
+          <div class="legend"><span><span class="sw" style="background:#3B82F6"></span>Day (06–14)</span><span><span class="sw" style="background:#F59E0B"></span>Evening (14–22)</span><span><span class="sw" style="background:#A78BFA"></span>Night (22–06)</span></div>
+        </div>
+        <div class="card"><h3>Shift-wise MD — breach flags <span class="badge new">NEW</span></h3><table id="mdTable"></table></div>
+        <div class="card"><h3>Shift analysis summary (ToD ₹ per shift) <span class="badge new">NEW</span></h3>
+          <table id="shiftSummary"></table>
+          <div class="kpi" style="margin-top:8px">Shift 8h meter hota hai jo do zones ko cover karta hai — isliye pro-rata split kiya jata hai (e.g. Day 06–14 = 3h B + 5h C; Evening 14–22 = 3h C + 5h D; Night 22–06 = 2h D + 6h A).</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= REPORTS ================= -->
+  <section class="tab" id="tab-reports">
+    <div class="wrapper">
+      <div class="note">✅ <b>Reports → Bill (NEW).</b> Bill ab is account ke readings + selected preset se banta hai — har line, math, tag. Kisi bhi month, kisi bhi preset pe.</div>
+      <div class="grid g2">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <h3 style="margin:0">Estimated bill — your TODMeter (last 30 days)</h3>
+            <div class="seg" id="monthSeg"><button data-m="cur" class="on">This month</button><button data-m="prev">Prev month</button></div>
+          </div>
+          <table id="billTable"></table>
+        </div>
+        <div class="card"><h3>Summary facts <span class="badge ok">computed live</span></h3><div id="billFacts"></div></div>
+      </div>
+
+      <details>
+        <summary>🔒 Engine validation vs a real discom bill (G K Healthcare · Jul-2026) — proof the math is right</summary>
+        <div class="kpi" style="margin:8px 0 14px">Yeh aapke account ka data nahi hai — sirf ek <b>validation fixture</b> hai: engine ke formulas real bill ko line-by-line reproduce karte hain. Matlab jab aap apne data ke liye bill dekhenge, wahi sahi hoga.</div>
+        <table id="validateTable"></table>
+        <div class="row" style="margin-top:10px"><span class="l">Total (bill) = Energy + Demand + ToD + FAC + Wheeling + Tax − ICR</span><b class="mono pos">2,62,355.12 → ₹2,62,350 ✓ exact</b></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ================= METERS / IMPORT / PLAN ================= -->
+  <section class="tab" id="tab-meters"><div class="wrapper"><div class="note">Meter Management unchanged.</div><div class="card"><h3>Meters</h3><div class="hint">Meter CRUD, CT/PT ratios, TODMeter visibility — unchanged. Existing history stays valid.</div></div></div></section>
+  <section class="tab" id="tab-import"><div class="wrapper"><div class="note">Excel Import unchanged.</div><div class="card"><h3>Import</h3><div class="hint">Imported readings with timestamps automatically feed the slot engine.</div></div></div></section>
+  <section class="tab" id="tab-plan"><div class="wrapper"><div class="note">Plan &amp; Billing (subscription) unchanged — yeh energy-bill engine hai, payment plan nahi.</div><div class="card"><h3>Plan &amp; Billing</h3><div class="hint">Razorpay subscription page untouched.</div></div></div></section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section class="tab" id="tab-settings">
+    <div class="wrapper">
+      <div class="note">⚙️ <b>Settings → Billing.</b> Kisi bhi category ke liye preset chuno — engine turant recompute karega. Har preset tariff order se verify kiya hua hai.</div>
+      <div class="grid g2">
+        <div class="card"><h3>Tariff presets <span class="badge new">3 verified</span></h3><div id="presetList"></div>
+          <div class="kpi" style="margin-top:6px">Legacy preset = aapke real bill se verify (8.44/650/0.81, C−1.266, D+2.11). FY26-27 = Case 75/2025. MPERC = LV-4 tariff doc.</div>
+        </div>
+        <div class="card"><h3>Billing rules — engine ke rules (editable demo)</h3>
+          <label class="f">Contract demand <span><input id="inpCd" type="number" value="400" step="10"> kVA</span></label>
+          <label class="f">Demand floor <span><input id="inpFloor" type="number" value="75" min="0" max="100"> % of CD</span></label>
+          <label class="f">Ratchet <span><input id="inpRatchet" type="number" value="75" min="0" max="100"> % of prev-11m high</span></label>
+          <label class="f">Billing unit <span><select id="inpUnit"><option>kVAh (official)</option><option>kWh</option></select></span></label>
+          <label class="f">FAC (this month) <span><input id="inpFac" type="number" value="35" step="1"> Ps/u</span></label>
+          <div class="hint" style="margin-top:8px">Files changes apply instantly — dashboard/report/analysis sab recompute hote hain. Real app me ye sab Settings → Billing me hoga (saved per user).</div>
+        </div>
+        <div class="card"><h3>LF incentive <span class="badge new">per-preset</span></h3>
+          <label class="f">Threshold <span><input id="inpLfT" type="number" value="75"> % LF</span></label>
+          <label class="f">Rate per 1% <span><input id="inpLfR" type="number" value="0.06"> % of EC</span></label>
+          <label class="f">Sealing cap <span><input id="inpLfS" type="number" value="15"> %</span></label>
+          <div class="kpi">MPERC preset: 12/24/36 Ps/u tiers automatic. Current LF ~10% → ₹0.</div>
+        </div>
+        <div class="card"><h3>PF incentive / surcharge <span class="badge new">tables</span></h3>
+          <div class="row"><span class="l">MSEDCL: ≥0.95 rebate 1% · &lt;0.90 penalty 5%</span><span class="blu" id="pfStatus">—</span></div>
+          <div class="row"><span class="l">MPERC LV-4: 86–100% → 0.5–10% rebate</span><span class="pos">tiered ✓</span></div>
+          <div class="row"><span class="l">&lt;80% → 1–10% surcharge</span><span class="neg">tiered ✓</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  </div>
+</main>
+
+<script>
+/* =====================================================================
+   DATA — app's OWN readings (TODMeter, mirrors tool/seed_tod_data.dart)
+   ===================================================================== */
+const CD=400, DAYS=90;
+function genData(){
+  const d=[]; let rng=42; const rnd=()=>{rng=(rng*1103515245+12345)%2147483648;return rng/2147483648;};
+  const splits=[.45,.35,.20], pfR=[[.955,.985],[.92,.965],[.87,.94]], mdR=[[330,370],[355,425],[260,330]], hours=[6,14,22];
+  for(let day=0;day<DAYS;day++){
+    const dow=(day+1)%7+1; const wf=[1,1,1,1,1,.78,.52][dow-1];
+    const base=1050*wf*(1+0.0015*day)*(1+(rnd()-.5)*.14);
+    const row=[];
+    for(let s=0;s<3;s++){
+      let split=splits[s]*(1+(rnd()-.5)*.10);
+      const kwh=Math.max(8,base*split);
+      const pf=pfR[s][0]+rnd()*(pfR[s][1]-pfR[s][0]);
+      const md=(mdR[s][0]+rnd()*(mdR[s][1]-mdR[s][0]))*Math.min(1,Math.max(.75,wf));
+      row.push({kwh:Math.round(kwh*100)/100,kvah:Math.round(kwh/pf*100)/100,pf:Math.round(pf*1000)/1000,md:Math.round(md*100)/100,hour:hours[s]});
+    }
+    d.push(row);
+  }
+  return d;
+}
+const SERIES=genData();
+const FLAT=SERIES.flatMap((day,di)=>day.map((sh,si)=>({...sh,si,di})));
+const LAST30=FLAT.slice(180), PRIOR30=FLAT.slice(90,180);
+
+/* 8h shift covers two zones (pro-rata): 06→B+C, 14→C+D, 22→D+A */
+const ZF={6:{B:3/8,C:5/8},14:{C:3/8,D:5/8},22:{D:2/8,A:6/8}};
+
+function aggregate(rows,days,p){
+  const s={A:0,B:0,C:0,D:0,kwh:0,kvah:0,mdPeak:0,mdSum:0,mdN:0,byShift:[0,0,0]};
+  rows.forEach(r=>{
+    s.kwh+=r.kwh; s.kvah+=r.kvah; s.mdSum+=r.md; s.mdN++;
+    if(r.md>s.mdPeak)s.mdPeak=r.md;
+    const f=ZF[r.hour];
+    if(f.A)s.A+=r.kvah*f.A; if(f.B)s.B+=r.kvah*f.B; if(f.C)s.C+=r.kvah*f.C; if(f.D)s.D+=r.kvah*f.D;
+    s.byShift[r.si]+=r.kwh;
+  });
+  s.pf=s.kvah>0?s.kwh/s.kvah:0;
+  s.lf=s.mdPeak>0?(s.kwh/(days*24))/s.mdPeak:0;
+  return s;
+}
+
+/* =====================================================================
+   PRESETS — verified. Zones rate = ₹/unit (bill style).
+   ===================================================================== */
+const PRESETS={
+  legacy:{name:'MSEDCL HT-I A — legacy (real-bill verified)',ec:8.44,dc:650,wheel:0.81,facPs:35,unit:'kVAh',round:10,
+    dutyPct:0,taxPu:0.279,floor:75,ratchet:75,ppdPct:0.95,dpcPct:1.25,
+    pfRThresh:.95,pfR:1.0,pfPThresh:.90,pfP:5.0,lfThresh:75,lfSeal:15,lfRate:0.06,
+    zones:[{k:'A',t:'00–06',pu:0},{k:'B',t:'06–09',pu:0},{k:'C',t:'09–17',pu:-1.266},{k:'D',t:'17–24',pu:2.11}],winterC:-2.11},
+  msedcl26:{name:'MSEDCL HT-I A — FY 26-27 official (Case 75/2025)',ec:8.68,dc:600,wheel:0.74,facPs:35,unit:'kVAh',round:10,
+    dutyPct:0,taxPu:0.30,floor:75,ratchet:75,ppdPct:0.95,dpcPct:1.25,
+    pfRThresh:.95,pfR:1.0,pfPThresh:.90,pfP:5.0,lfThresh:75,lfSeal:15,lfRate:0.06,
+    zones:[{k:'A',t:'00–06',pu:0},{k:'B',t:'06–09',pu:0},{k:'C',t:'09–17',pu:-1.266},{k:'D',t:'17–24',pu:2.11}],winterC:-2.11},
+  mperc:{name:'MPERC LV-4 — LT Industrial FY 25-26 (tariff doc)',ec:6.76,dc:261,wheel:1.60,facPs:10,unit:'kWh',round:1,
+    dutyPct:16,taxPu:0.15,floor:90,ratchet:100,ppdPct:1.25,dpcPct:1.25,
+    pfRThresh:.86,pfR:1.0,pfPThresh:.80,pfP:5.0,lfThresh:75,lfSeal:15,lfRate:0.06,
+    zones:[{k:'A',t:'00–06',pu:0},{k:'B',t:'06–09',pu:2.11},{k:'C',t:'09–17',pu:-1.35},{k:'D',t:'17–24',pu:2.11}]}
+};
+let preset=PRESETS.legacy, season='ss', mod='ru', monthKey='cur';
+
+const money=v=>(v<0?'−₹':'₹')+Math.abs(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+const inr=v=>'₹'+Math.round(Math.abs(v)).toLocaleString('en-IN');
+const num=s=>parseFloat(String(s).replace(/,/g,''));
+
+/* =====================================================================
+   ENGINE — same algorithm the Dart engine will implement
+   ===================================================================== */
+function compute(rows,days,cd,p,season){
+  const agg=aggregate(rows,days,p);
+  const useKvah=document.getElementById('inpUnit').value.startsWith('kVAh');
+  const unit=useKvah?'kVAh':'kWh';
+  const units=useKvah?agg.kvah:agg.kwh;
+  const floor=Math.round(cd*(num(document.getElementById('inpFloor').value)/100));
+  const ratchetBase=aggregate(PRIOR30,30,p).mdPeak;
+  const ratchet=Math.round(ratchetBase*(num(document.getElementById('inpRatchet').value)/100));
+  const bd=Math.max(agg.mdPeak,floor,ratchet);
+  const energy=units*p.ec;
+  const demand=bd*p.dc;
+  const zones=p.zones.map(z=>{
+    let pu=z.pu;
+    if(z.k==='C'&&season==='wm'&&p.winterC!==undefined)pu=p.winterC;
+    return {...z,pu,u:agg[z.k],amt:agg[z.k]*pu};
+  });
+  const tod=zones.reduce((s,z)=>s+z.amt,0);
+  const fac=units*(num(document.getElementById('inpFac').value)/100);
+  const wheel=units*p.wheel;
+  const duty=p.dutyPct>0?energy*p.dutyPct/100:0;
+  const tax=units*p.taxPu;
+  const gross=energy+demand+tod+fac+wheel+duty+tax;
+  const pfReb=agg.pf>=p.pfRThresh?(energy+demand)*p.pfR/100:0;
+  const pfSur=agg.pf<p.pfPThresh?(energy+demand)*p.pfP/100:0;
+  let net=gross-pfReb+pfSur;
+  const lfPot=(()=>{const t=num(document.getElementById('inpLfT').value),s=num(document.getElementById('inpLfS').value),r=num(document.getElementById('inpLfR').value);
+    return s>0?Math.min(s,Math.max(0,(agg.lf*100-t))*r):0;})();
+  const lfInc=lfPot; // LF incentive (placeholder rate until official circular confirmed)
+  net-=lfInc;
+  const ppd=net*p.ppdPct/100;
+  const rr=p.round;
+  const due=Math.floor(net/rr)*rr;
+  const before=Math.floor((net-ppd)/rr)*rr;
+  const after=Math.floor((net+net*p.dpcPct/100)/rr)*rr;
+  return {agg,units,bd,floor,ratchet,energy,demand,zones,tod,fac,wheel,duty,tax,gross,net,pfReb,pfSur,lfInc,lfPot,ppd,due,before,after,p,season,unit,
+    lfT:num(document.getElementById('inpLfT').value),lfS:num(document.getElementById('inpLfS').value)};
+}
+
+function currentCompute(){
+  const rows=monthKey==='cur'?LAST30:PRIOR30, days=monthKey==='cur'?30:30;
+  const cd=num(document.getElementById('inpCd').value)||400;
+  return compute(rows,days,cd,preset,season);
+}
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function renderAll(){
+  const c=currentCompute();
+  renderDash(c); renderBill(c); renderBillFacts(c); renderZones(c); drawChart(); renderMd(); renderShift(); recalcTod();
+  renderPresets(); renderInsights(); drawTrend(); drawWv();
+}
+function pc(v){return v<0?'neg':v>0?'pos':'';}
+
+function bar(w,col){return `<div class="bar"><i style="width:${w}%;background:${col}"></i></div>`;}
+
+function renderDash(c){
+  const b=c.agg, pfPct=(b.pf*100).toFixed(1), lfPct=(b.lf*100).toFixed(1);
+  const bdInfo=`Recorded ${b.mdPeak.toFixed(0)} · floor ${c.floor} · ratchet ${c.ratchet}`;
+  const todInfo=`C rebate ${money(c.zones[2].amt)} · D surcharge ${money(c.zones[3].amt)}`;
+  const kpis=[
+    {t:'Estimated bill (due)',v:c.due,sub:'last 30d · '+c.p.name.split('—')[0].trim()+' · '+c.unit.toUpperCase(),col:'var(--success)',pct:88,badge:''},
+    {t:'Net ToD (slot-wise)',v:c.tod,sub:todInfo,col:c.tod<=0?'var(--success)':'var(--danger)',pct:15,badge:'new'},
+    {t:'Billed demand',v:c.bd+' kVA',sub:bdInfo,col:'var(--warning)',pct:(c.bd/5).toFixed(0),badge:'warn'},
+    {t:'Power factor',v:(b.pf*100).toFixed(1)+'%',sub:pfPct>=95?'rebate zone':pfPct<90?'penalty zone':'no charge',col:pfPct>=95?'var(--success)':pfPct<90?'var(--danger)':'var(--warning)',pct:(b.pf*100).toFixed(0),badge:''},
+    {t:'Load factor',v:lfPct+'%',sub:'LF incentive '+c.lfT+'% · sealing '+c.lfS+'%',col:'var(--warning)',pct:Math.max(6,(b.lf*100)).toFixed(0),badge:''},
+    {t:'MD breaches',v:breachCount()+' days',sub:'shift MD > 380 (95% CD) · peak '+b.mdPeak.toFixed(0),col:'var(--danger)',pct:70,badge:'new'},
+  ];
+  document.getElementById('dashKpis').innerHTML=kpis.map(k=>{
+    const negative=k.v<0||(''+k.v).startsWith('−');
+    const color=negative?k.col:k.col;
+    return `<div class="card"><h3>${k.t}${k.badge?` <span class="badge new">NEW</span>`:''}</h3>
+      <div class="big mono" style="color:${negative&&k.t!=='Billed demand'?color:color}">${typeof k.v==='number'?money(k.v):k.v}</div>
+      <div class="kpi" style="color:var(--dim)">${k.sub}</div>${bar(k.pct,k.col)}</div>`;
+  }).join('');
+
+  const due=[['Pay early (PPD '+c.p.ppdPct+'%)',inr(c.before)],['Due',inr(c.due)],['After DPC '+c.p.dpcPct+'%',inr(c.after)]];
+  document.getElementById('dashBill').innerHTML=
+    `<div class="row"><span class="l">Energy charges</span><b class="mono">${money(c.energy)}</b></div>
+     <div class="row"><span class="l">Demand (${c.bd} kVA × ${c.p.dc})</span><b class="mono">${money(c.demand)}</b></div>
+     <div class="row"><span class="l">ToD (slot-wise)</span><b class="mono ${pc(c.tod)}">${money(c.tod)}</b></div>
+     <div class="row"><span class="l">FAC · Wheeling · Duty · Tax</span><b class="mono">${money(c.fac+c.wheel+c.duty+c.tax)}</b></div>
+     <div class="row"><span class="l">PF ${pc(c.pfReb)}${c.pfSur>0?'':' rebate'}</span><b class="mono">${c.pfReb>0?'−'+money(c.pfReb):money(c.pfSur)}</b></div>
+     <div class="row"><span class="l">Rounding to ₹${c.p.round}</span><b class="mono">${money(c.due-c.net)}</b></div>
+     <div class="row"><span class="l">Total due (rounded)</span><b class="mono">${inr(c.due)}</b></div>
+     <div class="split">${due.map(d=>`<div class="s"><small>${d[0]}</small><b class="mono ${pc(d[1].includes('−')?-1:1)}">${d[1]}</b></div>`).join('')}</div>`;
+  const feats=[
+    ['Electricity units',(c.unit==='kVAh'?c.agg.kvah:c.agg.kwh).toLocaleString('en-IN')+' '+c.unit.toUpperCase(),'Σ readings × MF'],
+    ['Billing demand',c.bd+' kVA','max(md, floor, ratchet) — floor ab applied'],
+    ['ToD zones',c.zones.map(z=>z.k+' '+(z.pu>0?'+':'')+(z.pu*100).toFixed(1)+'Ps').join(' · '),'hour-based, not flat average'],
+    ['Tax on sale',(c.p.taxPu*100).toFixed(1)+' Ps/u','flat per-unit (real bill model)'],
+    ['Duty',c.duty>0?money(c.duty):'exempt','HT 0% till 31-Mar-29'],
+    ['PF rebate/penalty',c.pfReb>0?'rebate '+money(c.pfReb):c.pfSur>0?'penalty '+money(c.pfSur):'none','threshold tables per preset'],
+  ];
+  document.getElementById('engineFeat').innerHTML=feats.map(f=>`<div class="row"><span class="l">${f[0]}</span><b class="mono">${f[1]}</b></div><div class="kpi" style="padding-left:2px;border:0">${f[2]}</div>`).join('');
+}
+
+function breachCount(){return SERIES.filter(r=>Math.max(...r.map(x=>x.md))>380).length;}
+
+function dailyTotals(){return SERIES.map(r=>r[0].kwh+r[1].kwh+r[2].kwh);}
+
+function drawTrend(){
+  const cv=document.getElementById('trendChart'); const ctx=cv.getContext('2d');
+  const W=cv.clientWidth,H=240; cv.width=W*2; cv.height=H*2; ctx.scale(2,2);
+  ctx.clearRect(0,0,W,H);
+  const dt=dailyTotals().slice(60);
+  const max=Math.max(...dt)*1.12, left=38, bottom=20, step=(W-left-8)/(dt.length-1), top=14;
+  ctx.strokeStyle='#334155'; ctx.fillStyle='#94A3B8'; ctx.font='10px sans-serif';
+  for(let g=0;g<=4;g++){const y=H-bottom-(H-bottom-top)*g/4;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(W-6,y);ctx.stroke();ctx.fillText(Math.round(max*g/4),4,y+3);}
+  const y=v=>H-bottom-((H-bottom-top)*v/max);
+  const avg=dt.reduce((a,b)=>a+b,0)/dt.length;
+  ctx.beginPath(); ctx.moveTo(left,y(dt[0]));
+  dt.forEach((v,i)=>ctx.lineTo(left+i*step,y(v)));
+  ctx.lineTo(left+(dt.length-1)*step,H-bottom); ctx.lineTo(left,H-bottom); ctx.closePath();
+  ctx.fillStyle='rgba(59,130,246,.16)'; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(left,y(dt[0]));
+  dt.forEach((v,i)=>ctx.lineTo(left+i*step,y(v)));
+  ctx.strokeStyle='#3B82F6'; ctx.lineWidth=1.8; ctx.stroke();
+  ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(left,y(avg)); ctx.lineTo(left+(dt.length-1)*step,y(avg));
+  ctx.strokeStyle='#F59E0B'; ctx.lineWidth=1.2; ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#F59E0B'; ctx.fillText('avg '+Math.round(avg)+' kWh',W-72,y(avg)-5);
+  const pi=dt.indexOf(Math.max(...dt));
+  ctx.beginPath(); ctx.arc(left+pi*step,y(dt[pi]),3.5,0,7); ctx.fillStyle='#EF4444'; ctx.fill();
+  ctx.fillStyle='#EF4444'; ctx.fillText('peak '+Math.round(dt[pi])+' kWh',left+pi*step+7,y(dt[pi])-7);
+  ctx.fillStyle='#64748B'; ctx.fillText('day '+(pi+1),left+pi*step-8,H-6);
+}
+
+function drawWv(){
+  const cv=document.getElementById('wvChart'); const ctx=cv.getContext('2d');
+  const W=cv.clientWidth,H=240; cv.width=W*2; cv.height=H*2; ctx.scale(2,2);
+  ctx.clearRect(0,0,W,H);
+  const n=[0,0,0,0,0,0,0], sum=[0,0,0,0,0,0,0];
+  SERIES.forEach((r,i)=>{const d=(i+1)%7;n[d]++;sum[d]+=r[0].kwh+r[1].kwh+r[2].kwh;});
+  const names=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const vals=sum.map((v,i)=>v/Math.max(1,n[i]));
+  const mx=Math.max(...vals)*1.18, left=30, bottom=22, top=30;
+  const bw=(W-left-8)/7;
+  vals.forEach((v,d)=>{
+    const x=left+d*bw, y=H-bottom-((H-bottom-top)*v/mx), h=(H-bottom-top)*v/mx;
+    ctx.fillStyle=d===0?'#EF4444':d===6?'#F59E0B':'#3B82F6';
+    ctx.fillRect(x+3,y,bw-6,h);
+    ctx.fillStyle='#94A3B8'; ctx.font='10px sans-serif';
+    ctx.fillText(Math.round(v),x+3,y-4);
+    ctx.fillText(names[d],x+4,H-8);
+  });
+  const avg=sum.reduce((a,b)=>a+b,0)/90;
+  const yA=H-bottom-((H-bottom-top)*avg/mx);
+  ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(left,yA); ctx.lineTo(left+7*bw,yA);
+  ctx.strokeStyle='#F59E0B'; ctx.lineWidth=1.2; ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#F59E0B'; ctx.fillText('overall avg '+(avg).toFixed(1),left+5,yA-4);
+}
+
+function genInsights(c){
+  const b=c.agg, out=[];
+  const pf=b.pf*100, penalty=(c.energy+c.demand)*5/100;
+  out.push({tone:pf>=95?'ok':'bad',ico:'⚡',
+    t:pf>=95?'PF rebate locked — margin thin, don\u2019t slip':'PF penalty zone — act now',
+    txt:pf>=95?'PF '+pf.toFixed(2)+'% ≥ 95% → rebate '+inr(c.pfReb)+'. Sirf '+(pf-95).toFixed(2)+' pt margin baki: <95% pe 5% penalty (−'+inr(penalty)+') lag jaata hai.'
+      :'PF '+pf.toFixed(2)+'% < 95% → 5% penalty '+inr(penalty)+'. Capacitor bank ya load balancing se bacho.',
+    res:pf>=95?inr(c.pfReb):'−'+inr(penalty),resLbl:'rebate / mo'});
+  const brk=breachCount();
+  if(brk>0) out.push({tone:'warn',ico:'🚨',
+    t:brk+' days MD > 380 kVA (95% CD) — breach ho raha hai',
+    txt:'Peak '+b.mdPeak.toFixed(0)+' kVA (evening shift). CD 400 ka 120% (480) ek hi spike se cross ho sakta hai → excess-demand charges. Peak-shaving tile dekho.',
+    res:brk+' days',resLbl:'of 90'});
+  else out.push({tone:'ok',ico:'✅',t:'MD clean — no breaches',
+    txt:'90 din me MD '+b.mdPeak.toFixed(0)+' kVA ≤ 380 (95% CD 400). Demand charges stable.',res:'0',resLbl:'breaches'});
+  const d=c.zones[3], cZ=c.zones[2];
+  const shiftU=Math.round(d.u*0.2), save=Math.round(shiftU*(d.pu-cZ.pu));
+  out.push({tone:save>0?'warn':'ok',ico:'🕘',
+    t:'ToD arbitrage: peak-shift load ko day me le jao',
+    txt:'Zone D '+Math.round(d.u).toLocaleString('en-IN')+' kVAh @ +'+d.pu+' ₹/u = '+money(d.amt)+' surcharge. Iska 20% day (C −'+Math.abs(cZ.pu)+' ₹/u) me shift karo → '+inr(save)+'/mo kam.',
+    res:inr(save)+'/mo',resLbl:'savings'});
+  const cut=Math.round(b.mdPeak*0.1), saveD=Math.round(cut*c.p.dc);
+  out.push({tone:'warn',ico:'📉',
+    t:'Demand-led bill: 10% peak trim = '+inr(saveD)+'/mo',
+    txt:'Billed demand '+b.mdPeak.toFixed(0)+' kVA × '+c.p.dc+' ₹/kVA. Evening peak (6–10 PM) scheduling/diesel-sync se 10% kam karo → demand charge '+inr(saveD)+' ghatega, breach-safe bhi.',
+    res:'−'+inr(saveD),resLbl:'/mo'});
+  const wdn=[0,0], wsum=[0,0], dtAll=dailyTotals();
+  dtAll.forEach((v,i)=>{const d=(i+1)%7;const k=d===0||d===6?1:0;wdn[k]++;wsum[k]+=v;});
+  const we=wsum[1]/wdn[1], wa=wsum[0]/wdn[0], pct=(1-we/wa)*100;
+  out.push({tone:'ok',ico:'📅',
+    t:'Weekend load '+pct.toFixed(0)+'% lower — scheduling window',
+    txt:'Weekend avg '+Math.round(we)+' kWh vs weekday '+Math.round(wa)+' kWh. High-draw ops (heating, charging) weekend pe shift karo → MD ratchet flat, demand bill kam.',
+    res:'−'+pct.toFixed(0)+'%',resLbl:'vs weekday'});
+  const mix=b.byShift.map(x=>Math.round(100*x/b.kwh));
+  out.push({tone:'ok',ico:'🧩',
+    t:'Shift mix '+mix[0]+'/'+mix[1]+'/'+mix[2]+' (Day/Evening/Night)',
+    txt:'Day shift sabse bada consumer hai — solar rebate (C zone) me padta hai, isliye ToD net negative (rebate) bacha hua hai. Night me demand kam hai.',
+    res:Math.round(b.kwh).toLocaleString('en-IN')+' kWh',resLbl:'30d'});
+  return out;
+}
+
+function renderInsights(){
+  document.getElementById('insights').innerHTML=genInsights(currentCompute()).map(i=>
+    `<div class="insight ${i.tone}"><div class="ico">${i.ico}</div>
+     <div><b>${i.t}</b><p>${i.txt}</p></div>
+     <div class="res"><b>${i.res}</b><small>${i.resLbl||'impact'}</small></div></div>`).join('');
+}
+
+function renderBill(c){
+  const rows=[
+    ['Energy charges',c.energy,`${c.unit==='kVAh'?c.agg.kvah:c.agg.kwh.toLocaleString('en-IN')} ${c.unit.toUpperCase()} × ${c.p.ec}`,''],
+    ['Demand charges',c.demand,`billed ${c.bd} kVA × ${c.p.dc}`,'<span class="badge warn">floor+ratchet applied</span>'],
+    ...c.zones.map(z=>['ToD '+z.k+' ('+z.t+')',z.amt,`${z.u.toLocaleString('en-IN')} ${c.unit.toUpperCase()} × ${z.pu} ₹/u`,'<span class="badge new">slot-wise</span>']),
+    ['Net ToD',c.tod,'',''],
+    ['FAC',c.fac,num(document.getElementById('inpFac').value)+' Ps/u',''],
+    ['Wheeling',c.wheel,c.p.wheel+' ₹/u',''],
+    ['Electricity duty',c.duty,c.duty>0?c.p.dutyPct+'% of EC':'exempt (HT)',''],
+    ['Tax on sale',c.tax,(c.p.taxPu*100).toFixed(1)+' Ps/u flat',''],
+    ['PF '+(c.pfReb>0?'rebate':'penalty'+(c.pfSur>0?'':' (none)')),-(c.pfReb||-c.pfSur),c.pfReb>0?c.p.pfR+'%':c.pfSur>0?c.p.pfP+'%':'no charge',''],
+    ['LF incentive',-c.lfInc,c.lfInc>0?c.lfR+'% × excess over '+c.lfT+'% LF (seal '+c.lfS+'%)':'LF '+(c.agg.lf*100).toFixed(1)+'% < '+c.lfT+'%',''],
+  ];
+  const grossRow=(c.p.round===10?Math.floor(c.net/10)*10:c.net);
+  document.getElementById('billTable').innerHTML='<tr><th>Line</th><th class="right">₹</th><th>Math</th><th></th></tr>'
+    +rows.map(r=>`<tr><td>${r[0]}</td><td class="right mono ${r[1]<0?'neg':'pos'}">${r[1]<0?'−':''}${money(Math.abs(r[1]))}</td><td style="color:var(--dim);font-size:11.5px">${r[2]}</td><td>${r[3]}</td></tr>`).join('')
+    +`<tr class="total"><td>Estimated bill (rounded)</td><td class="right mono">${inr(c.due)}</td><td style="color:var(--dim);font-size:11.5px">${money(c.net).replace('₹','')} → nearest ₹${c.p.round}</td><td><span class="badge ok">computed ✓</span></td></tr>`;
+}
+
+function renderBillFacts(c){
+  document.getElementById('billFacts').innerHTML=[
+    ['Period',monthKey==='cur'?'Last 30 days (current)':'Previous 30 days'],
+    ['Consumer category',c.p.name.split('—')[0].trim()],['Meter','TODMeter · MF 1.0 · CD '+num(document.getElementById('inpCd').value)+' kVA'],
+    ['Units',(c.unit==='kVAh'?c.agg.kvah:c.agg.kwh).toLocaleString('en-IN')+' '+c.unit.toUpperCase()],
+    ['Recorded peak MD',c.agg.mdPeak.toFixed(0)+' kVA'],['Billed demand',c.bd+' kVA (floor '+c.floor+' / ratchet '+c.ratchet+')'],
+    ['Power factor',(c.agg.pf*100).toFixed(1)+'%'],['Load factor',(c.agg.lf*100).toFixed(1)+'%'],
+    ['ToD net',money(c.tod)],['Gross charges',money(c.gross)],['Net bill',money(c.net)],
+    ['Round ₹'+c.p.round,inr(c.due)],['Pay early',inr(c.before)],['After DPC',inr(c.after)]
+  ].map(r=>`<div class="row"><span class="l">${r[0]}</span><b class="mono">${r[1]}</b></div>`).join('');
+}
+
+function renderZones(c){
+  const body=c.zones.map(z=>`<tr><td><b>${z.k}</b></td><td>${z.t}</td>
+    <td class="right mono">${z.u.toLocaleString('en-IN')}</td>
+    <td><input id="zp_${z.k}" type="number" step="0.001" value="${mod==='ru'?z.pu:((z.pu/(c.p.ec*0.01)).toFixed(2))}" style="width:76px"></td>
+    <td class="mono" id="za_${z.k}" style="text-align:right"></td><td>${mod==='ru'?'₹/u':'% EC'}</td></tr>`).join('');
+  const note=mod==='ru'
+    ? 'Rates ₹/u: C = −15% of '+c.p.ec+' (solar), D = +25% (peak), A/B 0.'
+    : 'Simplify: C −15% (Apr–Sep) / −25% (Oct–Mar) · D +25% · MPERC: solar −20%, peak +20%';
+  document.getElementById('zoneTable').innerHTML='<tr><th>Zone</th><th>Time</th><th class="right">Units (your data)</th><th>Rate</th><th class="right">₹</th><th></th></tr>'+body
+    +`<tr><td colspan="6" class="hint">${note}</td></tr>`;
+}
+
+function recalcTod(){
+  const c=currentCompute(); const b=c;
+  let net=0;
+  c.zones.forEach(z=>{
+    const rate=mod==='ru' ? +document.getElementById('zp_'+z.k).value||0 : (+document.getElementById('zp_'+z.k).value||0)*(c.p.ec*0.01);
+    const amt=z.u*rate; net+=amt;
+    const el=document.getElementById('za_'+z.k);
+    if(el){el.textContent=money(amt);el.style.color=amt<0?'var(--danger)':'inherit';}
+  });
+  const el=document.getElementById('todNet'); el.textContent=money(net);
+  el.style.color=net<0?'var(--success)':net>0?'var(--danger)':'inherit';
+}
+
+function drawChart(){
+  const cv=document.getElementById('stackChart'); const ctx=cv.getContext('2d');
+  const W=cv.clientWidth, H=270; cv.width=W*2; cv.height=H*2; ctx.scale(2,2);
+  ctx.clearRect(0,0,W,H);
+  const max=Math.max(...SERIES.map(r=>r[0].kwh+r[1].kwh+r[2].kwh))*1.05;
+  const left=34,bottom=18,step=(W-left-6)/90;
+  ctx.strokeStyle='#334155'; ctx.fillStyle='#94A3B8'; ctx.font='10px sans-serif';
+  for(let g=0;g<=4;g++){const y=H-bottom-(H-bottom-14)*g/4;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(W-4,y);ctx.stroke();ctx.fillText(Math.round(max*g/4),4,y+3);}
+  const cols=['#3B82F6','#F59E0B','#A78BFA'];
+  SERIES.forEach((r,i)=>{
+    const x=left+i*step, w=Math.max(1.6,step*0.72); let y=0;
+    for(let s=0;s<3;s++){const hb=(H-bottom-14)*r[s].kwh/max;
+      ctx.fillStyle=cols[s];ctx.fillRect(x,y,w,hb);y+=hb;}
+  });
+}
+
+function renderMd(){
+  const rows=SERIES.map((r,i)=>({d:i+1,night:r[2].md,eve:r[1].md,day:r[0].md}));
+  const breaches=rows.filter(r=>r.eve>380||r.day>380||r.night>380);
+  const peak=Math.max(...rows.map(r=>Math.max(r.day,r.eve,r.night)));
+  const body=breaches.slice(-8).map(r=>`<tr><td>Day ${r.d}</td><td class="right mono">${Math.max(r.day,r.eve,r.night).toFixed(0)} kVA</td>
+    <td class="right">${r.eve>380?'<span class="badge warn">Evening BREACH</span>':r.day>380?'<span class="badge warn">Day BREACH</span>':'<span class="badge neutral">Night</span>'}</td></tr>`).join('');
+  document.getElementById('mdTable').innerHTML=`<tr><th>Recent breach (&gt;380 kVA)</th><th class="right">Max MD</th><th class="right">Shift</th></tr>`
+    + (body||'<tr><td colspan="3" class="hint">Koi breach nahi</td></tr>')
+    + `<tr class="total"><td>Total: <b>${breaches.length}</b> days of 90 · peak <b>${peak.toFixed(0)} kVA</b></td><td></td><td class="right">CD ${CD} · 120% = 480</td></tr>`;
+}
+
+function renderShift(){
+  const c=currentCompute(), b=c.agg;
+  const dZ=BOUNDS(c,['B','C'],3,5), eZ=BOUNDS(c,['C','D'],3,5), nZ=BOUNDS(c,['D','A'],2,6);
+  const day=dZ.amt, eve=eZ.amt, night=nZ.amt;
+  const rows=[['Day (06–14)',b.byShift[0].toFixed(0),'3h B (0) + 5h C',day,'#3B82F6'],
+    ['Evening (14–22)',b.byShift[1].toFixed(0),'3h C + 5h D',eve,'#F59E0B'],
+    ['Night (22–06)',b.byShift[2].toFixed(0),'2h D + 6h A (0)',night,'#A78BFA']];
+  document.getElementById('shiftSummary').innerHTML='<tr><th>Shift</th><th class="right">kWh (30d)</th><th>Zone split</th><th class="right">ToD ₹</th></tr>'
+    +rows.map(r=>`<tr><td><span class="sw" style="background:${r[4]}"></span>${r[0]}</td><td class="right mono">${r[1]}</td><td class="hint">${r[2]}</td><td class="right mono" style="color:${r[3]<0?'var(--success)':r[3]>0?'var(--danger)':'inherit'}">${money(r[3])}</td></tr>`).join('')
+    +`<tr class="total"><td>Total ToD</td><td></td><td>pro-rata split engine</td><td class="right mono" style="color:${day+eve+night<0?'var(--success)':'var(--danger)'}">${money(day+eve+night)}</td></tr>`;
+}
+function BOUNDS(c,lst,hr1,hr2){
+  let amt=0;
+  c.zones.forEach(z=>{if(lst.includes(z.k))amt+=z.u*z.pu*(z.k===lst[0]?hr1/8:hr2/8);});
+  return {amt};
+}
+
+function renderPresets(){
+  document.getElementById('presetList').innerHTML=Object.keys(PRESETS).map(k=>{
+    const p=PRESETS[k];
+    return `<div class="preset ${preset===p?'on':''}" onclick="pickPreset('${k}')">
+      <div><b>${p.name}</b><small>${p.ec} ₹/u · ${p.dc} ₹/kVA · ${p.unit} · ₹${p.round} · ToD ₹/u</small></div>
+      <span class="badge ${preset===p?'ok':'neutral'}">${preset===p?'ACTIVE':''}</span></div>`;
+  }).join('');
+}
+function pickPreset(k){ preset=PRESETS[k]; renderAll(); }
+
+/* =====================================================================
+   VALIDATION — real bill reproduced (G K Healthcare, Jul-2026)
+   ===================================================================== */
+const GK={
+  energy:{u:17932,rate:8.44,amt:151346.08}, demand:{bd:151,rate:650,amt:98150},
+  zones:[{k:'A',t:'00–06',u:1628,pu:0,amt:0},{k:'B',t:'06–09',u:791,pu:0,amt:0},{k:'C',t:'09–17',u:12361,pu:-1.266,amt:-15649.03},{k:'D',t:'17–24',u:3151,pu:2.11,amt:6648.61}],
+  fac:6276.20, wheel:14524.92, duty:0, tax:4953.09, icr:-3894.75
+};
+function renderValidate(){
+  const it=[['Energy charges',GK.energy.amt,'17,932 kVAh × 8.44'],
+    ['Demand charges',GK.demand.amt,'151 kVA × 650 (75% CD floor)'],
+    ...GK.zones.map(z=>['ToD '+z.k+' ('+z.t+')',z.amt,z.u.toLocaleString('en-IN')+' u × '+z.pu+' ₹/u']),
+    ['Net ToD',-9000.42,'Σ zones'],
+    ['FAC',GK.fac,'35 Ps/u × 17,932'],['Wheeling',GK.wheel,'0.81 × 17,932'],
+    ['Electricity Duty',0,'exempt'],['Tax on sale',GK.tax,'27.9 Ps/u'],['ICR rebate',GK.icr,'5,193 × 0.75']];
+  const gross=GK.energy.amt+GK.demand.amt-9000.42+GK.fac+GK.wheel+GK.duty+GK.tax;
+  document.getElementById('validateTable').innerHTML='<tr><th>Line</th><th class="right">₹</th><th>Math</th></tr>'
+    +it.map(r=>`<tr><td>${r[0]}</td><td class="right mono ${r[1]<0?'neg':''}">${money(r[1])}</td><td style="color:var(--dim);font-size:11.5px">${r[2]}</td></tr>`).join('')
+    +`<tr class="total"><td>Gross → after ICR</td><td class="right mono">${money(gross)} → ${money(gross+GK.icr)}</td><td style="color:var(--dim);font-size:11.5px">rounds to ₹2,62,350 (bill exact)</td></tr>`;
+}
+
+/* =====================================================================
+   CHROME / WIRING
+   ===================================================================== */
+const titles={dash:['Dashboard','v1.2.5 — analytics + smart insights, sab readings se compute'],entry:['Reading Entry','unchanged in v1.2.5'],
+  analysis:['Analysis — ToD / Shift','NEW · slot-wise ToD + shift analysis (hour-based)'],reports:['Reports — Bill','NEW · estimated bill from your data, line-by-line'],
+  meters:['Meter Management','unchanged in v1.2.5'],import:['Excel Import','unchanged in v1.2.5'],
+  plan:['Plan & Billing','unchanged in v1.2.5'],settings:['Settings — Billing','NEW · verified presets + billing rules']};
+document.getElementById('nav').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='tab-'+b.dataset.t));
+  document.getElementById('pageTitle').textContent=titles[b.dataset.t][0];
+  document.getElementById('pageSub').textContent=titles[b.dataset.t][1];
+});
+document.getElementById('themeBtn').addEventListener('click',()=>{document.body.classList.toggle('light');
+  document.getElementById('themeIcon').innerHTML=document.body.classList.contains('light')
+    ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'
+    : '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>';});
+document.getElementById('logoutBtn').onclick=()=>alert('Trial demo — logout not active.');
+document.getElementById('monthSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  monthKey=b.dataset.m;document.querySelectorAll('#monthSeg button').forEach(x=>x.classList.toggle('on',x===b));renderAll();});
+document.getElementById('modeSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  mod=b.dataset.mode;document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b));renderZones(currentCompute());recalcTod();});
+document.getElementById('seasonSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  season=b.dataset.s;document.querySelectorAll('#seasonSeg button').forEach(x=>x.classList.toggle('on',x===b));
+  const el=document.getElementById('zp_C'); if(el)el.value=(mod==='ru'?preset.winterC:(preset.winterC/(preset.ec*0.01)).toFixed(2));
+  recalcTod();});
+['inpCd','inpFloor','inpRatchet','inpFac'].forEach(id=>document.getElementById(id).addEventListener('input',()=>renderAll()));
+document.getElementById('inpUnit').addEventListener('change',()=>renderAll());
+
+renderValidate(); renderAll();
+window.addEventListener('resize',()=>{drawChart();drawTrend();drawWv();});
+</script>
+</body>
+</html>
