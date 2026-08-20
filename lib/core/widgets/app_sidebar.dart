@@ -60,7 +60,7 @@ class _AppSidebarState extends State<AppSidebar> {
       SidebarItem(
         icon: Icons.edit_note_outlined,
         activeIcon: Icons.edit_note_rounded,
-        label: 'Entry',
+        label: 'Reading Entry',
         index: 1,
       ),
       SidebarItem(
@@ -84,7 +84,7 @@ class _AppSidebarState extends State<AppSidebar> {
       SidebarItem(
         icon: Icons.file_upload_outlined,
         activeIcon: Icons.file_upload_rounded,
-        label: 'Import',
+        label: 'Excel Import',
         index: 7,
       ),
       SidebarItem(
@@ -168,12 +168,16 @@ class _AppSidebarState extends State<AppSidebar> {
               itemBuilder: (context, index) {
                 final item = items[index];
                 final selected = widget.selectedIndex == item.index;
-                return _SidebarItem(
-                  item: item,
-                  selected: selected,
-                  isCollapsed: widget.isCollapsed,
-                  isDark: widget.isDark,
-                  onTap: () => widget.onItemSelected(item.index),
+                return Tooltip(
+                  message: item.label,
+                  waitDuration: const Duration(milliseconds: 600),
+                  child: _SidebarItem(
+                    item: item,
+                    selected: selected,
+                    isCollapsed: widget.isCollapsed,
+                    isDark: widget.isDark,
+                    onTap: () => widget.onItemSelected(item.index),
+                  ),
                 );
               },
             ),
@@ -223,6 +227,7 @@ class _AppSidebarState extends State<AppSidebar> {
               ),
               onPressed: widget.onThemeToggle,
               color: AppColors.textSecondary,
+              tooltip: widget.isDark ? 'Light mode' : 'Dark mode',
             ),
             const SizedBox(height: 4),
             IconButton(
@@ -282,6 +287,7 @@ class _AppSidebarState extends State<AppSidebar> {
                   ),
                   onPressed: widget.onThemeToggle,
                   color: AppColors.textSecondary,
+                  tooltip: widget.isDark ? 'Light mode' : 'Dark mode',
                 ),
               ],
             ),

@@ -329,12 +329,15 @@ class _AnalysisContentState extends State<_AnalysisContent> {
           flex: 2,
         ),
       Expanded(
-        flex: 3,
+        flex: 4,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: MonthFilterDropdown(
-            controller: widget.monthFilter,
-            availableMonths: _monthKeys,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 150),
+            child: MonthFilterDropdown(
+              controller: widget.monthFilter,
+              availableMonths: _monthKeys,
+            ),
           ),
         ),
       ),

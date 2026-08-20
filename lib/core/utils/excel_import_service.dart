@@ -480,7 +480,12 @@ class ExcelImportService {
   static DateTime? _cellDate(Data? data) {
     if (data == null) return null;
     final v = data.value;
-    if (v is DateCellValue) return DateTime(v.year, v.month, v.day);
+    // Date-only cells (no time component) default to midday (12:00) instead
+    // of midnight — midnight gets bucketed into the previous day's Night
+    // slot and skews shift totals in the dashboard.
+    if (v is DateCellValue) {
+      return DateTime(v.year, v.month, v.day, 12);
+    }
     if (v is DateTimeCellValue) {
       return DateTime(v.year, v.month, v.day, v.hour, v.minute);
     }
@@ -489,10 +494,20 @@ class ExcelImportService {
     return _parseDateString(_cellText(data));
   }
 
-  /// Excel stores dates as days since 1899-12-30.
+  /// Excel stores dates as days since 1899-12-30; the fractional part is the
+  /// time of day. Whole-day (integer) cells default to midday instead of
+  /// midnight so they don't fall into the previous day's Night slot.
   static DateTime? _fromExcelSerial(double serial) {
     if (serial <= 0 || serial > 100000) return null;
-    return DateTime(1899, 12, 30).add(Duration(days: serial.floor()));
+    final base = DateTime(1899, 12, 30).add(Duration(days: serial.floor()));
+    final fraction = serial - serial.floorToDouble();
+    if (fraction <= 0 || fraction >= 1) {
+      return DateTime(base.year, base.month, base.day, 12);
+    }
+    final minutes = (fraction * 24 * 60).round();
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    return DateTime(base.year, base.month, base.day, h, m);
   }
 
   /// Parses dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy or yyyy-mm-dd.
@@ -529,7 +544,8 @@ class ExcelImportService {
 
   static DateTime? _validDate(int year, int month, int day) {
     if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-    return DateTime(year, month, day);
+    // Midday default — see [_cellDate].
+    return DateTime(year, month, day, 12);
   }
 
   /// Builds a ready-to-use .xlsx template that matches the column headers the

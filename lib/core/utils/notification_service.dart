@@ -88,14 +88,17 @@ class NotificationService {
     if (kIsWeb) return;
 
     // Suppress identical alerts re-firing on every dashboard auto-refresh.
-    final key = '$id|$title|$body';
+    // Keyed by alert type (id) with a 5-minute quiet window so a borderline
+    // PF/MD that jitters between refreshes does not spam the tray; the
+    // alert reappears only after the window lapses. Different alert types
+    // always fire independently.
     final now = DateTime.now();
-    if (_lastAlertKey == key &&
+    if (_lastAlertKey == id.toString() &&
         _lastAlertAt != null &&
-        now.difference(_lastAlertAt!).inSeconds < 60) {
+        now.difference(_lastAlertAt!).inSeconds < 300) {
       return;
     }
-    _lastAlertKey = key;
+    _lastAlertKey = '$id';
     _lastAlertAt = now;
 
     if (defaultTargetPlatform == TargetPlatform.windows) {

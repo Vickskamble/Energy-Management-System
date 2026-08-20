@@ -29,12 +29,19 @@ class _ReadingsPreviewSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final surface = theme.brightness == Brightness.dark
+        ? AppColors.surfaceDark
+        : AppColors.surfaceLight;
+    final border = theme.brightness == Brightness.dark
+        ? AppColors.borderDark
+        : AppColors.borderLight;
     final maxHeight = MediaQuery.of(context).size.height * 0.78;
     return Container(
       margin: const EdgeInsets.only(top: 8),
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceLight,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -46,7 +53,7 @@ class _ReadingsPreviewSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.borderLight,
+                color: border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -76,7 +83,7 @@ class _ReadingsPreviewSheet extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1, color: AppColors.borderLight),
+          Divider(height: 1, color: border),
           Flexible(
             child: ConstrainedBox(
               constraints: BoxConstraints(maxHeight: maxHeight - 100),
@@ -103,11 +110,15 @@ class _ReadingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mf = log.multiplyingFactor;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceLight,
-        border: Border.all(color: AppColors.borderLight),
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -195,10 +206,13 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.sidebarItemActive,
+        color: theme.brightness == Brightness.dark
+            ? AppColors.sidebarItemActiveDark
+            : AppColors.sidebarItemActive,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(

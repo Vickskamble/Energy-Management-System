@@ -36,6 +36,11 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   /// Shared month selection — one filter for Dashboard, Analysis & Reports.
   final MonthFilterController _monthFilter = MonthFilterController();
 
+  /// Lets the hub ask Reading Entry whether it holds unsaved values before
+  /// switching tabs (discard guard).
+  final GlobalKey<ReadingEntryPageState> _readingEntryKey =
+      GlobalKey<ReadingEntryPageState>();
+
   @override
   void dispose() {
     _monthFilter.dispose();
@@ -68,6 +73,41 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   }
 
   void _onItemTapped(int index) {
+    if (index != _selectedIndex &&
+        _selectedIndex == 1 &&
+        (_readingEntryKey.currentState?.isDirty ?? false)) {
+      _confirmDiscardReadingForm(() => _goTo(index));
+      return;
+    }
+    _goTo(index);
+  }
+
+  Future<void> _confirmDiscardReadingForm(VoidCallback proceed) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard unsaved reading?'),
+        content: const Text(
+          'You have unsubmitted values in Reading Entry. '
+          'Switching tabs will discard them.',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Stay'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Discard & leave'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) proceed();
+  }
+
+  void _goTo(int index) {
     if (index == 5) {
       Navigator.push(
         context,
@@ -144,7 +184,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
             monthFilter: _monthFilter,
             onNavigateToMeters: () => _onItemTapped(4),
           ),
-          const ReadingEntryPage(),
+          ReadingEntryPage(key: _readingEntryKey),
           AnalysisPage(monthFilter: _monthFilter),
           ReportsPage(monthFilter: _monthFilter),
           const MeterManagementPage(),

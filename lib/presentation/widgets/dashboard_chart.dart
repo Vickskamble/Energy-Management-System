@@ -25,9 +25,20 @@ class DashboardChart extends StatelessWidget {
       return const SizedBox(
         height: 220,
         child: Center(
-          child: Text(
-            'No data available for chart',
-            style: TextStyle(color: AppColors.textSecondary),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.query_stats,
+                size: 34,
+                color: AppColors.textSecondary,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'No data available for chart',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
           ),
         ),
       );
@@ -52,9 +63,20 @@ class DashboardChart extends StatelessWidget {
       return const SizedBox(
         height: 220,
         child: Center(
-          child: Text(
-            'No data available for chart',
-            style: TextStyle(color: AppColors.textSecondary),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.query_stats,
+                size: 34,
+                color: AppColors.textSecondary,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'No data available for chart',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
           ),
         ),
       );

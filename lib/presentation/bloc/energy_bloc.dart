@@ -34,6 +34,7 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
     // Silent refresh: when data already exists, skip the loading state so
     // periodic refreshes never flicker the screens.
     final hasData = state is EnergySuccess;
+    final previousSuccess = state is EnergySuccess ? state as EnergySuccess : null;
     if (!hasData) emit(const EnergyLoading());
     try {
       final dashboard = await _repository.getDashboardData();
@@ -49,10 +50,16 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
           currentPowerFactor:
               (dashboard.currentPowerFactor * 1000).roundToDouble() / 1000,
           maxDemandPeak: (dashboard.maxDemandPeak * 100).roundToDouble() / 100,
+          refreshFailed: false,
         ),
       );
     } on AppException catch (e) {
       if (!hasData) emit(EnergyOperationFailure(e.message));
+      if (previousSuccess != null) {
+        // Keep the last-known-good data visible, but tell the UI the refresh
+        // failed so it no longer looks like freshly synced numbers.
+        emit(previousSuccess.copyWith(refreshFailed: true));
+      }
     } catch (_) {
       if (!hasData) {
         emit(
@@ -60,6 +67,9 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
             'Failed to load dashboard. Check your connection and try again.',
           ),
         );
+      }
+      if (previousSuccess != null) {
+        emit(previousSuccess.copyWith(refreshFailed: true));
       }
     }
   }
@@ -171,6 +181,7 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
           currentPowerFactor:
               (dashboard.currentPowerFactor * 1000).roundToDouble() / 1000,
           maxDemandPeak: (dashboard.maxDemandPeak * 100).roundToDouble() / 100,
+          refreshFailed: false,
         ),
       );
     } on ValidationException catch (e) {

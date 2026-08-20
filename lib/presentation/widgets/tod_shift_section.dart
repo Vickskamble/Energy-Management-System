@@ -718,9 +718,16 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                 ? SizedBox(
                     height: 100,
                     child: Center(
-                      child: Text(
-                        'No readings in this period',
-                        style: TextStyle(fontSize: 12, color: _dim),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.query_stats, size: 30, color: _dim),
+                          const SizedBox(height: 6),
+                          Text(
+                            'No readings in this period',
+                            style: TextStyle(fontSize: 12, color: _dim),
+                          ),
+                        ],
                       ),
                     ),
                   )

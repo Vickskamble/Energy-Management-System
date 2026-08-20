@@ -45,7 +45,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _load();
-    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _load());
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _load(silent: true));
   }
 
   @override
@@ -59,14 +59,18 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _load();
+    if (state == AppLifecycleState.resumed) _load(silent: true);
   }
 
-  Future<void> _load() async {
+  /// Loads plan + meter entitlements. [silent] skips the full-screen spinner
+  /// so the 30s background poll never flickers the page.
+  Future<void> _load({bool silent = false}) async {
     final meterRepo = context.read<MeterRepository>();
     setState(() {
-      _loading = true;
-      _error = null;
+      if (!silent) {
+        _loading = true;
+        _error = null;
+      }
     });
     try {
       // Re-confirm any add-on payment whose checkout page was closed before
@@ -97,7 +101,9 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Could not load your plan. Check your connection and retry.';
+        if (!silent) {
+          _error = 'Could not load your plan. Check your connection and retry.';
+        }
       });
     }
   }
@@ -152,11 +158,9 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
         );
         paidInApp = attempt?.status == PaymentAttemptStatus.completed;
         if (paidInApp && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Payment received — confirming with the bank…'),
-              backgroundColor: Colors.green,
-            ),
+          _showStatus(
+            'Payment received — confirming with the bank…',
+            Colors.green,
           );
           // Hit payment-status right now so the server flips the DB row
           // immediately — the 3-s poll below is a safety net only.
@@ -188,55 +192,44 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
           mode: LaunchMode.externalApplication,
         );
         if (!opened && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not open the payment page. Try again.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          _showStatus('Could not open the payment page. Try again.', Colors.orange);
           return;
         }
         _startPaymentPolling(result);
       }
 
       SubscriptionStore.invalidateCache();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              paidInApp
-                  ? 'Payment received — your plan updates automatically.'
-                  : 'Payment page opened — your plan updates automatically '
-                      'after payment.',
-            ),
-            backgroundColor: Colors.green,
-          ),
+      if (mounted && !paidInApp) {
+        _showStatus(
+          'Payment page opened — your plan updates automatically '
+          'after payment.',
+          Colors.green,
         );
         _load();
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
+      _showStatus(e.toString(), Colors.red.shade700);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Replace any visible snackbar instead of stacking a new one (payment
+  /// flows previously queued up to 3 green toasts at once).
+  void _showStatus(String text, Color background) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(content: Text(text), backgroundColor: background),
+    );
   }
 
   void _copyReferralCode() {
     final code = _entitlement?.referralCode ?? '';
     if (code.isEmpty) return;
     Clipboard.setData(ClipboardData(text: code));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Referral code copied!'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    _showStatus('Referral code copied!', Colors.green);
   }
 
   /// In-app checkout page for web subscriptions: Razorpay Checkout JS hosted
@@ -290,11 +283,9 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       if (paid) {
         _paymentPollTimer?.cancel();
         setState(() => _paymentPending = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Payment received — your plan has been updated!'),
-            backgroundColor: Colors.green,
-          ),
+        _showStatus(
+          'Payment received — your plan has been updated!',
+          Colors.green,
         );
         _load();
         return;
@@ -315,13 +306,9 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
         if (rzpPaid) {
           confirmed = true;
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Payment confirmed — your plan is activating (please wait a moment)…',
-              ),
-              backgroundColor: Colors.green,
-            ),
+          _showStatus(
+            'Payment confirmed — your plan is activating (please wait a moment)…',
+            Colors.green,
           );
           _load();
         }
@@ -334,14 +321,10 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
         _paymentPollTimer?.cancel();
         if (!mounted) return;
         setState(() => _paymentPending = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Payment confirmation pending — your plan updates automatically '
-              'once the payment is received.',
-            ),
-            backgroundColor: Colors.orange,
-          ),
+        _showStatus(
+          'Payment confirmation pending — your plan updates automatically '
+          'once the payment is received.',
+          Colors.orange,
         );
       }
     });
@@ -602,7 +585,9 @@ body: _loading
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Valid until ${DateFormat('d MMM yyyy').format(ent.creditEnd ?? DateTime.now().add(const Duration(days: 30)))}',
+                  ent.creditEnd == null
+                      ? 'Active on your account — no expiry set'
+                      : 'Valid until ${DateFormat('d MMM yyyy').format(ent.creditEnd!)}',
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],

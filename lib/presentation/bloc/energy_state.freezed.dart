@@ -128,12 +128,12 @@ return operationFailure(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  initial,TResult Function()?  loading,TResult Function( List<dynamic> logs,  double estimatedBill,  double totalConsumption,  double activeConsumptionToday,  double currentPowerFactor,  double maxDemandPeak)?  success,TResult Function( String message)?  validationError,TResult Function( String message)?  operationFailure,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  initial,TResult Function()?  loading,TResult Function( List<EnergyLogEntity> logs,  double estimatedBill,  double totalConsumption,  double activeConsumptionToday,  double currentPowerFactor,  double maxDemandPeak,  bool refreshFailed)?  success,TResult Function( String message)?  validationError,TResult Function( String message)?  operationFailure,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case EnergyInitial() when initial != null:
 return initial();case EnergyLoading() when loading != null:
 return loading();case EnergySuccess() when success != null:
-return success(_that.logs,_that.estimatedBill,_that.totalConsumption,_that.activeConsumptionToday,_that.currentPowerFactor,_that.maxDemandPeak);case EnergyValidationError() when validationError != null:
+return success(_that.logs,_that.estimatedBill,_that.totalConsumption,_that.activeConsumptionToday,_that.currentPowerFactor,_that.maxDemandPeak,_that.refreshFailed);case EnergyValidationError() when validationError != null:
 return validationError(_that.message);case EnergyOperationFailure() when operationFailure != null:
 return operationFailure(_that.message);case _:
   return orElse();
@@ -153,12 +153,12 @@ return operationFailure(_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  initial,required TResult Function()  loading,required TResult Function( List<dynamic> logs,  double estimatedBill,  double totalConsumption,  double activeConsumptionToday,  double currentPowerFactor,  double maxDemandPeak)  success,required TResult Function( String message)  validationError,required TResult Function( String message)  operationFailure,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  initial,required TResult Function()  loading,required TResult Function( List<EnergyLogEntity> logs,  double estimatedBill,  double totalConsumption,  double activeConsumptionToday,  double currentPowerFactor,  double maxDemandPeak,  bool refreshFailed)  success,required TResult Function( String message)  validationError,required TResult Function( String message)  operationFailure,}) {final _that = this;
 switch (_that) {
 case EnergyInitial():
 return initial();case EnergyLoading():
 return loading();case EnergySuccess():
-return success(_that.logs,_that.estimatedBill,_that.totalConsumption,_that.activeConsumptionToday,_that.currentPowerFactor,_that.maxDemandPeak);case EnergyValidationError():
+return success(_that.logs,_that.estimatedBill,_that.totalConsumption,_that.activeConsumptionToday,_that.currentPowerFactor,_that.maxDemandPeak,_that.refreshFailed);case EnergyValidationError():
 return validationError(_that.message);case EnergyOperationFailure():
 return operationFailure(_that.message);}
 }
@@ -174,12 +174,12 @@ return operationFailure(_that.message);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  initial,TResult? Function()?  loading,TResult? Function( List<dynamic> logs,  double estimatedBill,  double totalConsumption,  double activeConsumptionToday,  double currentPowerFactor,  double maxDemandPeak)?  success,TResult? Function( String message)?  validationError,TResult? Function( String message)?  operationFailure,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  initial,TResult? Function()?  loading,TResult? Function( List<EnergyLogEntity> logs,  double estimatedBill,  double totalConsumption,  double activeConsumptionToday,  double currentPowerFactor,  double maxDemandPeak,  bool refreshFailed)?  success,TResult? Function( String message)?  validationError,TResult? Function( String message)?  operationFailure,}) {final _that = this;
 switch (_that) {
 case EnergyInitial() when initial != null:
 return initial();case EnergyLoading() when loading != null:
 return loading();case EnergySuccess() when success != null:
-return success(_that.logs,_that.estimatedBill,_that.totalConsumption,_that.activeConsumptionToday,_that.currentPowerFactor,_that.maxDemandPeak);case EnergyValidationError() when validationError != null:
+return success(_that.logs,_that.estimatedBill,_that.totalConsumption,_that.activeConsumptionToday,_that.currentPowerFactor,_that.maxDemandPeak,_that.refreshFailed);case EnergyValidationError() when validationError != null:
 return validationError(_that.message);case EnergyOperationFailure() when operationFailure != null:
 return operationFailure(_that.message);case _:
   return null;
@@ -257,13 +257,13 @@ String toString() {
 
 
 class EnergySuccess implements EnergyState {
-  const EnergySuccess({required final  List<dynamic> logs, required this.estimatedBill, required this.totalConsumption, required this.activeConsumptionToday, required this.currentPowerFactor, required this.maxDemandPeak}): _logs = logs;
+  const EnergySuccess({required final  List<EnergyLogEntity> logs, required this.estimatedBill, required this.totalConsumption, required this.activeConsumptionToday, required this.currentPowerFactor, required this.maxDemandPeak, this.refreshFailed = false}): _logs = logs;
   
 
 /// All energy logs for the current view
- final  List<dynamic> _logs;
+ final  List<EnergyLogEntity> _logs;
 /// All energy logs for the current view
- List<dynamic> get logs {
+ List<EnergyLogEntity> get logs {
   if (_logs is EqualUnmodifiableListView) return _logs;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableListView(_logs);
@@ -279,6 +279,10 @@ class EnergySuccess implements EnergyState {
  final  double currentPowerFactor;
 /// Maximum demand peak recorded in the current period (kW)
  final  double maxDemandPeak;
+/// A background refresh failed while data was already on screen —
+/// the payload above is the last known-good snapshot. Defaults to
+/// false (no failure, fresh data).
+@JsonKey() final  bool refreshFailed;
 
 /// Create a copy of EnergyState
 /// with the given fields replaced by the non-null parameter values.
@@ -290,16 +294,16 @@ $EnergySuccessCopyWith<EnergySuccess> get copyWith => _$EnergySuccessCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is EnergySuccess&&const DeepCollectionEquality().equals(other._logs, _logs)&&(identical(other.estimatedBill, estimatedBill) || other.estimatedBill == estimatedBill)&&(identical(other.totalConsumption, totalConsumption) || other.totalConsumption == totalConsumption)&&(identical(other.activeConsumptionToday, activeConsumptionToday) || other.activeConsumptionToday == activeConsumptionToday)&&(identical(other.currentPowerFactor, currentPowerFactor) || other.currentPowerFactor == currentPowerFactor)&&(identical(other.maxDemandPeak, maxDemandPeak) || other.maxDemandPeak == maxDemandPeak));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is EnergySuccess&&const DeepCollectionEquality().equals(other._logs, _logs)&&(identical(other.estimatedBill, estimatedBill) || other.estimatedBill == estimatedBill)&&(identical(other.totalConsumption, totalConsumption) || other.totalConsumption == totalConsumption)&&(identical(other.activeConsumptionToday, activeConsumptionToday) || other.activeConsumptionToday == activeConsumptionToday)&&(identical(other.currentPowerFactor, currentPowerFactor) || other.currentPowerFactor == currentPowerFactor)&&(identical(other.maxDemandPeak, maxDemandPeak) || other.maxDemandPeak == maxDemandPeak)&&(identical(other.refreshFailed, refreshFailed) || other.refreshFailed == refreshFailed));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_logs),estimatedBill,totalConsumption,activeConsumptionToday,currentPowerFactor,maxDemandPeak);
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_logs),estimatedBill,totalConsumption,activeConsumptionToday,currentPowerFactor,maxDemandPeak,refreshFailed);
 
 @override
 String toString() {
-  return 'EnergyState.success(logs: $logs, estimatedBill: $estimatedBill, totalConsumption: $totalConsumption, activeConsumptionToday: $activeConsumptionToday, currentPowerFactor: $currentPowerFactor, maxDemandPeak: $maxDemandPeak)';
+  return 'EnergyState.success(logs: $logs, estimatedBill: $estimatedBill, totalConsumption: $totalConsumption, activeConsumptionToday: $activeConsumptionToday, currentPowerFactor: $currentPowerFactor, maxDemandPeak: $maxDemandPeak, refreshFailed: $refreshFailed)';
 }
 
 
@@ -310,7 +314,7 @@ abstract mixin class $EnergySuccessCopyWith<$Res> implements $EnergyStateCopyWit
   factory $EnergySuccessCopyWith(EnergySuccess value, $Res Function(EnergySuccess) _then) = _$EnergySuccessCopyWithImpl;
 @useResult
 $Res call({
- List<dynamic> logs, double estimatedBill, double totalConsumption, double activeConsumptionToday, double currentPowerFactor, double maxDemandPeak
+ List<EnergyLogEntity> logs, double estimatedBill, double totalConsumption, double activeConsumptionToday, double currentPowerFactor, double maxDemandPeak, bool refreshFailed
 });
 
 
@@ -327,15 +331,16 @@ class _$EnergySuccessCopyWithImpl<$Res>
 
 /// Create a copy of EnergyState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') $Res call({Object? logs = null,Object? estimatedBill = null,Object? totalConsumption = null,Object? activeConsumptionToday = null,Object? currentPowerFactor = null,Object? maxDemandPeak = null,}) {
+@pragma('vm:prefer-inline') $Res call({Object? logs = null,Object? estimatedBill = null,Object? totalConsumption = null,Object? activeConsumptionToday = null,Object? currentPowerFactor = null,Object? maxDemandPeak = null,Object? refreshFailed = null,}) {
   return _then(EnergySuccess(
 logs: null == logs ? _self._logs : logs // ignore: cast_nullable_to_non_nullable
-as List<dynamic>,estimatedBill: null == estimatedBill ? _self.estimatedBill : estimatedBill // ignore: cast_nullable_to_non_nullable
+as List<EnergyLogEntity>,estimatedBill: null == estimatedBill ? _self.estimatedBill : estimatedBill // ignore: cast_nullable_to_non_nullable
 as double,totalConsumption: null == totalConsumption ? _self.totalConsumption : totalConsumption // ignore: cast_nullable_to_non_nullable
 as double,activeConsumptionToday: null == activeConsumptionToday ? _self.activeConsumptionToday : activeConsumptionToday // ignore: cast_nullable_to_non_nullable
 as double,currentPowerFactor: null == currentPowerFactor ? _self.currentPowerFactor : currentPowerFactor // ignore: cast_nullable_to_non_nullable
 as double,maxDemandPeak: null == maxDemandPeak ? _self.maxDemandPeak : maxDemandPeak // ignore: cast_nullable_to_non_nullable
-as double,
+as double,refreshFailed: null == refreshFailed ? _self.refreshFailed : refreshFailed // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 

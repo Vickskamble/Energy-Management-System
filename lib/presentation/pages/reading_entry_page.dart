@@ -22,10 +22,10 @@ class ReadingEntryPage extends StatefulWidget {
   const ReadingEntryPage({super.key});
 
   @override
-  State<ReadingEntryPage> createState() => _ReadingEntryPageState();
+  State<ReadingEntryPage> createState() => ReadingEntryPageState();
 }
 
-class _ReadingEntryPageState extends State<ReadingEntryPage> {
+class ReadingEntryPageState extends State<ReadingEntryPage> {
   final _formKey = GlobalKey<FormState>();
 
   List<MeterModel> _meters = [];
@@ -46,6 +46,16 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
   /// date/meter — read-only, never editable by the client.
   double _prevCumulativeKwh = 0;
   double _prevCumulativeKvah = 0;
+  bool _prevFetchFailed = false;
+
+  /// True when the user has typed values or changed the date — used by the
+  /// navigation hub to warn before switching away and discarding the form.
+  bool get isDirty =>
+      _currentKwhCtrl.text.isNotEmpty ||
+      _currentKvahCtrl.text.isNotEmpty ||
+      _rkvarhLagCtrl.text.isNotEmpty ||
+      _rkvarhLeadCtrl.text.isNotEmpty ||
+      _mdRecordedCtrl.text.isNotEmpty;
 
   @override
   void initState() {
@@ -62,13 +72,13 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
   }
 
   double? get _diffKwh {
-    final cur = double.tryParse(_currentKwhCtrl.text.trim());
+    final cur = AppInputFormatters.parseNumber(_currentKwhCtrl.text.trim());
     if (cur == null) return null;
     return cur - _prevCumulativeKwh;
   }
 
   double? get _diffKvah {
-    final cur = double.tryParse(_currentKvahCtrl.text.trim());
+    final cur = AppInputFormatters.parseNumber(_currentKvahCtrl.text.trim());
     if (cur == null) return null;
     return cur - _prevCumulativeKvah;
   }
@@ -140,9 +150,11 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
         setState(() {
           _prevCumulativeKwh = prev.kwh;
           _prevCumulativeKvah = prev.kvah;
+          _prevFetchFailed = false;
         });
       }
     } catch (_) {
+      if (mounted) setState(() => _prevFetchFailed = true);
     } finally {
       if (mounted) setState(() => _fetchingPrevious = false);
     }
@@ -194,12 +206,16 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
 
   String? _requiredNumberValidator(String? v) {
     if (v == null || v.trim().isEmpty) return 'Required';
-    return double.tryParse(v.trim()) == null ? 'Enter a valid number' : null;
+    return AppInputFormatters.parseNumber(v.trim()) == null
+        ? 'Enter a valid number'
+        : null;
   }
 
   String? _optionalNumberValidator(String? v) {
     if (v == null || v.trim().isEmpty) return null;
-    return double.tryParse(v.trim()) == null ? 'Enter a valid number' : null;
+    return AppInputFormatters.parseNumber(v.trim()) == null
+        ? 'Enter a valid number'
+        : null;
   }
 
   bool get _noPreviousReading =>
@@ -243,13 +259,18 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
     bloc.add(
       SubmitManualReadingForm(
         meterName: _selectedMeter,
-        currentKwh: double.parse(_currentKwhCtrl.text.trim()),
+        currentKwh:
+            AppInputFormatters.parseNumber(_currentKwhCtrl.text.trim()) ?? 0,
         previousKwh: _prevCumulativeKwh,
-        currentKvah: double.parse(_currentKvahCtrl.text.trim()),
+        currentKvah:
+            AppInputFormatters.parseNumber(_currentKvahCtrl.text.trim()) ?? 0,
         previousKvah: _prevCumulativeKvah,
-        rkvarhLag: double.tryParse(_rkvarhLagCtrl.text.trim()) ?? 0,
-        rkvarhLead: double.tryParse(_rkvarhLeadCtrl.text.trim()) ?? 0,
-        mdRecorded: double.parse(_mdRecordedCtrl.text.trim()),
+        rkvarhLag:
+            AppInputFormatters.parseNumber(_rkvarhLagCtrl.text.trim()) ?? 0,
+        rkvarhLead:
+            AppInputFormatters.parseNumber(_rkvarhLeadCtrl.text.trim()) ?? 0,
+        mdRecorded:
+            AppInputFormatters.parseNumber(_mdRecordedCtrl.text.trim()) ?? 0,
         powerFactor: null,
         loggedAt: _loggedAt,
       ),
@@ -483,6 +504,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                               keyboardType: TextInputType.numberWithOptions(
                                 decimal: true,
                               ),
+                              inputFormatters: [AppInputFormatters.numeric],
                               validator: _requiredNumberValidator,
                             ),
                             const SizedBox(height: 12),
@@ -494,6 +516,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                               keyboardType: TextInputType.numberWithOptions(
                                 decimal: true,
                               ),
+                              inputFormatters: [AppInputFormatters.numeric],
                               validator: _requiredNumberValidator,
                             ),
                             if (_noPreviousReading) ...[
@@ -592,12 +615,19 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
-                                            'Previous (auto, from DB): '
-                                            '${_prevCumulativeKwh.toStringAsFixed(2)} kWh · '
-                                            '${_prevCumulativeKvah.toStringAsFixed(2)} kVAh',
-                                            style: const TextStyle(
+                                            _prevFetchFailed
+                                                ? 'Couldn\'t fetch previous reading — check your connection. Consumption shown here may be inaccurate.'
+                                                : 'Previous (auto, from DB): '
+                                                      '${_prevCumulativeKwh.toStringAsFixed(2)} kWh · '
+                                                      '${_prevCumulativeKvah.toStringAsFixed(2)} kVAh',
+                                            style: TextStyle(
                                               fontSize: 11.5,
-                                              color: AppColors.textSecondary,
+                                              color: _prevFetchFailed
+                                                  ? AppColors.warningText
+                                                  : AppColors.textSecondary,
+                                              fontWeight: _prevFetchFailed
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w400,
                                             ),
                                           ),
                                         ),
@@ -634,6 +664,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                         TextInputType.numberWithOptions(
                                           decimal: true,
                                         ),
+                                    inputFormatters: [AppInputFormatters.numeric],
                                     validator: _optionalNumberValidator,
                                   ),
                                 ),
@@ -647,6 +678,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                                         TextInputType.numberWithOptions(
                                           decimal: true,
                                         ),
+                                    inputFormatters: [AppInputFormatters.numeric],
                                     validator: _optionalNumberValidator,
                                   ),
                                 ),
@@ -661,6 +693,7 @@ class _ReadingEntryPageState extends State<ReadingEntryPage> {
                               keyboardType: TextInputType.numberWithOptions(
                                 decimal: true,
                               ),
+                              inputFormatters: [AppInputFormatters.numeric],
                               validator: _optionalNumberValidator,
                             ),
                           ],

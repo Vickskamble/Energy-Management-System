@@ -29,9 +29,20 @@ class MonthlyConsumptionChart extends StatelessWidget {
       return const SizedBox(
         height: 200,
         child: Center(
-          child: Text(
-            'No monthly data',
-            style: TextStyle(color: AppColors.textSecondary),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.calendar_month_outlined,
+                size: 30,
+                color: AppColors.textSecondary,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'No monthly data',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
           ),
         ),
       );
@@ -55,9 +66,20 @@ class MonthlyConsumptionChart extends StatelessWidget {
       return const SizedBox(
         height: 200,
         child: Center(
-          child: Text(
-            'No monthly data',
-            style: TextStyle(color: AppColors.textSecondary),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.calendar_month_outlined,
+                size: 30,
+                color: AppColors.textSecondary,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'No monthly data',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
           ),
         ),
       );

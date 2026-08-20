@@ -56,7 +56,9 @@ void main() {
 
       final a = drafts[0];
       expect(a.meterName, 'Meter A');
-      expect(a.loggedAt, DateTime(2026, 6, 1));
+      // Date-only cells default to midday (12:00) so imports don't land in
+      // the previous day's Night slot (midnight 00:00 = end of the prior day).
+      expect(a.loggedAt, DateTime(2026, 6, 1, 12));
       expect(a.kwh, 123.45);
       expect(a.kvah, 130.5);
       expect(a.rkvarhLag, 5.5);
@@ -70,7 +72,7 @@ void main() {
 
       final b = drafts[1];
       expect(b.meterName, 'Meter B');
-      expect(b.loggedAt, DateTime(2026, 6, 2));
+      expect(b.loggedAt, DateTime(2026, 6, 2, 12));
       expect(b.kwh, 200);
       expect(b.mdRecorded, 60);
       expect(b.sourceLabel, 'Row 3');

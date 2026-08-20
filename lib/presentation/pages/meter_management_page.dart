@@ -67,11 +67,12 @@ class MeterManagementPage extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: Text(existing != null ? 'Edit Meter' : 'Add Meter'),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               AppTextField(
                 controller: nameCtrl,
                 label: 'Meter Name',
@@ -124,9 +125,10 @@ class MeterManagementPage extends StatelessWidget {
                 label: 'Contract Demand (kVA)',
                 prefixIcon: Icons.trending_up,
                 keyboardType: TextInputType.number,
+                inputFormatters: [AppInputFormatters.numeric],
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Required';
-                  if (double.tryParse(v.trim()) == null) {
+                  if (AppInputFormatters.parseNumber(v.trim()) == null) {
                     return 'Invalid number';
                   }
                   return null;
@@ -139,9 +141,10 @@ class MeterManagementPage extends StatelessWidget {
                 hint: 'Optional — sets the chart cross line and alerts',
                 prefixIcon: Icons.electric_bolt_rounded,
                 keyboardType: TextInputType.number,
+                inputFormatters: [AppInputFormatters.numeric],
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return null;
-                  final val = double.tryParse(v.trim());
+                  final val = AppInputFormatters.parseNumber(v.trim());
                   if (val == null || val <= 0) return 'Invalid number';
                   return null;
                 },
@@ -156,9 +159,10 @@ class MeterManagementPage extends StatelessWidget {
                       hint: 'e.g. 100/5 = 20',
                       prefixIcon: Icons.tune,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [AppInputFormatters.numeric],
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
-                        final val = double.tryParse(v.trim());
+                        final val = AppInputFormatters.parseNumber(v.trim());
                         if (val == null || val <= 0) return 'Invalid';
                         return null;
                       },
@@ -172,9 +176,10 @@ class MeterManagementPage extends StatelessWidget {
                       hint: '1 if none',
                       prefixIcon: Icons.tune,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [AppInputFormatters.numeric],
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Required';
-                        final val = double.tryParse(v.trim());
+                        final val = AppInputFormatters.parseNumber(v.trim());
                         if (val == null || val <= 0) return 'Invalid';
                         return null;
                       },
@@ -200,6 +205,7 @@ class MeterManagementPage extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
         actions: [
           TextButton(
@@ -251,31 +257,35 @@ class MeterManagementPage extends StatelessWidget {
                       location: locationCtrl.text.trim().isEmpty
                           ? null
                           : locationCtrl.text.trim(),
-                      contractDemandKw: double.parse(demandCtrl.text.trim()),
+                      contractDemandKw:
+                          AppInputFormatters.parseNumber(demandCtrl.text.trim())!,
                       isActive: existing.isActive,
-                      ctRatio: double.parse(ctCtrl.text.trim()),
-                      ptRatio: double.parse(ptCtrl.text.trim()),
+                      ctRatio: AppInputFormatters.parseNumber(ctCtrl.text.trim())!,
+                      ptRatio: AppInputFormatters.parseNumber(ptCtrl.text.trim())!,
                       site: siteCtrl.text.trim().isEmpty
                           ? 'Main Site'
                           : siteCtrl.text.trim(),
                       dailyKwhTarget: targetCtrl.text.trim().isEmpty
                           ? 0.0
-                          : double.parse(targetCtrl.text.trim()),
+                          : AppInputFormatters.parseNumber(
+                              targetCtrl.text.trim())!,
                     )
                   : MeterModel.create(
                       name: nameCtrl.text.trim(),
                       location: locationCtrl.text.trim().isEmpty
                           ? null
                           : locationCtrl.text.trim(),
-                      contractDemandKw: double.parse(demandCtrl.text.trim()),
-                      ctRatio: double.parse(ctCtrl.text.trim()),
-                      ptRatio: double.parse(ptCtrl.text.trim()),
+                      contractDemandKw:
+                          AppInputFormatters.parseNumber(demandCtrl.text.trim())!,
+                      ctRatio: AppInputFormatters.parseNumber(ctCtrl.text.trim())!,
+                      ptRatio: AppInputFormatters.parseNumber(ptCtrl.text.trim())!,
                       site: siteCtrl.text.trim().isEmpty
                           ? 'Main Site'
                           : siteCtrl.text.trim(),
                       dailyKwhTarget: targetCtrl.text.trim().isEmpty
                           ? 0.0
-                          : double.parse(targetCtrl.text.trim()),
+                          : AppInputFormatters.parseNumber(
+                              targetCtrl.text.trim())!,
                     );
               try {
                 if (existing != null) {
@@ -311,6 +321,7 @@ class _MeterList extends StatefulWidget {
 class _MeterListState extends State<_MeterList> {
   List<MeterModel> _meters = [];
   bool _loading = true;
+  String? _error;
   String _searchQuery = '';
 
   @override
@@ -327,13 +338,26 @@ class _MeterListState extends State<_MeterList> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
-    final repo = context.read<MeterRepository>();
-    final meters = await repo.getAllMeters();
     setState(() {
-      _meters = meters;
-      _loading = false;
+      _loading = true;
+      _error = null;
     });
+    try {
+      final repo = context.read<MeterRepository>();
+      final meters = await repo.getAllMeters();
+      if (!mounted) return;
+      setState(() {
+        _meters = meters;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load meters. Check your connection and retry.';
+        _meters = const [];
+      });
+    }
   }
 
   List<MeterModel> get _filteredMeters {
@@ -352,6 +376,13 @@ class _MeterListState extends State<_MeterList> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return AppErrorState(
+        message: _error!,
+        onRetry: _load,
+      );
     }
 
     if (_meters.isEmpty) {

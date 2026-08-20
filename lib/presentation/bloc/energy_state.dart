@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../domain/entities/energy_log_entity.dart';
+
 part 'energy_state.freezed.dart';
 
 @freezed
@@ -13,7 +15,7 @@ sealed class EnergyState with _$EnergyState {
   /// Successful operation with full dashboard payload
   const factory EnergyState.success({
     /// All energy logs for the current view
-    required List<dynamic> logs,
+    required List<EnergyLogEntity> logs,
 
     /// Current month estimated bill in INR (calculated)
     required double estimatedBill,
@@ -29,6 +31,11 @@ sealed class EnergyState with _$EnergyState {
 
     /// Maximum demand peak recorded in the current period (kW)
     required double maxDemandPeak,
+
+    /// A background refresh failed while data was already on screen —
+    /// the payload above is the last known-good snapshot. Defaults to
+    /// false (no failure, fresh data).
+    @Default(false) bool refreshFailed,
   }) = EnergySuccess;
 
   /// Form validation failed — [message] describes the specific field error

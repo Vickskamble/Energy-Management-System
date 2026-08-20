@@ -1,4 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+/// Shared number-input formatting + parsing used across all entry forms.
+class AppInputFormatters {
+  /// Allows digits, one decimal point and Indian comma grouping ("1,23,456.78").
+  static final TextInputFormatter numeric =
+      FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'));
+
+  /// Strips Indian grouping commas before `double.tryParse`.
+  static double? parseNumber(String v) => double.tryParse(v.replaceAll(',', ''));
+}
 
 class AppTextField extends StatelessWidget {
   final TextEditingController controller;
@@ -15,6 +26,10 @@ class AppTextField extends StatelessWidget {
   final int? maxLines;
   final int? maxLength;
   final int? minLines;
+  final List<TextInputFormatter>? inputFormatters;
+  final TextInputAction? textInputAction;
+  final void Function(String)? onFieldSubmitted;
+  final Iterable<String>? autofillHints;
 
   const AppTextField({
     super.key,
@@ -32,6 +47,10 @@ class AppTextField extends StatelessWidget {
     this.maxLines = 1,
     this.maxLength,
     this.minLines,
+    this.inputFormatters,
+    this.textInputAction,
+    this.onFieldSubmitted,
+    this.autofillHints,
   });
 
   @override
@@ -46,12 +65,24 @@ class AppTextField extends StatelessWidget {
       maxLines: maxLines,
       minLines: minLines,
       maxLength: maxLength,
+      inputFormatters: inputFormatters,
+      textInputAction: textInputAction,
+      onFieldSubmitted: onFieldSubmitted,
+      autofillHints: autofillHints,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20) : null,
         suffixIcon: suffixIcon != null
-            ? InkWell(onTap: onSuffixTap, child: Icon(suffixIcon, size: 20))
+            ? Semantics(
+                label: label,
+                button: true,
+                child: IconButton(
+                  onPressed: onSuffixTap,
+                  icon: Icon(suffixIcon, size: 20),
+                  tooltip: label,
+                ),
+              )
             : null,
       ),
     );

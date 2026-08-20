@@ -185,8 +185,9 @@ class _DashboardPageState extends State<DashboardPage> {
             EnergyInitial() || EnergyLoading() => const AppLoadingIndicator(
               message: 'Loading dashboard...',
             ),
-            EnergySuccess(:final logs) => _DashboardContent(
+            EnergySuccess(:final logs, :final refreshFailed) => _DashboardContent(
               logs: logs,
+              refreshFailed: refreshFailed,
               monthFilter: widget.monthFilter,
               onNavigateToMeters: widget.onNavigateToMeters,
             ),
@@ -210,12 +211,14 @@ class _DashboardPageState extends State<DashboardPage> {
 }
 
 class _DashboardContent extends StatefulWidget {
-  final List<dynamic> logs;
+  final List<EnergyLogEntity> logs;
+  final bool refreshFailed;
   final MonthFilterController monthFilter;
   final VoidCallback? onNavigateToMeters;
 
   const _DashboardContent({
     required this.logs,
+    required this.refreshFailed,
     required this.monthFilter,
     this.onNavigateToMeters,
   });
@@ -916,6 +919,43 @@ class _DashboardContentState extends State<_DashboardContent> {
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.page),
         children: [
+          if (widget.refreshFailed) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.warningText.withValues(alpha: 0.08),
+                border: Border.all(
+                  color: AppColors.warningText.withValues(alpha: 0.35),
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.cloud_off_outlined,
+                    size: 18,
+                    color: AppColors.warningText,
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Couldn\'t refresh — showing last synced data. '
+                      'Check your connection.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.warningText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
           _buildDropdownFilterBar(),
           const SizedBox(height: AppSpacing.lg),
           _buildAllAlertsSection(context),
@@ -1113,62 +1153,7 @@ class _DashboardContentState extends State<_DashboardContent> {
 
           AppSectionHeader(
             title: 'Trends',
-            subtitle: 'Site / meter select kar ke trend aur consumption analyze karein',
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                if (_siteNames.isNotEmpty) ...[
-                  _filterDropdown<String>(
-                    label: 'All Sites',
-                    icon: Icons.location_on_outlined,
-                    value: (_site != null && _siteNames.contains(_site))
-                        ? _site!
-                        : 'all',
-                    items: [
-                      const DropdownMenuItem(
-                        value: 'all',
-                        child: Text('All Sites'),
-                      ),
-                      for (final s in _siteNames)
-                        DropdownMenuItem(
-                          value: s,
-                          child: Text(s, overflow: TextOverflow.ellipsis),
-                        ),
-                    ],
-                    onChanged: (v) => setState(() {
-                      _site = (v == 'all') ? null : v;
-                      _recompute();
-                    }),
-                  ),
-                  const SizedBox(width: 12),
-                ],
-                _filterDropdown<String>(
-                  label: 'All Meters',
-                  icon: Icons.speed_rounded,
-                  value: (_meter != null && _meterNames.contains(_meter))
-                      ? _meter!
-                      : 'all',
-                  items: [
-                    const DropdownMenuItem(
-                      value: 'all',
-                      child: Text('All Meters'),
-                    ),
-                    for (final m in _meterNames)
-                      DropdownMenuItem(
-                        value: m,
-                        child: Text(m, overflow: TextOverflow.ellipsis),
-                      ),
-                  ],
-                  onChanged: (v) => setState(() {
-                    _meter = (v == 'all') ? null : v;
-                    _recompute();
-                  }),
-                ),
-              ],
-            ),
+            subtitle: 'Top filters ko use karke site / meter select karke trend analyze karein',
           ),
           const SizedBox(height: AppSpacing.lg),
 
