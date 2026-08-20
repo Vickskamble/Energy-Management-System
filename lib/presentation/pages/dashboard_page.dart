@@ -238,7 +238,6 @@ class _DashboardContentState extends State<_DashboardContent> {
   /// Cached, derived results so the heavy billing/savings/alert math runs only
   /// when the inputs (logs / filters) change — not on every rebuild.
   BillBreakdown? _breakdown;
-  BusinessKpi? _kpis;
   MonthComparison? _comparison;
   BillForecast? _forecast;
   List<SavingOpportunity> _opportunities = const [];
@@ -380,7 +379,6 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
 
     _breakdown = breakdown;
-    _kpis = kpis;
     _comparison = comparison;
     _forecast = forecast;
     _opportunities = opportunities;
@@ -583,13 +581,6 @@ class _DashboardContentState extends State<_DashboardContent> {
   /// so the card reflects the day's actual usage cost.
   double get _siteEstimatedBill => _breakdown?.netBill ?? 0;
 
-  double get _siteTotalConsumption {
-    return _selectedLogs.fold(
-      0.0,
-      (s, e) => s + e.kwh * e.multiplyingFactor,
-    );
-  }
-
   double get _siteMaxDemandPeak {
     return _selectedLogs.fold(
       0.0,
@@ -599,77 +590,22 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
-  double get _sitePowerFactor => _breakdown?.powerFactor ?? 0;
-
-  /// Visible formula for the Power Factor card: per-meter and combined PF as
-  /// ΣkWh ÷ ΣkVAh (ratio of sums) — the utility's billing method.
-  String get _powerFactorBreakdown {
-    if (_selectedLogs.isEmpty) return 'No readings — add kVAh data';
-    final perMeter = <String, ({double kwh, double kvah})>{};
-    var sumKwh = 0.0;
-    var sumKvah = 0.0;
-    for (final l in _selectedLogs) {
-      final kwh = l.kwh * l.multiplyingFactor;
-      final kvah = l.kvah * l.multiplyingFactor;
-      final rec = perMeter.putIfAbsent(
-        l.meterName,
-        () => (kwh: 0, kvah: 0),
-      );
-      perMeter[l.meterName] = (
-        kwh: rec.kwh + kwh,
-        kvah: rec.kvah + kvah,
-      );
-      sumKwh += kwh;
-      sumKvah += kvah;
+  /// Distinct days in the visible period with any shift reading whose
+  /// MD × MF crosses 95% of the contract demand — same rule as the trial UI.
+  int _mdBreachDays(
+    List<EnergyLogEntity> logs,
+    BillBreakdown breakdown,
+  ) {
+    final threshold = breakdown.contractDemand * 0.95;
+    final days = <String>{};
+    for (final l in logs) {
+      if (l.mdRecorded * l.multiplyingFactor > threshold) {
+        days.add(
+          '${l.loggedAt.year}-${l.loggedAt.month}-${l.loggedAt.day}',
+        );
+      }
     }
-    final nf = NumberFormat.decimalPattern('en_IN');
-    final combined = sumKvah > 0 ? (sumKwh / sumKvah).toStringAsFixed(3) : '—';
-    final lines = <String>[
-      'As recorded (kWh ÷ kVAh): $combined',
-    ];
-    for (final e in perMeter.entries) {
-      final d = e.value;
-      final pf =
-          d.kvah > 0 ? 'PF ${(d.kwh / d.kvah).toStringAsFixed(3)}' : 'PF —';
-      lines.add('${e.key}: ${nf.format(d.kwh)} kWh · $pf');
-    }
-    return lines.join('\n');
-  }
-
-  /// Daily-average consumption for the visible period. The same label, value
-  /// and semantics on every platform regardless of the selected filter:
-  ///  - a selected day → that day's total (Day mode);
-  ///  - the live (current) month → month-to-date average per elapsed day;
-  ///  - a past month → month total ÷ days in that month;
-  ///  - a year / all-time → total ÷ 365 (or log count, capped).
-  double get _todayUnits {
-    if (_isDayMode) {
-      return _selectedLogs.fold(
-        0.0,
-        (s, l) => s + l.kwh * l.multiplyingFactor,
-      );
-    }
-    final monthLogs = _selectedMonthLogs;
-    if (monthLogs.isEmpty) return 0.0;
-    final total = monthLogs.fold(
-      0.0,
-      (s, l) => s + l.kwh * l.multiplyingFactor,
-    );
-    final int days;
-    if (_selection.isCurrent) {
-      days = DateTime.now().day.clamp(1, 31);
-    } else if (_selection.year != null) {
-      days = 365;
-    } else if (_selection.allTime) {
-      days = _siteLogs.length.clamp(1, 365);
-    } else {
-      days = DateTime(
-        _selection.month!.year,
-        _selection.month!.month + 1,
-        0,
-      ).day;
-    }
-    return (total / days * 100).roundToDouble() / 100;
+    return days.length;
   }
 
   /// Distinct years present in the (site-filtered) data, for the filter bar.
@@ -911,7 +847,6 @@ class _DashboardContentState extends State<_DashboardContent> {
     final entityLogs = _siteLogs;
     final periodLogs = _selectedLogs;
     final breakdown = _breakdown!;
-    final kpis = _kpis!;
     final comparison = _comparison;
     final forecast = _forecast;
     final opportunities = _opportunities;
@@ -1034,66 +969,32 @@ class _DashboardContentState extends State<_DashboardContent> {
                 color: AppColors.kpiCost,
                 decimals: 0,
                 description: _isDayMode
-                    ? '${_kpiMonthLabel}Demand charge excluded — avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}'
+                    ? 'Demand charge excluded — avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}'
                     : '${_kpiMonthLabel}Avg unit cost: ₹${breakdown.averageUnitCost.toStringAsFixed(2)}',
               ),
               AppKpiCard(
-                title: _isDayMode ? 'Day Consumption' : 'Total Consumption',
-                value: _siteTotalConsumption,
-                suffix: 'kWh',
-                icon: Icons.bolt_rounded,
-                color: AppColors.kpiEnergy,
+                title: 'Net ToD (slot-wise)',
+                value: breakdown.todCharges,
+                suffix: '₹',
+                icon: Icons.swap_vert_rounded,
+                color: breakdown.todCharges <= 0
+                    ? AppColors.success
+                    : AppColors.danger,
                 decimals: 0,
-                description:
-                    '$_kpiMonthLabel${_siteTotalConsumption.toStringAsFixed(0)} kWh consumed',
+                description: (breakdown.todZoneCharges['C'] ?? 0) == 0 &&
+                        (breakdown.todZoneCharges['D'] ?? 0) == 0
+                    ? 'No ToD zone data — slot engine not applied'
+                    : 'C rebate −₹${((breakdown.todZoneCharges['C'] ?? 0)).abs().toStringAsFixed(0)} · D surcharge +₹${(breakdown.todZoneCharges['D'] ?? 0).toStringAsFixed(0)}',
               ),
               AppKpiCard(
-                title: 'Max Demand',
-                value: _siteMaxDemandPeak,
+                title: 'Billed Demand',
+                value: breakdown.billingDemand,
                 suffix: 'kVA',
                 icon: Icons.trending_up_rounded,
-                color: _siteMaxDemandPeak >= AppConstants.mdWarningThresholdKva
-                    ? AppColors.warning
-                    : AppColors.kpiDemand,
+                color: AppColors.warning,
+                decimals: 1,
                 description:
-                    '${_kpiMonthLabel}Billing demand: ${breakdown.billingDemand.toStringAsFixed(1)} kVA',
-              ),
-              AppKpiCard(
-                title: 'Power Factor',
-                value: _sitePowerFactor,
-                suffix: 'PF',
-                icon: Icons.waves_rounded,
-                color: _sitePowerFactor <= 0
-                    ? AppColors.textSecondary
-                    : (_sitePowerFactor < AppConstants.pfPenaltyThreshold
-                          ? AppColors.danger
-                          : AppColors.kpiPower),
-                decimals: 3,
-                description: _sitePowerFactor <= 0
-                    ? 'No kVAh data — enter kVAh in your readings'
-                    : _powerFactorBreakdown,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _kpiGrid(
-            cards: [
-              AppKpiCard(
-                title: 'Bill Health Score',
-                value: kpis.billHealthScore,
-                suffix: '/100',
-                icon: Icons.health_and_safety_rounded,
-                color: kpis.billHealthScore >= 80
-                    ? AppColors.kpiEfficiency
-                    : (kpis.billHealthScore >= 60
-                          ? AppColors.warning
-                          : AppColors.danger),
-                decimals: 0,
-                description: kpis.billHealthScore >= 80
-                    ? 'Good — all parameters optimized'
-                    : kpis.billHealthScore >= 60
-                    ? 'Needs attention'
-                    : 'Critical issues',
+                    'Recorded ${_siteMaxDemandPeak.toStringAsFixed(1)} kVA · CD floor ${(breakdown.contractDemand * AppConstants.billingDemandFloorPercent).ceil().toStringAsFixed(0)} kVA',
               ),
               AppKpiCard(
                 title: 'Load Factor',
@@ -1111,18 +1012,16 @@ class _DashboardContentState extends State<_DashboardContent> {
                     : 'Improve load smoothing',
               ),
               AppKpiCard(
-                title: _isDayMode ? 'Readings' : 'Daily Avg',
-                value: _isDayMode
-                    ? _selectedLogs.length.toDouble()
-                    : _todayUnits,
-                suffix: _isDayMode ? 'entries' : 'units',
-                icon: Icons.today_rounded,
-                color: AppColors.kpiSavings,
-                description: _isDayMode
-                    ? 'Readings logged on ${DateFormat('d MMM yyyy').format(_selectedDate!)}'
-                    : _selection.isCurrent
-                    ? 'Month-to-date average per day (kWh × MF)'
-                    : '${_selection.label} average per day (kWh × MF)',
+                title: 'MD Breaches',
+                value: _mdBreachDays(periodLogs, breakdown).toDouble(),
+                suffix: 'days',
+                icon: Icons.warning_amber_rounded,
+                color: _mdBreachDays(periodLogs, breakdown) > 0
+                    ? AppColors.danger
+                    : AppColors.success,
+                decimals: 0,
+                description:
+                    'Shift MD above 95% CD · peak ${_siteMaxDemandPeak.toStringAsFixed(1)} kVA',
               ),
             ],
           ),

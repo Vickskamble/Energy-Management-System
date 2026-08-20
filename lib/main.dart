@@ -108,7 +108,7 @@ class EmsApp extends StatefulWidget {
 }
 
 class _EmsAppState extends State<EmsApp> {
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.dark;
 
   void _toggleTheme() {
     setState(() {
