@@ -48,17 +48,17 @@ void main() {
     });
 
     test('daily-totalizer day (single reading) spreads across zones '
-        'by wall-clock duration', () {
+        'by the fixed single-reading profile', () {
       final result = TodCalculator.calculate(
         logs: [_log(name: 'one', kwh: 92, kvah: 100, hour: 0)],
         zoneShares: shares,
         energyRatePerUnit: 8.44,
       );
-      // A 6h, B 3h, C 8h, D 7h of 24h — never a dump into one zone.
-      expect(result.zoneUnits['A'], closeTo(25, 0.001));
-      expect(result.zoneUnits['B'], closeTo(12.5, 0.001));
-      expect(result.zoneUnits['C'], closeTo(100 / 3, 0.001));
-      expect(result.zoneUnits['D'], closeTo(29.1667, 0.001));
+      // C 70.72%, D 16.55%, A+B 12.73% (bill-derived profile).
+      expect(result.zoneUnits['A'], closeTo(8.47, 0.001));
+      expect(result.zoneUnits['B'], closeTo(4.23, 0.001));
+      expect(result.zoneUnits['C'], closeTo(70.72, 0.001));
+      expect(result.zoneUnits['D'], closeTo(16.55, 0.001));
     });
 
     test('zone charges = units × (share × energy rate)', () {
@@ -67,9 +67,9 @@ void main() {
         zoneShares: shares,
         energyRatePerUnit: 8.44,
       );
-      // single reading = totalizer: C 33.333 × (−0.15 × 8.44) + D 29.167 ×
-      // (0.25 × 8.44) = −42.2 + 61.54
-      expect(result.netCharges, closeTo(19.34, 0.01));
+      // single reading = totalizer: C 70.72 × (−0.15 × 8.44) + D 16.55 ×
+      // (0.25 × 8.44) = −89.53 + 34.92
+      expect(result.netCharges, closeTo(-54.61, 0.01));
     });
 
     test('winter deepens the solar-window rebate only', () {
@@ -80,9 +80,9 @@ void main() {
         useWinter: true,
         energyRatePerUnit: 8.44,
       );
-      // single reading = totalizer: C 33.333 × (−0.25 × 8.44) + D 29.167 ×
-      // (0.25 × 8.44) = −70.33 + 61.54
-      expect(result.netCharges, closeTo(-8.79, 0.01));
+      // single reading = totalizer: C 70.72 × (−0.25 × 8.44) + D 16.55 ×
+      // (0.25 × 8.44) = −149.22 + 34.92
+      expect(result.netCharges, closeTo(-114.30, 0.01));
     });
 
     test('bills kWh when the kVAh toggle is off', () {
@@ -92,8 +92,8 @@ void main() {
         energyRatePerUnit: 8.44,
         onKvah: false,
       );
-      // C fraction of the kWh (100, not 200) via duration spread
-      expect(result.zoneUnits['C'], closeTo(100 / 3, 0.001));
+      // C fraction of the kWh (100, not 200) via fixed profile
+      expect(result.zoneUnits['C'], closeTo(70.72, 0.001));
     });
 
     test('day buckets spread shift units evenly for totalizer days and '

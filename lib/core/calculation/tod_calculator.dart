@@ -11,10 +11,9 @@ import '../../domain/entities/energy_log_entity.dart';
 ///
 /// 2. **Daily-totalizer days** (ONE reading per day, e.g. a plant that records
 ///    its meter once daily — the gkh@ems.com real dataset): the reading covers
-///    all 24 hours, so its units are spread across the day by wall-clock zone
-///    duration (A 6h, B 3h, C 8h, D 7h). Dumping the whole day into the
-///    recording hour's zone (everything in A/D for a 00:00 entry) would be
-///    wrong — this is the fix for the previous behaviour.
+///    all 24 hours, so its units are spread across the zones by the fixed
+///    single-reading profile (wall-clock duration would be wrong — the actual
+///    day's consumption concentrates in the solar window C).
 class TodCalculator {
   TodCalculator._();
 
@@ -26,13 +25,16 @@ class TodCalculator {
     (startHour: 22, shares: {'D': 2 / 8, 'A': 6 / 8}),
   ];
 
-  /// Wall-clock duration (hours) per billing zone — used to spread a daily
-  /// totalizer reading across the day.
-  static const Map<String, double> _zoneHours = {
-    'A': 6, // 00–06
-    'B': 3, // 06–09
-    'C': 8, // 09–17
-    'D': 7, // 17–24
+  /// Single-reading-day profile — same fixed zone spread for every day a
+  /// consumer records one daily reading. Derived from the actual MSEDCL bill
+  /// (G K Healthcare, June-2026): C 70.72% (15,788 u), D 16.55% (3,696 u),
+  /// A+B 12.73% (2,842 u). A/B split proportionally to their zone hours
+  /// (6h:3h = 2:1) since the bill groups them.
+  static const Map<String, double> _singleReadingShares = {
+    'A': 0.0847, // 12.73% × 2/3
+    'B': 0.0423, // 12.73% × 1/3
+    'C': 0.7072,
+    'D': 0.1655,
   };
 
   /// The single 8h window a given hour falls into (06/14/22 starts).
@@ -161,15 +163,15 @@ class TodCalculator {
         }
       } else {
         // Daily-totalizer day — the reading(s) cover the whole 24h. Spread by
-        // wall-clock zone duration so a 00:00 entry doesn't dump the day into
-        // zone A/D.
+        // the fixed single-reading profile (actual-bill derived); the A/B
+        // split is proportional to their zone hours.
         var dayUnits = 0.0;
         for (final l in dayLogs) {
           final unit = (onKvah ? l.kvah : l.kwh) * l.multiplyingFactor;
           if (unit >= 0) dayUnits += unit;
         }
-        for (final skill in _zoneHours.entries) {
-          zoneUnits[skill.key] = dayUnits * skill.value / 24;
+        for (final entry in _singleReadingShares.entries) {
+          zoneUnits[entry.key] = dayUnits * entry.value;
         }
         // Each 8h shift gets an equal third of a uniform day.
         final third = dayUnits / 3;

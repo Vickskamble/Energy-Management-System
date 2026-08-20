@@ -55,10 +55,10 @@ void main() {
       expect(b.demandCharges, closeTo(98150, 0.01)); // 151 × 650
       expect(b.powerFactor, closeTo(0.92, 0.001)); // inside no-charge window
 
-      // FAC 6,276.20, wheeling 14,524.92, tax ~4,953, duty exempt.
+      // FAC 6,276.20, wheeling 14,524.92, tax on kWh (~4,557), duty exempt.
       expect(b.facCharges, closeTo(6276.20, 0.01));
       expect(b.wheelingCharges, closeTo(14524.92, 0.01));
-      expect(b.taxes, closeTo(4953.09, 1.0));
+      expect(b.taxes, closeTo(4556.59, 1.0)); // kWh × 0.279
       expect(b.electricityDuty, 0);
 
       // No PF rebate/penalty (0.90 ≤ PF < 0.95) — matches bill (no PF line).

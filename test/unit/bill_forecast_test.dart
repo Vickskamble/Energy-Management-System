@@ -62,8 +62,9 @@ void main() {
       expect(forecast.projectedBill, greaterThan(0));
       expect(forecast.dailyAverageBill, greaterThan(0));
       // 7750 kVAh units projected across the month, with the two 00:00
-      // daily-totalizer readings spread over all four TOD zones (D 7/24).
-      expect(forecast.projectedBill, closeTo(1083670, 0.01));
+      // daily-totalizer readings spread over all four TOD zones (fixed
+      // single-reading profile C 70.72% / D 16.55%).
+      expect(forecast.projectedBill, closeTo(1077930, 0.01));
     });
 
     test('scales by the number of days in the reference month', () {

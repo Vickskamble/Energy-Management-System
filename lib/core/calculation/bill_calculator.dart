@@ -158,12 +158,13 @@ class BillCalculator {
             effectiveEdRate,
           );
 
-    // Taxes = % of energy charges (official ~1.25%); flat per-unit × units
-    // only as legacy fallback.
+    // Taxes = % of energy charges (official ~1.25%); flat per-unit × kWh
+    // when no percent — the printed bill taxes active (kWh) energy, not the
+    // apparent (kVAh) billing units.
     final taxes = effectiveTaxPercent > 0
         ? energyCharges * effectiveTaxPercent / 100
         : EnergyCalculator.calculateTaxes(
-            totalUnits,
+            totalKwh,
             effectiveTaxRate,
           );
 

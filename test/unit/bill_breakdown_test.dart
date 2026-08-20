@@ -44,19 +44,19 @@ void main() {
       expect(breakdown.facCharges, closeTo(375, 0.01)); // 1250 × 0.30
       expect(breakdown.wheelingCharges, closeTo(1012.5, 0.01)); // 1250 × 0.81
       expect(breakdown.electricityDuty, 0); // 0.0/u — official model
-      expect(breakdown.taxes, closeTo(348.75, 0.01)); // 1250 × 0.279 per-unit
+      expect(breakdown.taxes, closeTo(279, 0.01)); // 1000 kWh × 0.279 per-unit
       expect(breakdown.pfSurcharge, closeTo(49277.5, 0.01)); // PF 0.8 < 0.9 → 5%
       expect(breakdown.pfRebate, 0);
       expect(breakdown.loadFactor, 1.0);
-      // 00:00 daily-totalizer reading → spread across all zones: A 6/24,
-      // B 3/24, C 8/24, D 7/24 (1250 units total).
-      expect(breakdown.todZoneUnits['A'], closeTo(312.5, 0.01));
-      expect(breakdown.todZoneUnits['B'], closeTo(156.25, 0.01));
-      expect(breakdown.todZoneUnits['C'], closeTo(416.67, 0.01));
-      expect(breakdown.todZoneUnits['D'], closeTo(364.58, 0.01));
+      // 00:00 daily-totalizer reading → fixed single-reading profile:
+      // C 70.72%, D 16.55%, A 8.47%, B 4.23% (1250 units total).
+      expect(breakdown.todZoneUnits['A'], closeTo(105.88, 0.01));
+      expect(breakdown.todZoneUnits['B'], closeTo(52.88, 0.01));
+      expect(breakdown.todZoneUnits['C'], closeTo(884.0, 0.01));
+      expect(breakdown.todZoneUnits['D'], closeTo(206.88, 0.01));
       expect(breakdown.lfIncentive, closeTo(158.25, 0.01));
-      expect(breakdown.payableEarly, 997150); // floor ₹10
-      expect(breakdown.payableAfterDpc, 1016890); // floor ₹10
+      expect(breakdown.payableEarly, 996190); // floor ₹10
+      expect(breakdown.payableAfterDpc, 1015920); // floor ₹10
     });
 
     test('applies PF rebate when power factor >= threshold', () {
@@ -67,11 +67,12 @@ void main() {
       expect(breakdown.powerFactor, 1.0);
       expect(breakdown.pfRebate, closeTo(9834.4, 0.01)); // 1% of (8440+975000)
       expect(breakdown.pfSurcharge, 0);
-      expect(breakdown.todZoneUnits['A'], closeTo(250, 0.01)); // 1000 u × 6/24
-      expect(breakdown.todZoneUnits['D'], closeTo(291.67, 0.01)); // 1000 u × 7/24
+      // Single reading (kwh=200, kvah=200 × MF5 = 1000 units) → fixed profile.
+      expect(breakdown.todZoneUnits['A'], closeTo(84.7, 0.01)); // 8.47%
+      expect(breakdown.todZoneUnits['D'], closeTo(165.5, 0.01)); // 16.55%
       expect(breakdown.lfIncentive, closeTo(126.6, 0.01));
-      expect(breakdown.payableEarly, 936050); // floor ₹10
-      expect(breakdown.payableAfterDpc, 955560); // floor ₹10
+      expect(breakdown.payableEarly, 935340); // floor ₹10
+      expect(breakdown.payableAfterDpc, 954830); // floor ₹10
     });
 
     test('respects a custom energy rate', () {
