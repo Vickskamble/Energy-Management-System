@@ -56,3 +56,4 @@ ems_meta.db
 
 # Web trial build (no-dot env copy - secrets; written by CI)
 assets/env
+!assets/env
