@@ -271,6 +271,7 @@ class MonthFilterBar extends StatelessWidget {
           child: Row(
             children: [
               _chip(
+                context: context,
                 label: 'This Month',
                 selected: value.isCurrent,
                 onTap: () => controller.value = const MonthFilterValue.current(),
@@ -278,6 +279,7 @@ class MonthFilterBar extends StatelessWidget {
               if (includeAllTime) ...[
                 const SizedBox(width: 4),
                 _chip(
+                  context: context,
                   label: 'All Time',
                   selected: value.allTime,
                   onTap: () => controller.value = const MonthFilterValue.allTime(),
@@ -286,6 +288,7 @@ class MonthFilterBar extends StatelessWidget {
               for (final m in months) ...[
                 const SizedBox(width: 4),
                 _chip(
+                  context: context,
                   label: DateFormat('MMM yy').format(m),
                   selected: !value.allTime &&
                       !value.isCurrent &&
@@ -297,6 +300,7 @@ class MonthFilterBar extends StatelessWidget {
               ],
               const SizedBox(width: 4),
               _chip(
+                context: context,
                 label: value.year != null ? 'Year ${value.year}' : 'Year…',
                 icon: Icons.date_range,
                 selected: value.year != null,
@@ -310,6 +314,7 @@ class MonthFilterBar extends StatelessWidget {
   }
 
   Widget _chip({
+    required BuildContext context,
     required String label,
     required bool selected,
     required VoidCallback onTap,
@@ -328,10 +333,15 @@ class MonthFilterBar extends StatelessWidget {
         labelStyle: TextStyle(
           fontSize: 12,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? AppColors.primary : AppColors.textSecondary,
+          color: selected
+              ? AppColors.primary
+              : AppColors.dim(context),
         ),
         side: BorderSide(
-          color: selected ? AppColors.primary : AppColors.borderLight,
+          color: selected
+              ? AppColors.primary
+              : Theme.of(context).dividerTheme.color ??
+                    AppColors.line(context),
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),

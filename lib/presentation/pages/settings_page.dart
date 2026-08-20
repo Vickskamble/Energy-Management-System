@@ -60,7 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _billOnKvah = AppConstants.billOnKvah;
 
   Color get _dim => widget.isDark
-      ? AppColors.textSecondary
+      ? AppColors.textDarkSecondary
       : const Color(0xFF475569);
 
   /// Labels for the preceding 11 months (oldest → most recent).
@@ -337,7 +337,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: widget.isDark
+                      ? AppColors.textOnDark
+                      : AppColors.textPrimary,
                 ),
               ),
               Text(

@@ -65,19 +65,19 @@ class _ReadingsPreviewSheet extends StatelessWidget {
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.close,
                     size: 20,
-                    color: AppColors.textSecondary,
+                    color: AppColors.dim(context),
                   ),
                 ),
               ],
@@ -131,18 +131,18 @@ class _ReadingCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   log.meterName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
               ),
               Text(
                 DateFormat('dd MMM yyyy · hh:mm a').format(log.loggedAt),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: AppColors.dim(context),
                 ),
               ),
             ],
@@ -220,19 +220,19 @@ class _Stat extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
+              color: AppColors.dim(context),
             ),
           ),
           const SizedBox(height: 2),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+              color: theme.colorScheme.onSurface,
             ),
           ),
         ],

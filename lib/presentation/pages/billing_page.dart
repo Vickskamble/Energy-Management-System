@@ -389,7 +389,7 @@ body: _loading
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.textSecondary),
+            Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.dim(context)),
             const SizedBox(height: 12),
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -509,9 +509,9 @@ body: _loading
                   end == null
                       ? '1 meter included'
                       : '1 meter included • ends ${DateFormat('d MMM yyyy').format(end)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: AppColors.dim(context),
                   ),
                 ),
               ],
@@ -550,7 +550,7 @@ body: _loading
                 Text(
                   '₹799/month • ${ent.extraMeters} extra meter(s) • '
                   '${end == null ? 'next billing unknown' : 'next billing ${DateFormat('d MMM yyyy').format(end)}'}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
                 ),
               ],
             ),
@@ -588,7 +588,7 @@ body: _loading
                   ent.creditEnd == null
                       ? 'Active on your account — no expiry set'
                       : 'Valid until ${DateFormat('d MMM yyyy').format(ent.creditEnd!)}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
                 ),
               ],
             ),
@@ -615,7 +615,7 @@ body: _loading
           const Divider(height: 24),
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -625,7 +625,7 @@ body: _loading
                     ),
                     Text(
                       '₹${SubscriptionConfig.meterPricePerMonth}/mo each',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
                     ),
                   ],
                 ),
@@ -658,7 +658,7 @@ body: _loading
           Text(
             'You have $_meterCount meter(s) configured. Base plan + '
             '$_extraMeters extra meter(s) = ${_meterCount > 1 ? _meterCount : 1} total.',
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
           ),
           const SizedBox(height: 16),
           if (ent.subActive && _extraMeters > ent.extraMeters) ...[
@@ -668,13 +668,13 @@ body: _loading
                 color: AppColors.warning.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
+child: Text(
                 'You are subscribed — extra meters cost ₹99/meter as a '
                 'one-time top-up. Your ₹799 base plan is NOT charged again.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
               ),
             ),
-            const SizedBox(height: 12),
+const SizedBox(height: 12),
           ],
           AppButton(
             label: ent.subActive
@@ -696,10 +696,10 @@ body: _loading
             expanded: true,
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Powered by Razorpay — UPI, cards & netbanking. 60-day free trial '
             'on every new account.',
-            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 11, color: AppColors.dim(context)),
           ),
         ],
       ),
@@ -722,7 +722,9 @@ body: _loading
           style: TextStyle(
             fontSize: emphasized ? 16 : 13,
             fontWeight: FontWeight.w700,
-            color: emphasized ? AppColors.primary : AppColors.textPrimary,
+            color: emphasized
+                ? AppColors.primary
+                : Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ],
@@ -746,10 +748,10 @@ body: _loading
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Every client who signs up with your code and subscribes gives '
             'you +1 free month. No limit on referrals.',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 13, color: AppColors.dim(context)),
           ),
           const SizedBox(height: 16),
           Row(
@@ -816,10 +818,10 @@ body: _loading
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Enter the owner key to unlock 6 months of full access — '
             'unlimited meters, no read-only lock.',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 13, color: AppColors.dim(context)),
           ),
           if (activeUntil != null && activeUntil.isAfter(DateTime.now())) ...[
             const SizedBox(height: 12),

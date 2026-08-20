@@ -87,14 +87,14 @@ class MeterManagementPage extends StatelessWidget {
               ),
               if (nameLocked) ...[
                 const SizedBox(height: 8),
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
                   child: Row(
                     children: [
                       Icon(
                         Icons.lock_outline,
                         size: 14,
-                        color: AppColors.textSecondary,
+                        color: AppColors.dim(context),
                       ),
                       SizedBox(width: 6),
                       Expanded(
@@ -104,7 +104,7 @@ class MeterManagementPage extends StatelessWidget {
                           'Other fields can still be edited.',
                           style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textSecondary,
+                            color: AppColors.dim(context),
                           ),
                         ),
                       ),
@@ -196,11 +196,14 @@ class MeterManagementPage extends StatelessWidget {
                 maxLength: 100,
               ),
               const SizedBox(height: 8),
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Multiplying Factor (MF) = CT × PT — meter readings are multiplied by this value',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.dim(context),
+                  ),
                 ),
               ),
             ],
@@ -463,7 +466,7 @@ class _MeterListState extends State<_MeterList> {
                                 color:
                                     (meter.isActive
                                             ? AppColors.success
-                                            : AppColors.textSecondary)
+                                            : AppColors.dim(context))
                                         .withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -473,7 +476,7 @@ class _MeterListState extends State<_MeterList> {
                                     : Icons.cancel_rounded,
                                 color: meter.isActive
                                     ? AppColors.success
-                                    : AppColors.textSecondary,
+                                    : AppColors.dim(context),
                                 size: 22,
                               ),
                             ),
@@ -494,7 +497,7 @@ class _MeterListState extends State<_MeterList> {
                                     '${meter.site} — Contract: ${meter.contractDemandKw.toStringAsFixed(0)} kVA — MF: ${meter.multiplyingFactor.toStringAsFixed(2)}${meter.location != null ? ' — ${meter.location}' : ''}',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: AppColors.textSecondary,
+                                      color: AppColors.dim(context),
                                     ),
                                   ),
                                 ],

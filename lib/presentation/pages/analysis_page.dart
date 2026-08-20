@@ -712,7 +712,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
           Text(
             '${DateFormat('MMM yyyy').format(refMonth)} vs '
             '${DateFormat('MMM yyyy').format(prevStart)}',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
           ),
           const Divider(height: 24),
           _deltaRow(
@@ -755,7 +755,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     final up = diff > 0;
     final good = diff == 0 ? true : (higherIsBetter ? up : !up);
     final color = diff == 0
-        ? AppColors.textSecondary
+        ? AppColors.dim(context)
         : (good ? AppColors.success : AppColors.danger);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1443,7 +1443,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   double.infinity,
                 ),
                 getDrawingHorizontalLine: (value) =>
-                    FlLine(color: AppColors.borderLight, strokeWidth: 1),
+                    FlLine(color: _line, strokeWidth: 1),
               ),
               titlesData: FlTitlesData(
                 leftTitles: const AxisTitles(
@@ -1541,7 +1541,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                           return LineTooltipItem(
                             '$label${spot.y.toStringAsFixed(1)} $unit',
                             TextStyle(
-                              color: AppColors.textPrimary,
+                              color: AppColors.textOnDark,
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -2006,7 +2006,7 @@ style: TextStyle(
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 11, color: AppColors.dim(context)),
           ),
           const SizedBox(height: 2),
           Text(

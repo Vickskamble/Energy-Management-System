@@ -81,21 +81,23 @@ class AppEmptyState extends StatelessWidget {
             Icon(
               icon,
               size: 64,
-              color: AppColors.textSecondary.withValues(alpha: 0.4),
+              color: AppColors.dim(context).withValues(alpha: 0.4),
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
               title,
               style: Theme.of(
                 context,
-              ).textTheme.titleLarge?.copyWith(color: AppColors.textSecondary),
+              ).textTheme.titleLarge?.copyWith(
+                color: AppColors.dim(context),
+              ),
             ),
             if (subtitle != null) ...[
               const SizedBox(height: AppSpacing.sm),
               Text(
                 subtitle!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
+                  color: AppColors.dim(context),
                 ),
               ),
             ],
@@ -139,7 +141,7 @@ class AppErrorState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,
-              ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
+              ).textTheme.bodyLarge?.copyWith(color: AppColors.dim(context)),
             ),
             if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.xl),
@@ -174,7 +176,7 @@ class AppLoadingIndicator extends StatelessWidget {
               message!,
               style: Theme.of(
                 context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.dim(context)),
             ),
           ],
         ],

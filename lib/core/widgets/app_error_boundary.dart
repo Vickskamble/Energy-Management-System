@@ -45,11 +45,11 @@ class _ErrorBoundaryStateState extends State<_ErrorBoundaryState> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Please retry. If the problem persists, contact support.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppColors.textSecondary,
+                  color: AppColors.dim(context),
                   fontSize: 13,
                 ),
               ),

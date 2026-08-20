@@ -54,6 +54,26 @@ class AppColors {
   static const Color borderLight = Color(0xFFE2E8F0);
   static const Color borderDark = Color(0xFF334155);
 
+  /// Theme-aware dim text colour (secondary text on the current surface).
+  /// Hardcoded `textSecondary` on a dark surface reads muddy — always route
+  /// secondary text through this so light/dark both stay readable.
+  static Color dim(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? textDarkSecondary
+          : textSecondary;
+
+  /// Theme-aware border/line colour for dividers, grids and outlines.
+  static Color line(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? borderDark
+          : borderLight;
+
+  /// Theme-aware elevated surface (card fill).
+  static Color surface(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? surfaceDark
+          : surfaceLight;
+
   // Sidebar
   static const Color sidebarLight = Color(0xFFFFFFFF);
   static const Color sidebarDark = Color(0xFF0F172A);

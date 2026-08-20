@@ -216,7 +216,7 @@ class _AppShellState extends State<AppShell> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.textSecondary,
+                    color: AppColors.dim(context),
                   ),
                 ),
               ],

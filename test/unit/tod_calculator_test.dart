@@ -7,6 +7,7 @@ EnergyLogEntity _log({
   required double kwh,
   required double kvah,
   required int hour,
+  DateTime? at,
 }) {
   return EnergyLogEntity(
     id: name,
@@ -19,7 +20,7 @@ EnergyLogEntity _log({
     mdRecorded: 30,
     contractDemand: 400,
     estimatedBill: 0,
-    loggedAt: DateTime(2026, 7, 3, hour),
+    loggedAt: at ?? DateTime(2026, 7, 3, hour),
     multiplyingFactor: 1,
   );
 }
@@ -28,7 +29,8 @@ void main() {
   group('TodCalculator slot engine', () {
     const shares = {'A': 0.0, 'B': 0.0, 'C': -0.15, 'D': 0.25};
 
-    test('splits each 8h window pro-rata across its two zones', () {
+    test('splits each 8h window pro-rata across its two zones '
+        '(shift-structured day)', () {
       final result = TodCalculator.calculate(
         logs: [
           _log(name: 'day', kwh: 92, kvah: 100, hour: 6),
@@ -45,14 +47,29 @@ void main() {
       expect(result.zoneUnits['D'], closeTo(87.5, 0.001));
     });
 
+    test('daily-totalizer day (single reading) spreads across zones '
+        'by wall-clock duration', () {
+      final result = TodCalculator.calculate(
+        logs: [_log(name: 'one', kwh: 92, kvah: 100, hour: 0)],
+        zoneShares: shares,
+        energyRatePerUnit: 8.44,
+      );
+      // A 6h, B 3h, C 8h, D 7h of 24h — never a dump into one zone.
+      expect(result.zoneUnits['A'], closeTo(25, 0.001));
+      expect(result.zoneUnits['B'], closeTo(12.5, 0.001));
+      expect(result.zoneUnits['C'], closeTo(100 / 3, 0.001));
+      expect(result.zoneUnits['D'], closeTo(29.1667, 0.001));
+    });
+
     test('zone charges = units × (share × energy rate)', () {
       final result = TodCalculator.calculate(
         logs: [_log(name: 'day', kwh: 92, kvah: 100, hour: 6)],
         zoneShares: shares,
         energyRatePerUnit: 8.44,
       );
-      // C 62.5 × (−0.15 × 8.44 = −1.266) + B 37.5 × 0
-      expect(result.netCharges, closeTo(-79.125, 0.001));
+      // single reading = totalizer: C 33.333 × (−0.15 × 8.44) + D 29.167 ×
+      // (0.25 × 8.44) = −42.2 + 61.54
+      expect(result.netCharges, closeTo(19.34, 0.01));
     });
 
     test('winter deepens the solar-window rebate only', () {
@@ -63,8 +80,9 @@ void main() {
         useWinter: true,
         energyRatePerUnit: 8.44,
       );
-      // C 62.5 × (−0.25 × 8.44 = −2.11) = −131.875
-      expect(result.netCharges, closeTo(-131.875, 0.001));
+      // single reading = totalizer: C 33.333 × (−0.25 × 8.44) + D 29.167 ×
+      // (0.25 × 8.44) = −70.33 + 61.54
+      expect(result.netCharges, closeTo(-8.79, 0.01));
     });
 
     test('bills kWh when the kVAh toggle is off', () {
@@ -74,8 +92,30 @@ void main() {
         energyRatePerUnit: 8.44,
         onKvah: false,
       );
-      // C fraction of the kWh (100, not 200)
-      expect(result.zoneUnits['C'], closeTo(62.5, 0.001));
+      // C fraction of the kWh (100, not 200) via duration spread
+      expect(result.zoneUnits['C'], closeTo(100 / 3, 0.001));
+    });
+
+    test('day buckets spread shift units evenly for totalizer days and '
+        'keep window attribution for shift-structured days', () {
+      final buckets = TodCalculator.days(
+        logs: [
+          _log(name: 'totalizer', kwh: 92, kvah: 100, hour: 0,
+              at: DateTime(2026, 7, 2, 0)),
+          _log(name: 'day', kwh: 103.5, kvah: 112.5, hour: 6),
+          _log(name: 'eve', kwh: 103.5, kvah: 112.5, hour: 14),
+          _log(name: 'night', kwh: 103.5, kvah: 112.5, hour: 22),
+        ],
+      );
+      expect(buckets, hasLength(2));
+      final totalizer = buckets.first;
+      expect(totalizer.shiftUnits[0], closeTo(100 / 3, 0.001));
+      expect(totalizer.shiftUnits[1], closeTo(100 / 3, 0.001));
+      expect(totalizer.shiftUnits[2], closeTo(100 / 3, 0.001));
+      final structured = buckets.last;
+      expect(structured.shiftUnits[0], closeTo(112.5, 0.001));
+      expect(structured.shiftUnits[1], closeTo(112.5, 0.001));
+      expect(structured.shiftUnits[2], closeTo(112.5, 0.001));
     });
   });
 }

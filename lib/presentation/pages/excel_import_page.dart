@@ -149,7 +149,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.info.withValues(alpha: 0.25)),
           ),
-          child: const Row(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
@@ -167,7 +167,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.5,
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -181,12 +181,12 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '3 Easy Steps',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -296,15 +296,15 @@ class _StepRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        Icon(icon, size: 18, color: AppColors.textSecondary),
+        Icon(icon, size: 18, color: AppColors.dim(context)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               height: 1.4,
-              color: AppColors.textSecondary,
+              color: AppColors.dim(context),
             ),
           ),
         ),
@@ -607,9 +607,9 @@ class _ExcelImportPreviewDialogState extends State<ExcelImportPreviewDialog> {
             Text(
               '${widget.drafts.length} reading(s) found — ${widget.sourceFile}. '
               'Verify the values, then import.',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.textSecondary,
+                color: AppColors.dim(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -649,10 +649,10 @@ class _ExcelImportPreviewDialogState extends State<ExcelImportPreviewDialog> {
               children: [
                 Text(
                   e.draft.sourceLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: AppColors.dim(context),
                   ),
                 ),
                 const Spacer(),

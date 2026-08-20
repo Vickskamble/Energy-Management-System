@@ -466,7 +466,7 @@ class _ReportsContentState extends State<_ReportsContent> {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -482,7 +482,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                       'Estimated vs actual utility bill per month',
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: AppColors.dim(context),
                       ),
                     ),
                   ],
@@ -509,9 +509,9 @@ class _ReportsContentState extends State<_ReportsContent> {
           ],
           const SizedBox(height: 16),
           if (months.isEmpty)
-            const Text(
+            Text(
               'No readings yet',
-              style: TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: AppColors.dim(context)),
             )
           else
             for (final key in months) _buildBillRow(key, currencyFmt),
@@ -555,7 +555,7 @@ class _ReportsContentState extends State<_ReportsContent> {
     Color diffColor;
     if (actual == null) {
       diffText = 'No actual bill entered';
-      diffColor = AppColors.textSecondary;
+      diffColor = AppColors.dim(context);
     } else {
       final diff = actual - estimated;
       final pct = estimated > 0 ? (diff / estimated).abs() * 100 : 0;
@@ -591,9 +591,9 @@ class _ReportsContentState extends State<_ReportsContent> {
                     ),
                     Text(
                       'Est. ${currencyFmt.format(estimated)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: AppColors.dim(context),
                       ),
                     ),
                   ],
@@ -606,9 +606,9 @@ class _ReportsContentState extends State<_ReportsContent> {
                         actual == null
                             ? '—'
                             : 'Actual ${currencyFmt.format(actual)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: AppColors.dim(context),
                         ),
                       ),
                     ),
@@ -641,9 +641,9 @@ class _ReportsContentState extends State<_ReportsContent> {
               Expanded(
                 child: Text(
                   'Est. ${currencyFmt.format(estimated)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: AppColors.dim(context),
                   ),
                 ),
               ),
@@ -652,9 +652,9 @@ class _ReportsContentState extends State<_ReportsContent> {
                   actual == null
                       ? '—'
                       : 'Actual ${currencyFmt.format(actual)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: AppColors.dim(context),
                   ),
                 ),
               ),
@@ -840,7 +840,7 @@ class _ReportsContentState extends State<_ReportsContent> {
           const SizedBox(height: 4),
           Text(
             'Last 12 months — estimated bill (₹)',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -856,7 +856,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                         '${DateFormat('MMM yy').format(monthDates[group.x])}: '
                         '₹${rod.toY.toStringAsFixed(0)}',
                         const TextStyle(
-                          color: AppColors.textPrimary,
+                          color: AppColors.textOnDark,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
@@ -886,10 +886,10 @@ class _ReportsContentState extends State<_ReportsContent> {
                           padding: const EdgeInsets.only(bottom: 3),
                           child: Text(
                             _compactInr(monthBills[i]),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 8.5,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                         );
@@ -912,9 +912,9 @@ class _ReportsContentState extends State<_ReportsContent> {
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             DateFormat('MMM').format(monthDates[i]),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 9,
-                              color: AppColors.textSecondary,
+                              color: AppColors.dim(context),
                             ),
                           ),
                         );
@@ -933,7 +933,7 @@ class _ReportsContentState extends State<_ReportsContent> {
                           borderRadius: BorderRadius.circular(3),
                           color: monthBills[i] > 0
                               ? AppColors.primary
-                              : AppColors.borderLight,
+                              : AppColors.line(context),
                         ),
                       ],
                     ),
@@ -963,7 +963,7 @@ class _ReportsContentState extends State<_ReportsContent> {
           const SizedBox(height: 4),
           Text(
             'Bill Analysis for ${entityLogs.length} readings',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
           ),
           const Divider(height: 24),
           LayoutBuilder(
@@ -1073,7 +1073,7 @@ class _ReportsContentState extends State<_ReportsContent> {
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 11, color: AppColors.dim(context)),
         ),
         const SizedBox(height: 2),
         Text(

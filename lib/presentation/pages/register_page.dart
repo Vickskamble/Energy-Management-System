@@ -83,11 +83,11 @@ class _RegisterPageState extends State<RegisterPage> {
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Create your account to start monitoring',
                     style: TextStyle(
                       fontSize: 14,
-                      color: AppColors.textSecondary,
+                      color: AppColors.dim(context),
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -206,7 +206,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   ? AppColors.danger
                                   : (_consentAccepted
                                         ? AppColors.primary
-                                        : AppColors.textSecondary),
+                                        : AppColors.dim(context)),
                               size: 22,
                             ),
                             const SizedBox(width: 10),

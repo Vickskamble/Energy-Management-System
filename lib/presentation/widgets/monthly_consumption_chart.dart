@@ -24,9 +24,11 @@ class MonthlyConsumptionChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final onTap = onMonthTap;
     final monthlyMap = <int, double>{};
+    final dim = AppColors.dim(context);
+    final line = AppColors.line(context);
 
     if (logs.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 200,
         child: Center(
           child: Column(
@@ -35,12 +37,12 @@ class MonthlyConsumptionChart extends StatelessWidget {
               Icon(
                 Icons.calendar_month_outlined,
                 size: 30,
-                color: AppColors.textSecondary,
+                color: dim,
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 'No monthly data',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: dim),
               ),
             ],
           ),
@@ -63,7 +65,7 @@ class MonthlyConsumptionChart extends StatelessWidget {
     }
 
     if (monthlyMap.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 200,
         child: Center(
           child: Column(
@@ -72,12 +74,12 @@ class MonthlyConsumptionChart extends StatelessWidget {
               Icon(
                 Icons.calendar_month_outlined,
                 size: 30,
-                color: AppColors.textSecondary,
+                color: dim,
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 'No monthly data',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: dim),
               ),
             ],
           ),
@@ -114,7 +116,7 @@ class MonthlyConsumptionChart extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (targetSpots.isNotEmpty) ...[
-          _targetLegend(),
+          _targetLegend(dim),
           const SizedBox(height: 8),
         ],
         SizedBox(
@@ -133,7 +135,7 @@ class MonthlyConsumptionChart extends StatelessWidget {
               double.infinity,
             ),
             getDrawingHorizontalLine: (value) =>
-                FlLine(color: AppColors.borderLight, strokeWidth: 1),
+                FlLine(color: line, strokeWidth: 1),
           ),
           titlesData: FlTitlesData(
             leftTitles: AxisTitles(
@@ -144,7 +146,7 @@ class MonthlyConsumptionChart extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: dim,
                   ),
                 ),
               ),
@@ -160,7 +162,7 @@ class MonthlyConsumptionChart extends StatelessWidget {
                       '${value.toInt()}',
                       style: TextStyle(
                         fontSize: 10,
-                        color: AppColors.textSecondary,
+                        color: dim,
                         fontFamily: 'JetBrains Mono',
                       ),
                     ),
@@ -176,7 +178,7 @@ class MonthlyConsumptionChart extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: dim,
                   ),
                 ),
               ),
@@ -196,7 +198,7 @@ class MonthlyConsumptionChart extends StatelessWidget {
                       '$month',
                       style: TextStyle(
                         fontSize: 9,
-                        color: AppColors.textSecondary,
+                        color: dim,
                       ),
                     ),
                   );
@@ -284,7 +286,7 @@ class MonthlyConsumptionChart extends StatelessWidget {
     );
   }
 
-  Widget _targetLegend() {
+  Widget _targetLegend(Color dim) {
     return Row(
       children: [
         CustomPaint(
@@ -295,9 +297,9 @@ class MonthlyConsumptionChart extends StatelessWidget {
         Text(
           'Daily target × days '
           '(${targetKwhPerDay.toStringAsFixed(0)} kWh/day)',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
-            color: AppColors.textSecondary,
+            color: dim,
           ),
         ),
       ],

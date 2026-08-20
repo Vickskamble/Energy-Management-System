@@ -48,10 +48,15 @@ void main() {
       expect(breakdown.pfSurcharge, closeTo(49277.5, 0.01)); // PF 0.8 < 0.9 → 5%
       expect(breakdown.pfRebate, 0);
       expect(breakdown.loadFactor, 1.0);
-      expect(breakdown.todZoneUnits['A'], closeTo(937.5, 0.01)); // 00:00 → A 6/8
-      expect(breakdown.todZoneUnits['D'], closeTo(312.5, 0.01)); // D 2/8
-      expect(breakdown.payableEarly, 997550); // floor ₹10
-      expect(breakdown.payableAfterDpc, 1017300); // floor ₹10
+      // 00:00 daily-totalizer reading → spread across all zones: A 6/24,
+      // B 3/24, C 8/24, D 7/24 (1250 units total).
+      expect(breakdown.todZoneUnits['A'], closeTo(312.5, 0.01));
+      expect(breakdown.todZoneUnits['B'], closeTo(156.25, 0.01));
+      expect(breakdown.todZoneUnits['C'], closeTo(416.67, 0.01));
+      expect(breakdown.todZoneUnits['D'], closeTo(364.58, 0.01));
+      expect(breakdown.lfIncentive, closeTo(158.25, 0.01));
+      expect(breakdown.payableEarly, 997150); // floor ₹10
+      expect(breakdown.payableAfterDpc, 1016890); // floor ₹10
     });
 
     test('applies PF rebate when power factor >= threshold', () {
@@ -62,8 +67,11 @@ void main() {
       expect(breakdown.powerFactor, 1.0);
       expect(breakdown.pfRebate, closeTo(9834.4, 0.01)); // 1% of (8440+975000)
       expect(breakdown.pfSurcharge, 0);
-      expect(breakdown.payableEarly, 936370); // floor ₹10
-      expect(breakdown.payableAfterDpc, 955880); // floor ₹10
+      expect(breakdown.todZoneUnits['A'], closeTo(250, 0.01)); // 1000 u × 6/24
+      expect(breakdown.todZoneUnits['D'], closeTo(291.67, 0.01)); // 1000 u × 7/24
+      expect(breakdown.lfIncentive, closeTo(126.6, 0.01));
+      expect(breakdown.payableEarly, 936050); // floor ₹10
+      expect(breakdown.payableAfterDpc, 955560); // floor ₹10
     });
 
     test('respects a custom energy rate', () {

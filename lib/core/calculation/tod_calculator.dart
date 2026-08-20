@@ -2,11 +2,19 @@ import '../../domain/entities/energy_log_entity.dart';
 
 /// Slot-wise ToD engine — replaces the old flat 4-multiplier average.
 ///
-/// Each TOD-meter reading falls in an 8-hour window (06–14, 14–22, 22–06)
-/// which covers two billing zones; the reading's units are split pro-rata by
-/// the hours covered (e.g. 06–14 = 3h zone B + 5h zone C). Zone charges use
-/// per-zone shares of the energy rate, exactly like the discom's zone
-/// accumulators.
+/// Handles BOTH data shapes that exist in the app:
+///
+/// 1. **Shift-structured days** (3 submeter readings per day at 06/14/22, like
+///    the demo seed / trial HTML): each reading falls in an 8-hour window which
+///    covers two billing zones; the reading's units are split pro-rata by the
+///    hours covered (e.g. 06–14 = 3h zone B + 5h zone C).
+///
+/// 2. **Daily-totalizer days** (ONE reading per day, e.g. a plant that records
+///    its meter once daily — the gkh@ems.com real dataset): the reading covers
+///    all 24 hours, so its units are spread across the day by wall-clock zone
+///    duration (A 6h, B 3h, C 8h, D 7h). Dumping the whole day into the
+///    recording hour's zone (everything in A/D for a 00:00 entry) would be
+///    wrong — this is the fix for the previous behaviour.
 class TodCalculator {
   TodCalculator._();
 
@@ -17,6 +25,50 @@ class TodCalculator {
     (startHour: 14, shares: {'C': 3 / 8, 'D': 5 / 8}),
     (startHour: 22, shares: {'D': 2 / 8, 'A': 6 / 8}),
   ];
+
+  /// Wall-clock duration (hours) per billing zone — used to spread a daily
+  /// totalizer reading across the day.
+  static const Map<String, double> _zoneHours = {
+    'A': 6, // 00–06
+    'B': 3, // 06–09
+    'C': 8, // 09–17
+    'D': 7, // 17–24
+  };
+
+  /// The single 8h window a given hour falls into (06/14/22 starts).
+  static ({int startHour, Map<String, double> shares}) _splitFor(int hour) {
+    if (hour >= 6 && hour < 14) return _shiftSplits[0];
+    if (hour >= 14 && hour < 22) return _shiftSplits[1];
+    return _shiftSplits[2];
+  }
+
+  /// Shift index for an hour (identical to [shiftIndex]): 0 = Day (06–14),
+  /// 1 = Evening (14–22), 2 = Night (22–06).
+  static int _windowStart(int hour) {
+    if (hour >= 6 && hour < 14) return 6;
+    if (hour >= 14 && hour < 22) return 14;
+    return 22;
+  }
+
+  /// Public shift index used by the UI: 0 = Day, 1 = Evening, 2 = Night.
+  static int shiftIndex(int hour) {
+    if (hour >= 6 && hour < 14) return 0;
+    if (hour >= 14 && hour < 22) return 1;
+    return 2;
+  }
+
+  /// Splits a reading's units into the 8h window pro-rata (engine primitive).
+  static void _splitInto({
+    required Map<String, double> zoneUnits,
+    required double unit,
+    required int hour,
+  }) {
+    final split = _splitFor(hour);
+    for (final entry in split.shares.entries) {
+      zoneUnits[entry.key] =
+          (zoneUnits[entry.key] ?? 0) + unit * entry.value;
+    }
+  }
 
   /// Result of the zone split: units and ₹ per zone + the net ToD charge.
   static TodZoneResult calculate({
@@ -31,14 +83,13 @@ class TodCalculator {
         ? winterZoneShares
         : zoneShares;
     final zoneUnits = <String, double>{};
-    for (final log in logs) {
-      final unit = (onKvah ? log.kvah : log.kwh) * log.multiplyingFactor;
-      if (unit < 0) continue;
-      final hour = log.loggedAt.hour;
-      final split = _splitFor(hour);
-      for (final entry in split.shares.entries) {
-        zoneUnits[entry.key] =
-            (zoneUnits[entry.key] ?? 0) + unit * entry.value;
+    for (final day in _days(logs: logs, onKvah: onKvah)) {
+      for (final entry in day.zoneUnits.entries) {
+        // Re-derive zone units from the calendar-hours spread: the day bucket
+        // already holds units shoe-horned into the correct 6/8h zone windows,
+        // but the reading itself may straddle windows — re-apply so every unit
+        // lands exactly once.
+        zoneUnits[entry.key] = (zoneUnits[entry.key] ?? 0) + entry.value;
       }
     }
     final zoneCharges = <String, double>{};
@@ -57,11 +108,97 @@ class TodCalculator {
     );
   }
 
-  static ({int startHour, Map<String, double> shares}) _splitFor(int hour) {
-    if (hour >= 6 && hour < 14) return _shiftSplits[0];
-    if (hour >= 14 && hour < 22) return _shiftSplits[1];
-    return _shiftSplits[2];
+  /// Normalised per-day buckets — the single source of truth for the zone
+  /// table, shift summary, daily chart AND the bill engine so every surface
+  /// shows the same ToD numbers.
+  ///
+  /// Each returned bucket carries:
+  ///   [date]         — the day (local).
+  ///   [zoneUnits]    — units attributed to each zone (A/B/C/D).
+  ///   [shiftUnits]   — units per 8h shift (Day/Evening/Night) for charts.
+  static List<TodDayBucket> days({
+    required List<EnergyLogEntity> logs,
+    bool onKvah = true,
+  }) {
+    return _days(logs: logs, onKvah: onKvah);
   }
+
+  static List<TodDayBucket> _days({
+    required List<EnergyLogEntity> logs,
+    required bool onKvah,
+  }) {
+    // Group by local day.
+    final byDay = <String, List<EnergyLogEntity>>{};
+    for (final l in logs) {
+      final logged = l.loggedAt;
+      final key = '${logged.year}-${logged.month}-${logged.day}';
+      byDay.putIfAbsent(key, () => []).add(l);
+    }
+    final keys = byDay.keys.toList()
+      ..sort((a, b) => a.compareTo(b));
+    final buckets = <TodDayBucket>[];
+    for (final key in keys) {
+      final dayLogs = byDay[key]!;
+      final first = dayLogs.first.loggedAt;
+      final date = DateTime(first.year, first.month, first.day);
+      final windows = dayLogs
+          .map((l) => _windowStart(l.loggedAt.hour))
+          .toSet();
+      final isShiftStructured =
+          dayLogs.length > 1 && windows.length > 1;
+
+      final zoneUnits = <String, double>{'A': 0, 'B': 0, 'C': 0, 'D': 0};
+      final shiftUnits = [0.0, 0.0, 0.0];
+
+      if (isShiftStructured) {
+        // 3-submeter day — each reading belongs to its own 8h window.
+        for (final l in dayLogs) {
+          final unit = (onKvah ? l.kvah : l.kwh) * l.multiplyingFactor;
+          if (unit < 0) continue;
+          _splitInto(zoneUnits: zoneUnits, unit: unit, hour: l.loggedAt.hour);
+          final si = shiftIndex(l.loggedAt.hour);
+          shiftUnits[si] += unit;
+        }
+      } else {
+        // Daily-totalizer day — the reading(s) cover the whole 24h. Spread by
+        // wall-clock zone duration so a 00:00 entry doesn't dump the day into
+        // zone A/D.
+        var dayUnits = 0.0;
+        for (final l in dayLogs) {
+          final unit = (onKvah ? l.kvah : l.kwh) * l.multiplyingFactor;
+          if (unit >= 0) dayUnits += unit;
+        }
+        for (final skill in _zoneHours.entries) {
+          zoneUnits[skill.key] = dayUnits * skill.value / 24;
+        }
+        // Each 8h shift gets an equal third of a uniform day.
+        final third = dayUnits / 3;
+        shiftUnits[0] = third;
+        shiftUnits[1] = third;
+        shiftUnits[2] = third;
+      }
+
+      buckets.add(TodDayBucket(
+        date: date,
+        zoneUnits: zoneUnits,
+        shiftUnits: shiftUnits,
+      ));
+    }
+    return buckets;
+  }
+}
+
+/// One day's ToD attribution — zones A/B/C/D units + 3 shift units.
+class TodDayBucket {
+  final DateTime date;
+  final Map<String, double> zoneUnits;
+  final List<double> shiftUnits;
+
+  const TodDayBucket({
+    required this.date,
+    required this.zoneUnits,
+    required this.shiftUnits,
+  });
 }
 
 class TodZoneResult {

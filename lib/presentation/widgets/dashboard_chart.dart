@@ -20,9 +20,12 @@ class DashboardChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final onTap = onMonthTap;
     final monthlySum = <int, double>{};
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final dim = dark ? AppColors.textDarkSecondary : AppColors.textSecondary;
+    final line = dark ? AppColors.borderDark : AppColors.borderLight;
 
     if (logs.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 220,
         child: Center(
           child: Column(
@@ -31,12 +34,12 @@ class DashboardChart extends StatelessWidget {
               Icon(
                 Icons.query_stats,
                 size: 34,
-                color: AppColors.textSecondary,
+                color: dim,
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 'No data available for chart',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: dim),
               ),
             ],
           ),
@@ -60,7 +63,7 @@ class DashboardChart extends StatelessWidget {
     }
 
     if (monthlySum.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 220,
         child: Center(
           child: Column(
@@ -69,12 +72,12 @@ class DashboardChart extends StatelessWidget {
               Icon(
                 Icons.query_stats,
                 size: 34,
-                color: AppColors.textSecondary,
+                color: dim,
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 'No data available for chart',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: dim),
               ),
             ],
           ),
@@ -114,11 +117,12 @@ class DashboardChart extends StatelessWidget {
       children: [
         Row(
           children: [
-            _legendItem(AppColors.warning, 'Max Demand (kVA)'),
+            _legendItem(AppColors.warning, 'Max Demand (kVA)', dim),
             const SizedBox(width: 16),
             _dashedLegendItem(
               AppColors.danger,
               '75% of Contract (${referenceDemand.toInt()} kVA)',
+              dim,
             ),
           ],
         ),
@@ -139,11 +143,11 @@ class DashboardChart extends StatelessWidget {
                   double.infinity,
                 ),
                 getDrawingHorizontalLine: (value) =>
-                    FlLine(color: AppColors.borderLight, strokeWidth: 1),
+                    FlLine(color: line, strokeWidth: 1),
               ),
               titlesData: FlTitlesData(
                 leftTitles: AxisTitles(
-                  axisNameWidget: _axisLabel('kVA', vertical: true),
+                  axisNameWidget: _axisLabel('kVA', vertical: true, dim: dim),
                   axisNameSize: 26,
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -156,7 +160,7 @@ class DashboardChart extends StatelessWidget {
                           '${value.toInt()}',
                           style: TextStyle(
                             fontSize: 10,
-                            color: AppColors.textSecondary,
+                            color: dim,
                             fontFamily: 'JetBrains Mono',
                           ),
                         ),
@@ -164,7 +168,7 @@ class DashboardChart extends StatelessWidget {
                     },
                   ),
                 ),
-                bottomTitles: _bottomTitles(),
+                bottomTitles: _bottomTitles(dim),
                 topTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
@@ -256,9 +260,9 @@ class DashboardChart extends StatelessWidget {
     );
   }
 
-  AxisTitles _bottomTitles() {
+  AxisTitles _bottomTitles(Color dim) {
     return AxisTitles(
-      axisNameWidget: _axisLabel('Month (1-12)'),
+      axisNameWidget: _axisLabel('Month (1-12)', dim: dim),
       axisNameSize: 22,
       sideTitles: SideTitles(
         showTitles: true,
@@ -273,7 +277,7 @@ class DashboardChart extends StatelessWidget {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               '$month',
-              style: TextStyle(fontSize: 9, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 9, color: dim),
             ),
           );
         },
@@ -281,13 +285,13 @@ class DashboardChart extends StatelessWidget {
     );
   }
 
-  Widget _axisLabel(String text, {bool vertical = false}) {
+  Widget _axisLabel(String text, {bool vertical = false, required Color dim}) {
     final label = Text(
       text,
       style: TextStyle(
         fontSize: 10,
         fontWeight: FontWeight.w600,
-        color: AppColors.textSecondary,
+        color: dim,
       ),
     );
     return vertical
@@ -295,7 +299,7 @@ class DashboardChart extends StatelessWidget {
         : Padding(padding: const EdgeInsets.only(top: 4), child: label);
   }
 
-  Widget _legendItem(Color color, String label) {
+  Widget _legendItem(Color color, String label, Color dim) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -307,13 +311,13 @@ class DashboardChart extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 11, color: dim),
         ),
       ],
     );
   }
 
-  Widget _dashedLegendItem(Color color, String label) {
+  Widget _dashedLegendItem(Color color, String label, Color dim) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -321,7 +325,7 @@ class DashboardChart extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 11, color: dim),
         ),
       ],
     );

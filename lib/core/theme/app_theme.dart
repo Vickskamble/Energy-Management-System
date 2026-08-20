@@ -273,6 +273,8 @@ class AppTheme {
           fontSize: 14,
           color: AppColors.textDarkSecondary,
         ),
+        prefixIconColor: AppColors.textDarkSecondary,
+        suffixIconColor: AppColors.textDarkSecondary,
       ),
       dividerTheme: base.dividerTheme.copyWith(color: AppColors.borderDark),
       chipTheme: base.chipTheme.copyWith(
@@ -281,12 +283,15 @@ class AppTheme {
       ),
       bottomNavigationBarTheme: base.bottomNavigationBarTheme.copyWith(
         backgroundColor: AppColors.surfaceDark,
+        unselectedItemColor: AppColors.textDarkSecondary,
       ),
       navigationBarTheme: base.navigationBarTheme.copyWith(
         backgroundColor: AppColors.surfaceDark,
       ),
       dialogTheme: base.dialogTheme.copyWith(
         backgroundColor: AppColors.surfaceDark,
+        titleTextStyle: base.dialogTheme.titleTextStyle
+            ?.copyWith(color: AppColors.textOnDark),
       ),
       snackBarTheme: base.snackBarTheme.copyWith(
         backgroundColor: AppColors.surfaceDark,

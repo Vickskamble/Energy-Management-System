@@ -708,7 +708,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           style: TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+            color: AppColors.dim(context),
           ),
         ),
         style: TextStyle(
@@ -911,6 +911,7 @@ class _DashboardContentState extends State<_DashboardContent> {
     final insights = _insights;
     final recommendations = _recommendations;
     final isCurrentMonth = _selection.isCurrent;
+    final mdBreachCount = _mdBreachDays(periodLogs, breakdown);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -1018,10 +1019,10 @@ class _DashboardContentState extends State<_DashboardContent> {
                 child: Center(
                   child: Column(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.event_busy_rounded,
                         size: 40,
-                        color: AppColors.textSecondary,
+                        color: AppColors.dim(context),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -1043,7 +1044,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: AppColors.dim(context),
                         ),
                       ),
                     ],
@@ -1105,9 +1106,11 @@ class _DashboardContentState extends State<_DashboardContent> {
               ),
               TrialKpiCard(
                 title: 'MD breaches',
-                value: '${_mdBreachDays(periodLogs, breakdown)} days',
+                value: '$mdBreachCount days',
                 sub: 'shift MD > ${(breakdown.contractDemand * 0.95).round()} (95% CD) · peak ${_siteMaxDemandPeak.round()}',
-                color: AppColors.danger,
+                color: mdBreachCount == 0
+                    ? AppColors.success
+                    : AppColors.danger,
                 pct: 70,
                 badgeNew: true,
               ),
@@ -1123,7 +1126,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           if (opportunities.isNotEmpty) ...[
             AppSectionHeader(
               title: 'Bill Saving Opportunities',
-              subtitle: 'Direct monthly savings — priority order me',
+              subtitle: 'Direct monthly savings — in priority order',
             ),
             if (MediaQuery.of(context).size.width < 600)
               Column(
@@ -1375,9 +1378,9 @@ class _DashboardContentState extends State<_DashboardContent> {
               ),
               Text(
                 '${events.length} event(s)',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textSecondary,
+                  color: AppColors.dim(context),
                 ),
               ),
             ],
@@ -1404,9 +1407,9 @@ class _DashboardContentState extends State<_DashboardContent> {
                         const SizedBox(height: 2),
                         Text(
                           events[i].meterName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textSecondary,
+                            color: AppColors.dim(context),
                           ),
                         ),
                       ],
@@ -1559,7 +1562,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                       : 'No reading recorded for this month yet',
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: AppColors.dim(context),
                   ),
                 ),
               ),
@@ -1619,7 +1622,7 @@ class _DashboardContentState extends State<_DashboardContent> {
     bool chipNeutral = false,
   }) {
     final chipColor = chipNeutral
-        ? AppColors.textSecondary
+        ? AppColors.dim(context)
         : (isGood ? AppColors.success : AppColors.danger);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -1628,7 +1631,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
             ),
           ),
           Text(
@@ -1693,7 +1696,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: AppColors.dim(context),
                   ),
                 ),
               ),
@@ -1703,10 +1706,10 @@ class _DashboardContentState extends State<_DashboardContent> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
-                  'No reading recorded for this month yet',
+'No reading recorded for this month yet',
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: AppColors.dim(context),
                   ),
                 ),
               ),
@@ -1714,7 +1717,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           else ...[
             Text(
               'Projected Month-End Bill',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
             ),
             const SizedBox(height: 4),
             Text(
@@ -1728,7 +1731,7 @@ class _DashboardContentState extends State<_DashboardContent> {
             const SizedBox(height: 4),
             Text(
               '≈ ${forecast.projectedUnits.toStringAsFixed(0)} kWh units',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
             ),
             const Divider(height: 24),
             Row(
@@ -1763,7 +1766,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               style: TextStyle(
                 fontSize: 10.5,
                 fontStyle: FontStyle.italic,
-                color: AppColors.textSecondary,
+                color: AppColors.dim(context),
               ),
             ),
           ],
@@ -1779,7 +1782,7 @@ class _DashboardContentState extends State<_DashboardContent> {
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 11, color: AppColors.dim(context)),
           ),
           const SizedBox(height: 2),
           Text(
@@ -1904,14 +1907,14 @@ class _DashboardContentState extends State<_DashboardContent> {
           const SizedBox(width: 6),
           Text(
             '$label: ',
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -2017,10 +2020,10 @@ class _DashboardContentState extends State<_DashboardContent> {
                       Padding(
                         padding: const EdgeInsets.only(left: 12, top: 2),
                         child: Text(
-                          '↳ ${item.solution}',
+'↳ ${item.solution}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: AppColors.dim(context),
                           ),
                         ),
                       ),
@@ -2112,7 +2115,7 @@ class _SavingOpportunityCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             opportunity.description,
-            style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 11.5, color: AppColors.dim(context)),
           ),
           const SizedBox(height: 10),
           Row(
@@ -2200,7 +2203,7 @@ class _InsightCard extends StatelessWidget {
                   insight.description,
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: AppColors.dim(context),
                   ),
                 ),
                 if (insight.recommendation != null) ...[
@@ -2299,7 +2302,7 @@ class _RecommendationCard extends StatelessWidget {
                   rec.description,
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: AppColors.dim(context),
                   ),
                 ),
                 const SizedBox(height: 4),

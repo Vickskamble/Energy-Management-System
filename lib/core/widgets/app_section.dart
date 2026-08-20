@@ -30,7 +30,7 @@ class AppSectionHeader extends StatelessWidget {
                     subtitle!,
                     style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textSecondary,
+                      color: AppColors.dim(context),
                     ),
                   ),
                 ],

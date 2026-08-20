@@ -150,7 +150,7 @@ class _AppSidebarState extends State<AppSidebar> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: AppColors.textOnDark,
                     ),
                   ),
                 ],
@@ -226,7 +226,9 @@ class _AppSidebarState extends State<AppSidebar> {
                 size: 18,
               ),
               onPressed: widget.onThemeToggle,
-              color: AppColors.textSecondary,
+              color: widget.isDark
+                  ? AppColors.textDarkSecondary
+                  : AppColors.textSecondary,
               tooltip: widget.isDark ? 'Light mode' : 'Dark mode',
             ),
             const SizedBox(height: 4),
@@ -260,18 +262,22 @@ class _AppSidebarState extends State<AppSidebar> {
                     children: [
                       Text(
                         widget.userName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: widget.isDark
+                              ? AppColors.textOnDark
+                              : AppColors.textPrimary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         widget.userEmail,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textSecondary,
+                          color: widget.isDark
+                              ? AppColors.textDarkSecondary
+                              : AppColors.textSecondary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -286,7 +292,9 @@ class _AppSidebarState extends State<AppSidebar> {
                     size: 18,
                   ),
                   onPressed: widget.onThemeToggle,
-                  color: AppColors.textSecondary,
+                  color: widget.isDark
+                      ? AppColors.textDarkSecondary
+                      : AppColors.textSecondary,
                   tooltip: widget.isDark ? 'Light mode' : 'Dark mode',
                 ),
               ],
@@ -363,7 +371,11 @@ class _SidebarItem extends StatelessWidget {
                 Icon(
                   selected ? item.activeIcon : item.icon,
                   size: 22,
-                  color: selected ? AppColors.primary : AppColors.textSecondary,
+                  color: selected
+                      ? AppColors.primary
+                      : (isDark
+                            ? AppColors.textDarkSecondary
+                            : AppColors.textSecondary),
                 ),
                 if (!isCollapsed) ...[
                   const SizedBox(width: 12),
@@ -377,7 +389,9 @@ class _SidebarItem extends StatelessWidget {
                             : FontWeight.w500,
                         color: selected
                             ? AppColors.primary
-                            : AppColors.textSecondary,
+                            : (isDark
+                                  ? AppColors.textDarkSecondary
+                                  : AppColors.textSecondary),
                       ),
                     ),
                   ),

@@ -65,7 +65,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                     subtitle!,
                     style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textSecondary,
+                      color: AppColors.dim(context),
                     ),
                   ),
               ],
@@ -135,12 +135,12 @@ class AppBreadcrumb extends StatelessWidget {
     return Row(
       children: List.generate(items.length * 2 - 1, (i) {
         if (i.isOdd) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 6),
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Icon(
               Icons.chevron_right,
               size: 14,
-              color: AppColors.textSecondary,
+              color: AppColors.dim(context),
             ),
           );
         }
@@ -151,7 +151,7 @@ class AppBreadcrumb extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: isLast ? FontWeight.w600 : FontWeight.w400,
-            color: isLast ? AppColors.primary : AppColors.textSecondary,
+            color: isLast ? AppColors.primary : AppColors.dim(context),
           ),
         );
       }),

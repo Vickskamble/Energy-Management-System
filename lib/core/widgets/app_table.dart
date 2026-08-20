@@ -61,7 +61,9 @@ class AppTable extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+                        color: isDark
+                            ? AppColors.textDarkSecondary
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ),

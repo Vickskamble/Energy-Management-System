@@ -78,11 +78,17 @@ class _TodShiftSectionState extends State<TodShiftSection> {
     );
   }
 
-  /// kWht per 8h shift: 0 = Day (06–14), 1 = Evening (14–22), 2 = Night.
+  /// Units per 8h shift via the day-aware engine — daily-totalizer days
+  /// spread their units ⅓ per shift so they are never dumped into one slot.
   List<double> get _byShiftKwh {
     final sums = [0.0, 0.0, 0.0];
-    for (final l in widget.logs) {
-      sums[_shiftIndex(l.loggedAt.hour)] += l.kwh * l.multiplyingFactor;
+    for (final d in TodCalculator.days(
+      logs: widget.logs,
+      onKvah: AppConfig.billOnKvah,
+    )) {
+      for (var i = 0; i < 3; i++) {
+        sums[i] += d.shiftUnits[i];
+      }
     }
     return sums;
   }
@@ -92,34 +98,21 @@ class _TodShiftSectionState extends State<TodShiftSection> {
     final maxes = [0.0, 0.0, 0.0];
     for (final l in widget.logs) {
       final md = l.mdRecorded * l.multiplyingFactor;
-      final i = _shiftIndex(l.loggedAt.hour);
+      final i = TodCalculator.shiftIndex(l.loggedAt.hour);
       if (md > maxes[i]) maxes[i] = md;
     }
     return maxes;
   }
 
-  /// Distinct days in the period (chronological) with their shift kWh.
+  /// Distinct days (chronological) with their shift units — day-aware.
   List<({DateTime date, List<double> kwh})> get _perDay {
-    final map = <String, ({DateTime date, List<double> kwh})>{};
-    for (final l in widget.logs) {
-      final key =
-          '${l.loggedAt.year}-${l.loggedAt.month}-${l.loggedAt.day}';
-      final i = _shiftIndex(l.loggedAt.hour);
-      final rec = map.putIfAbsent(
-        key,
-        () => (
-          date: DateTime(
-            l.loggedAt.year,
-            l.loggedAt.month,
-            l.loggedAt.day,
-          ),
-          kwh: [0.0, 0.0, 0.0],
-        ),
-      );
-      rec.kwh[i] += l.kwh * l.multiplyingFactor;
-    }
-    final list = map.values.toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final list = [
+      for (final d in TodCalculator.days(
+        logs: widget.logs,
+        onKvah: AppConfig.billOnKvah,
+      ))
+        (date: d.date, kwh: List<double>.of(d.shiftUnits)),
+    ];
     return list.length > 120 ? list.sublist(list.length - 120) : list;
   }
 
@@ -143,7 +136,7 @@ class _TodShiftSectionState extends State<TodShiftSection> {
       if (md <= threshold) continue;
       final key =
           '${l.loggedAt.year}-${l.loggedAt.month}-${l.loggedAt.day}';
-      final shift = _shiftIndex(l.loggedAt.hour);
+      final shift = TodCalculator.shiftIndex(l.loggedAt.hour);
       final rec = map[key];
       if (rec == null || md > rec.maxMd) {
         map[key] = (
@@ -162,23 +155,21 @@ class _TodShiftSectionState extends State<TodShiftSection> {
     return list.length > 8 ? list.sublist(list.length - 8) : list;
   }
 
-  static int _shiftIndex(int hour) {
-    if (hour >= 6 && hour < 14) return 0;
-    if (hour >= 14 && hour < 22) return 1;
-    return 2;
-  }
-
-  /// ToD ₹ contributed by a shift: zone units × zone rate × that zone's
-  /// hours in the 8h window (matches the trial's BOUNDS() pro-rata math).
-  double _shiftAmount({
-    required TodZoneResult tod,
-    required List<(String, double)> zones,
-  }) {
+  /// ToD ₹ contributed by a shift: the shift's units (day-aware buckets) ×
+  /// hours/8 per window zone × zone rate — the trial's BOUNDS() pro-rata.
+  /// Zone units already carry the day-aware allocation, so this never
+  /// double-counts and always sums to the net ToD.
+  double _shiftAmount({required int shift, required List<(String, double)> zones}) {
     final shares = _shares;
     var amt = 0.0;
-    for (final (z, hours) in zones) {
-      final units = tod.zoneUnits[z] ?? 0;
-      amt += units * shares[z]! * _energyRate * hours / 8;
+    for (final d in TodCalculator.days(
+      logs: widget.logs,
+      onKvah: AppConfig.billOnKvah,
+    )) {
+      final units = d.shiftUnits[shift];
+      for (final (z, hours) in zones) {
+        amt += units * hours / 8 * (shares[z] ?? 0) * _energyRate;
+      }
     }
     return amt;
   }
@@ -255,18 +246,9 @@ class _TodShiftSectionState extends State<TodShiftSection> {
     final days = _perDay;
     final cd = _contractDemand;
 
-    final dayAmt = _shiftAmount(
-      tod: tod,
-      zones: const [('B', 3), ('C', 5)],
-    );
-    final eveAmt = _shiftAmount(
-      tod: tod,
-      zones: const [('C', 3), ('D', 5)],
-    );
-    final nightAmt = _shiftAmount(
-      tod: tod,
-      zones: const [('D', 2), ('A', 6)],
-    );
+    final dayAmt = _shiftAmount(shift: 0, zones: const [('B', 3), ('C', 5)]);
+    final eveAmt = _shiftAmount(shift: 1, zones: const [('C', 3), ('D', 5)]);
+    final nightAmt = _shiftAmount(shift: 2, zones: const [('D', 2), ('A', 6)]);
 
     final nfGroups = NumberFormat.decimalPattern('en_IN');
 
@@ -434,14 +416,14 @@ class _TodShiftSectionState extends State<TodShiftSection> {
           ),
           const SizedBox(height: 4),
           Text(
-            'kWh per shift · pro-rata split engine',
+            'Units per shift · pro-rata split engine',
             style: TextStyle(fontSize: 11, color: _dim),
           ),
           const SizedBox(height: 10),
           Row(
             children: [
               Expanded(child: _th('Shift')),
-              SizedBox(width: 60, child: _th('kWh', right: true)),
+              SizedBox(width: 60, child: _th('Units', right: true)),
               SizedBox(width: 160, child: _th('Zone split')),
               SizedBox(width: 84, child: _th('ToD ₹', right: true)),
             ],

@@ -413,8 +413,8 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
                               },
                             ),
                             if (_fetchingPrevious)
-                              const Padding(
-                                padding: EdgeInsets.only(top: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
                                 child: Row(
                                   children: [
                                     SizedBox(
@@ -429,7 +429,7 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
                                       'Fetching previous reading...',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: AppColors.textSecondary,
+                                        color: AppColors.dim(context),
                                       ),
                                     ),
                                   ],
@@ -442,21 +442,21 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
                       AppCard(
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.event,
                               size: 20,
-                              color: AppColors.textSecondary,
+                              color: AppColors.dim(context),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Reading Date & Time',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: AppColors.textSecondary,
+                                      color: AppColors.dim(context),
                                     ),
                                   ),
                                   const SizedBox(height: 2),
@@ -607,10 +607,10 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
                                     const SizedBox(height: 6),
                                     Row(
                                       children: [
-                                        const Icon(
+                                        Icon(
                                           Icons.history,
                                           size: 14,
-                                          color: AppColors.textSecondary,
+                                          color: AppColors.dim(context),
                                         ),
                                         const SizedBox(width: 8),
                                         Expanded(
@@ -624,7 +624,7 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
                                               fontSize: 11.5,
                                               color: _prevFetchFailed
                                                   ? AppColors.warningText
-                                                  : AppColors.textSecondary,
+                                                  : AppColors.dim(context),
                                               fontWeight: _prevFetchFailed
                                                   ? FontWeight.w600
                                                   : FontWeight.w400,

@@ -186,7 +186,7 @@ class _AppKpiCardState extends State<AppKpiCard>
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12.5,
-                          color: AppColors.textSecondary,
+                          color: AppColors.dim(context),
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.2,
                         ),
@@ -199,7 +199,7 @@ class _AppKpiCardState extends State<AppKpiCard>
                         child: Icon(
                           Icons.info_outline_rounded,
                           size: 14,
-                          color: AppColors.textSecondary,
+                          color: AppColors.dim(context),
                         ),
                       ),
                     ],
@@ -235,7 +235,7 @@ class _AppKpiCardState extends State<AppKpiCard>
                     widget.trendLabel!,
                     style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.textSecondary,
+                      color: AppColors.dim(context),
                     ),
                   ),
                 ],
@@ -247,7 +247,7 @@ class _AppKpiCardState extends State<AppKpiCard>
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.textSecondary,
+                      color: AppColors.dim(context),
                       fontStyle: FontStyle.italic,
                     ),
                   ),

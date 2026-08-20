@@ -75,20 +75,20 @@ class _LoginPageState extends State<LoginPage>
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text(
+                        Text(
                           'Welcome back',
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           'Sign in to your account to continue',
                           style: TextStyle(
                             fontSize: 15,
-                            color: AppColors.textSecondary,
+                            color: AppColors.dim(context),
                           ),
                         ),
                         const SizedBox(height: 40),
@@ -191,11 +191,11 @@ class _LoginPageState extends State<LoginPage>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text(
+                            Text(
                               "Don't have an account?",
                               style: TextStyle(
                                 fontSize: 14,
-                                color: AppColors.textSecondary,
+                                color: AppColors.dim(context),
                               ),
                             ),
                             TextButton(

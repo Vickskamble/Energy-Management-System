@@ -12,10 +12,10 @@ class LegalConsentText extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text.rich(
       TextSpan(
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           height: 1.5,
-          color: AppColors.textSecondary,
+          color: AppColors.dim(context),
         ),
         children: [
           const TextSpan(
@@ -72,10 +72,10 @@ Future<void> showLegalDocDialog(
         child: SingleChildScrollView(
           child: SelectableText(
             _plainText(content),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               height: 1.5,
-              color: AppColors.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ),
