@@ -1,6 +1,7 @@
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../domain/entities/energy_log_entity.dart';
+import '../calculation/bill_calculator.dart';
 import 'export_service_io.dart'
     if (dart.library.js_interop) 'export_service_web.dart'
     as save;
@@ -60,7 +61,9 @@ class PdfReportService {
 
   static pw.Widget _summaryTable(List<EnergyLogEntity> logs) {
     final totalKwh = logs.fold<double>(0, (sum, l) => sum + l.kwh);
-    final totalBill = logs.fold<double>(0, (sum, l) => sum + l.estimatedBill);
+    final totalBill = logs.isEmpty
+        ? 0.0
+        : BillCalculator.calculate(logs: logs).netBill;
     final peakMd = logs.fold<double>(
       0,
       (peak, l) => l.mdRecorded * l.multiplyingFactor > peak

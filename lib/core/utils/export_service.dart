@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import '../../domain/entities/energy_log_entity.dart';
+import '../calculation/energy_calculator.dart';
 import 'export_service_io.dart'
     if (dart.library.js_interop) 'export_service_web.dart'
     as save;
@@ -26,7 +27,7 @@ class ExportService {
           log.powerFactor.toStringAsFixed(3),
           (log.mdRecorded * log.multiplyingFactor).toStringAsFixed(2),
           log.contractDemand.toStringAsFixed(2),
-          log.estimatedBill.toStringAsFixed(2),
+          EnergyCalculator.calculatePerReadingBill(log).toStringAsFixed(2),
           _escapeCsv(dateFmt.format(log.loggedAt)),
           log.isSynced ? 'Yes' : 'No',
         ].join(','),

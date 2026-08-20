@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../core/calculation/bill_calculator.dart';
+import '../../core/calculation/energy_calculator.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -1459,7 +1460,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                         _dataCell(
                           'Unit Cost',
                           log.kwh > 0
-                              ? '₹${(log.estimatedBill / log.kwh).toStringAsFixed(2)}'
+                              ? '₹${(EnergyCalculator.calculatePerReadingBill(log) / log.kwh).toStringAsFixed(2)}'
                               : '—',
                           AppColors.kpiCost,
                         ),
@@ -1476,7 +1477,7 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                         ),
                         _dataCell(
                           'Bill',
-                          '₹ ${log.estimatedBill.toStringAsFixed(0)}',
+                          '₹ ${EnergyCalculator.calculatePerReadingBill(log).toStringAsFixed(0)}',
                           AppColors.kpiCost,
                         ),
                       ],

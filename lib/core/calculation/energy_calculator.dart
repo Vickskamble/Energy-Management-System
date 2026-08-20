@@ -1,6 +1,9 @@
 import 'dart:math';
+import '../../domain/entities/energy_log_entity.dart';
+import '../config/app_config.dart';
 import '../config/tariff_presets.dart';
 import '../constants/app_constants.dart';
+import 'tod_calculator.dart';
 
 class EnergyCalculator {
   EnergyCalculator._();
@@ -127,6 +130,32 @@ class EnergyCalculator {
   static double calculateAverageUnitCost(double netBill, double totalUnits) {
     if (totalUnits <= 0) return 0;
     return netBill / totalUnits;
+  }
+
+  /// Engine-consistent per-reading estimated bill: the reading's billing
+  /// units split across ToD zones (slot engine) at the effective energy
+  /// rate, plus the flat per-unit duty and tax. Demand/FAC etc. are monthly
+  /// lines and are deliberately omitted for a single-reading estimate.
+  static double calculatePerReadingBill(
+    EnergyLogEntity log, {
+    double? energyRate,
+    double? dutyPerUnit,
+    double? taxPerUnit,
+    bool onKvah = AppConstants.billOnKvah,
+  }) {
+    final rate = energyRate ?? AppConfig.tariffPerUnit;
+    final duty = dutyPerUnit ?? AppConfig.electricityDutyPerUnit;
+    final tax = taxPerUnit ?? AppConfig.taxPerUnit;
+    final units = (onKvah ? log.kvah : log.kwh) * log.multiplyingFactor;
+    final zoneResult = TodCalculator.calculate(
+      logs: [log],
+      zoneShares: AppConfig.todZoneShares,
+      winterZoneShares: AppConfig.todZoneSharesWinter,
+      useWinter: AppConfig.useWinterTod,
+      energyRatePerUnit: rate,
+      onKvah: onKvah,
+    );
+    return units * (rate + duty + tax) + zoneResult.netCharges;
   }
 
   static double calculateTotalBill({
