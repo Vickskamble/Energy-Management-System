@@ -22,6 +22,7 @@ import '../bloc/energy_bloc.dart';
 import '../bloc/energy_event.dart';
 import '../bloc/energy_state.dart';
 import '../widgets/readings_preview_sheet.dart';
+import '../widgets/tod_shift_section.dart';
 
 class AnalysisPage extends StatelessWidget {
   final MonthFilterController monthFilter;
@@ -215,6 +216,13 @@ class _AnalysisContentState extends State<_AnalysisContent> {
             const SizedBox(height: 24),
           ],
           if (_filtered.isNotEmpty) ...[
+            TodShiftSection(
+              logs: _filtered,
+              siteLabel: _siteNames.length == 1
+                  ? _siteNames.first
+                  : 'All Sites',
+            ),
+            const SizedBox(height: 24),
             _buildBillAnalysis(),
             const SizedBox(height: 24),
             _buildPowerQualityTrends(),
