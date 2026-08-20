@@ -1,3 +1,4 @@
+import '../../core/calculation/bill_calculator.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/subscription_config.dart';
 import '../../core/error/exceptions.dart';
@@ -169,9 +170,28 @@ class EnergyRepository {
     }
     totalConsumption = (totalConsumption * 100).roundToDouble() / 100;
 
+    // Monthly bill through the full engine (ToD slots, demand floor, taxes)
+    // using the same new-engine path as Reports — the stored per-reading
+    // estimate alone is no longer shown anywhere as a bill.
+    final monthLogs = hydrated
+        .where((m) =>
+            !m.loggedAt.isBefore(monthStart) &&
+            m.loggedAt.isBefore(nextMonthStart))
+        .map((m) => m.toEntity())
+        .toList();
+    final monthKey =
+        '${monthStart.year}-${monthStart.month.toString().padLeft(2, '0')}';
+    final engineBill = monthLogs.isEmpty
+        ? 0.0
+        : BillCalculator.calculate(
+            logs: monthLogs,
+            ratchetLogs: hydrated.map((m) => m.toEntity()).toList(),
+            facRate: AppConfig.facRateForMonth(monthKey),
+          ).netBill;
+
     return DashboardData(
       logs: hydrated.map((m) => m.toEntity()).toList(),
-      estimatedBill: _calculateBill(totalConsumption),
+      estimatedBill: engineBill,
       totalConsumption: totalConsumption,
       activeConsumptionToday: activeConsumptionToday,
       currentPowerFactor: latestPf,
@@ -353,13 +373,6 @@ class EnergyRepository {
     if (SupabaseClientManager.client.auth.currentUser == null) {
       throw const RemoteStorageException('You must be signed in to save data.');
     }
-  }
-
-  /// Bill = Total Units × configured tariff
-  /// where Total Units = sum(consumed_kvah) × multiplyingFactor (5)
-  double _calculateBill(double totalConsumption) {
-    return (totalConsumption * AppConfig.tariffPerUnit * 100).roundToDouble() /
-        100;
   }
 }
 
