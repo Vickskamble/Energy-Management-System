@@ -96,8 +96,8 @@ void main() {
       expect(result.zoneUnits['C'], closeTo(70.72, 0.001));
     });
 
-    test('day buckets spread shift units evenly for totalizer days and '
-        'keep window attribution for shift-structured days', () {
+    test('day buckets spread shift units by zone-derived split for totalizer '
+        'days and keep window attribution for shift-structured days', () {
       final buckets = TodCalculator.days(
         logs: [
           _log(name: 'totalizer', kwh: 92, kvah: 100, hour: 0,
@@ -109,9 +109,13 @@ void main() {
       );
       expect(buckets, hasLength(2));
       final totalizer = buckets.first;
-      expect(totalizer.shiftUnits[0], closeTo(100 / 3, 0.001));
-      expect(totalizer.shiftUnits[1], closeTo(100 / 3, 0.001));
-      expect(totalizer.shiftUnits[2], closeTo(100 / 3, 0.001));
+      // Zone-derived shift split from single-reading profile:
+      //   Day = B + 5/8×C = 4.23 + 44.20 = 48.43
+      //   Evening = 3/8×C + 5/7×D = 26.52 + 11.82 = 38.34
+      //   Night = 2/7×D + A = 4.73 + 8.47 = 13.20
+      expect(totalizer.shiftUnits[0], closeTo(48.43, 0.1));
+      expect(totalizer.shiftUnits[1], closeTo(38.34, 0.1));
+      expect(totalizer.shiftUnits[2], closeTo(13.20, 0.1));
       final structured = buckets.last;
       expect(structured.shiftUnits[0], closeTo(112.5, 0.001));
       expect(structured.shiftUnits[1], closeTo(112.5, 0.001));

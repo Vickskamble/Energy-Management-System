@@ -1091,12 +1091,12 @@ class _DashboardContentState extends State<_DashboardContent> {
               ),
               TrialKpiCard(
                 title: 'Power factor',
-                value: '${(_sitePowerFactor * 100).toStringAsFixed(1)}%',
+                value: _sitePowerFactor.toStringAsFixed(3),
                 sub: _sitePowerFactor >= AppConstants.pfRebateThreshold
-                    ? 'rebate zone'
+                    ? 'rebate zone · ≥0.95'
                     : _sitePowerFactor < AppConstants.pfSurchargeThreshold
-                    ? 'penalty zone'
-                    : 'no charge',
+                    ? 'penalty zone · <0.90'
+                    : 'no charge · 0.90–0.95',
                 color: _sitePowerFactor >= AppConstants.pfRebateThreshold
                     ? AppColors.success
                     : _sitePowerFactor < AppConstants.pfSurchargeThreshold

@@ -661,20 +661,30 @@ class _TodShiftSectionState extends State<TodShiftSection> {
       required double barW,
       required double maxTotal,
     }) {
+      // Smart Y-axis: 3-5 gridlines, format large numbers (1k, 2k).
+      final rawStep = maxTotal > 0 ? maxTotal / 4 : 1.0;
+      final mag = rawStep >= 1000 ? 1000.0 : rawStep >= 100 ? 100.0 : rawStep >= 10 ? 10.0 : 1.0;
+      final step = (rawStep / mag).ceil() * mag;
+      final gridCount = step > 0 ? (maxTotal / step).ceil() : 4;
+      final yFmt = (double v) {
+        if (v >= 1000) return '${(v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1)}k';
+        return '${v.round()}';
+      };
       return Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            width: 32,
+            width: 44,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                for (var g = 4; g >= 0; g--)
+                for (var g = gridCount; g >= 0; g--)
                   Text(
-                    '${(maxTotal * g / 4).round()}',
+                    yFmt(step * g),
                     style: TextStyle(
-                      fontSize: 9.5,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
                       color: _dim,
                     ),
                   ),
@@ -686,11 +696,13 @@ class _TodShiftSectionState extends State<TodShiftSection> {
               height: plotH + 14,
               child: Stack(
                 children: [
-                  for (var g = 0; g <= 4; g++)
+                  for (var g = 0; g <= gridCount; g++)
                     Positioned(
                       left: 0,
                       right: 0,
-                      top: (plotH + 14) * g / 4 - 1,
+                      top: gridCount > 0
+                          ? (plotH + 14) * g / gridCount - 1
+                          : 0,
                       child: Container(
                         height: 1,
                         color: _line.withValues(alpha: 0.5),
@@ -805,18 +817,21 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                   )
                 : LayoutBuilder(
                     builder: (context, constraints) {
-                      final plotW = constraints.maxWidth - 40.0;
-                      const minBarW = 8.0;
-                      const maxBarW = 40.0;
+                      final plotW = constraints.maxWidth - 44.0;
+                      const minBarW = 14.0;
+                      const maxBarW = 44.0;
                       final barW = (plotW / days.length)
                           .clamp(minBarW, maxBarW);
-                      final needsScroll = barW < minBarW ||
-                          days.length > 30;
+                      final needsScroll = days.length > 20;
                       final chartW = needsScroll
-                          ? days.length * minBarW + 40.0
-                          : plotW + 40.0;
-                      final plotH = (200.0)
-                          .clamp(200.0, 320.0);
+                          ? days.length * minBarW + 44.0
+                          : plotW + 44.0;
+                      // Height scales with data: 220 for few days, up to 340 for many.
+                      final plotH = days.length <= 7
+                          ? 220.0
+                          : days.length <= 14
+                              ? 260.0
+                              : 300.0;
                       return SizedBox(
                         height: plotH + 26,
                         child: needsScroll
@@ -826,7 +841,7 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                                   width: chartW,
                                   child: buildBarChart(
                                     days: days,
-                                    plotW: chartW - 40,
+                                    plotW: chartW - 44,
                                     plotH: plotH,
                                     barW: barW,
                                     maxTotal: maxTotal,

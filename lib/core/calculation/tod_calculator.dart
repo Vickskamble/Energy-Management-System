@@ -162,9 +162,15 @@ class TodCalculator {
           shiftUnits[si] += unit;
         }
       } else {
-        // Daily-totalizer day — the reading(s) cover the whole 24h. Spread by
-        // the fixed single-reading profile (actual-bill derived); the A/B
-        // split is proportional to their zone hours.
+        // Daily-totalizer day — the reading(s) cover the whole 24h.
+        // Zone units come from the bill-derived profile (A/B/C/D).
+        // Shift units are reverse-derived from those zone allocations so the
+        // shift summary shows realistic distribution (not fake ⅓ equal split).
+        //
+        // Zone coverage by shift:
+        //   Day (06–14):    zone B (pure) + 5/8 of zone C (09–14 window)
+        //   Evening (14–22): 3/8 of zone C (14–17 window) + 5/7 of zone D (17–22)
+        //   Night (22–06): 2/7 of zone D (22–24 window) + zone A (pure)
         var dayUnits = 0.0;
         for (final l in dayLogs) {
           final unit = (onKvah ? l.kvah : l.kwh) * l.multiplyingFactor;
@@ -173,11 +179,11 @@ class TodCalculator {
         for (final entry in _singleReadingShares.entries) {
           zoneUnits[entry.key] = dayUnits * entry.value;
         }
-        // Each 8h shift gets an equal third of a uniform day.
-        final third = dayUnits / 3;
-        shiftUnits[0] = third;
-        shiftUnits[1] = third;
-        shiftUnits[2] = third;
+        final zoneC = zoneUnits['C']!;
+        final zoneD = zoneUnits['D']!;
+        shiftUnits[0] = zoneUnits['B']! + zoneC * 5 / 8;
+        shiftUnits[1] = zoneC * 3 / 8 + zoneD * 5 / 7;
+        shiftUnits[2] = zoneD * 2 / 7 + zoneUnits['A']!;
       }
 
       buckets.add(TodDayBucket(
