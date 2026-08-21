@@ -1058,6 +1058,13 @@ class _DashboardContentState extends State<_DashboardContent> {
           _kpiGrid(
             cards: [
               TrialKpiCard(
+                title: 'Unit consumption',
+                value: '${breakdown.totalUnits.round()} ${AppConfig.billOnKvah ? 'kVAh' : 'kWh'}',
+                sub: 'daily avg ${_selectedLogs.isEmpty ? 0 : (breakdown.totalUnits / _selectedLogs.length).round()} ${AppConfig.billOnKvah ? 'kVAh' : 'kWh'} · ${_selectedLogs.length} readings',
+                color: AppColors.primary,
+                pct: (breakdown.totalUnits / 10000).clamp(0.0, 100.0),
+              ),
+              TrialKpiCard(
                 title: 'Estimated bill (due)',
                 value: _money(_siteEstimatedBill),
                 sub: 'last 30d · ${_siteNames.length == 1 ? _siteNames.first : 'All Sites'} · ${AppConfig.billOnKvah ? 'kVAh' : 'kWh'}',

@@ -103,6 +103,15 @@ class _AppShellState extends State<AppShell> {
                 },
               ),
             ListTile(
+              selected: widget.selectedIndex == 8,
+              leading: const Icon(Icons.history_rounded),
+              title: const Text('Readings'),
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onItemSelected(8);
+              },
+            ),
+            ListTile(
               selected: widget.selectedIndex == 7,
               leading: const Icon(Icons.file_upload_outlined),
               title: const Text('Excel Import'),
@@ -241,6 +250,8 @@ class _AppShellState extends State<AppShell> {
         return Icons.speed_rounded;
       case 5:
         return Icons.settings_rounded;
+      case 8:
+        return Icons.history_rounded;
       default:
         return Icons.circle;
     }
@@ -260,6 +271,8 @@ class _AppShellState extends State<AppShell> {
         return 'Meter Management';
       case 5:
         return 'Settings';
+      case 8:
+        return 'Readings';
       default:
         return '';
     }

@@ -14,6 +14,7 @@ import 'reports_page.dart';
 import 'meter_management_page.dart';
 import 'billing_page.dart';
 import 'excel_import_page.dart';
+import 'reading_history_page.dart';
 import '../pages/settings_page.dart';
 
 class MainNavigationHub extends StatefulWidget {
@@ -113,7 +114,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         context,
         MaterialPageRoute(
           builder: (_) => SettingsScreen(
-            isDark: widget.isDark,
             onToggleTheme: widget.onToggleTheme,
           ),
         ),
@@ -128,6 +128,17 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const BillingPage()),
+      ).then((_) => setState(
+        () =>
+            _sidebarIndex = _selectedIndex == 5 ? 7 : _selectedIndex,
+      ));
+      setState(() => _sidebarIndex = index);
+      return;
+    }
+    if (index == 8) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ReadingHistoryPage()),
       ).then((_) => setState(
         () =>
             _sidebarIndex = _selectedIndex == 5 ? 7 : _selectedIndex,

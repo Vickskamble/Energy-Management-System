@@ -82,6 +82,12 @@ class _AppSidebarState extends State<AppSidebar> {
         index: 4,
       ),
       SidebarItem(
+        icon: Icons.history_outlined,
+        activeIcon: Icons.history_rounded,
+        label: 'Readings',
+        index: 8,
+      ),
+      SidebarItem(
         icon: Icons.file_upload_outlined,
         activeIcon: Icons.file_upload_rounded,
         label: 'Excel Import',

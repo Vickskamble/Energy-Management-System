@@ -401,6 +401,7 @@ class _TodShiftSectionState extends State<TodShiftSection> {
         ('Night (22–06)', byShift[2], nightAmt, 2),
       ];
       final total = dayAmt + eveAmt + nightAmt;
+      final totalUnits = byShift[0] + byShift[1] + byShift[2];
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -424,7 +425,8 @@ class _TodShiftSectionState extends State<TodShiftSection> {
             children: [
               Expanded(child: _th('Shift')),
               SizedBox(width: 60, child: _th('Units', right: true)),
-              SizedBox(width: 160, child: _th('Zone split')),
+              SizedBox(width: 42, child: _th('%', right: true)),
+              SizedBox(width: 130, child: _th('Zone split')),
               SizedBox(width: 84, child: _th('ToD ₹', right: true)),
             ],
           ),
@@ -463,7 +465,21 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                     ),
                   ),
                   SizedBox(
-                    width: 160,
+                    width: 42,
+                    child: Text(
+                      totalUnits > 0
+                          ? '${(kwh / totalUnits * 100).round()}%'
+                          : '0%',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: _dim,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 130,
                     child: Text(
                       splitTexts[shift],
                       textAlign: TextAlign.right,
@@ -501,7 +517,7 @@ class _TodShiftSectionState extends State<TodShiftSection> {
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: Text(
-                  'pro-rata split engine',
+                  'net from slot engine',
                   style: TextStyle(fontSize: 10, color: _dim),
                 ),
               ),
@@ -518,9 +534,9 @@ class _TodShiftSectionState extends State<TodShiftSection> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Shift 8h meter hota hai jo do zones ko cover karta hai — isliye '
-            'pro-rata split kiya jata hai (e.g. Day 06–14 = 3h B + 5h C; '
-            'Evening 14–22 = 3h C + 5h D; Night 22–06 = 2h D + 6h A).',
+            'Shift 8h window covers 2 billing zones — units split pro-rata '
+            '(Day 06–14 = 3h B + 5h C; Evening 14–22 = 3h C + 5h D; '
+            'Night 22–06 = 2h D + 6h A). ToD ₹ = shift units × zone share × energy rate.',
             style: TextStyle(
               fontSize: 11,
               color: _dim,
@@ -638,12 +654,86 @@ class _TodShiftSectionState extends State<TodShiftSection> {
       );
     }
 
+    Widget buildBarChart({
+      required List<({DateTime date, List<double> kwh})> days,
+      required double plotW,
+      required double plotH,
+      required double barW,
+      required double maxTotal,
+    }) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 32,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var g = 4; g >= 0; g--)
+                  Text(
+                    '${(maxTotal * g / 4).round()}',
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      color: _dim,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SizedBox(
+              height: plotH + 14,
+              child: Stack(
+                children: [
+                  for (var g = 0; g <= 4; g++)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: (plotH + 14) * g / 4 - 1,
+                      child: Container(
+                        height: 1,
+                        color: _line.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (final d in days)
+                        Container(
+                          width: barW,
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 0.5,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              for (var s = 2; s >= 0; s--)
+                                Container(
+                                  height: maxTotal <= 0
+                                      ? 0
+                                      : d.kwh[s] / maxTotal *
+                                          plotH,
+                                  color: _shiftColors[s],
+                                ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     Widget dailyChart() {
       final maxTotal = days.fold<double>(
         0,
         (m, d) => d.kwh.fold<double>(m, (a, b) => a + b > m ? a + b : m),
       );
-      final plotH = 170.0;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -716,79 +806,40 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                 : LayoutBuilder(
                     builder: (context, constraints) {
                       final plotW = constraints.maxWidth - 40.0;
-                      final barW =
-                          (plotW / days.length).clamp(1.0, plotW);
+                      const minBarW = 8.0;
+                      const maxBarW = 40.0;
+                      final barW = (plotW / days.length)
+                          .clamp(minBarW, maxBarW);
+                      final needsScroll = barW < minBarW ||
+                          days.length > 30;
+                      final chartW = needsScroll
+                          ? days.length * minBarW + 40.0
+                          : plotW + 40.0;
+                      final plotH = (200.0)
+                          .clamp(200.0, 320.0);
                       return SizedBox(
                         height: plotH + 26,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            SizedBox(
-                              width: 32,
-                              child: Column(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  for (var g = 4; g >= 0; g--)
-                                    Text(
-                                      '${(maxTotal * g / 4).round()}',
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        color: _dim,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            Expanded(
-                              child: SizedBox(
-                                height: plotH + 14,
-                                child: Stack(
-                                  children: [
-                                    for (var g = 0; g <= 4; g++)
-                                      Positioned(
-                                        left: 0,
-                                        right: 0,
-                                        top: (plotH + 14) * g / 4 - 1,
-                                        child: Container(
-                                          height: 1,
-                                          color: _line.withValues(alpha: 0.5),
-                                        ),
-                                      ),
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        for (final d in days)
-                                          Container(
-                                            width: barW,
-                                            margin: const EdgeInsets.symmetric(
-                                              horizontal: 0.5,
-                                            ),
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.end,
-                                              children: [
-                                                for (var s = 2; s >= 0; s--)
-                                                  Container(
-                                                    height: maxTotal <= 0
-                                                        ? 0
-                                                        : d.kwh[s] / maxTotal *
-                                                            plotH,
-                                                    color: _shiftColors[s],
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ],
+                        child: needsScroll
+                            ? SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: SizedBox(
+                                  width: chartW,
+                                  child: buildBarChart(
+                                    days: days,
+                                    plotW: chartW - 40,
+                                    plotH: plotH,
+                                    barW: barW,
+                                    maxTotal: maxTotal,
+                                  ),
                                 ),
+                              )
+                            : buildBarChart(
+                                days: days,
+                                plotW: plotW,
+                                plotH: plotH,
+                                barW: barW,
+                                maxTotal: maxTotal,
                               ),
-                            ),
-                          ],
-                        ),
                       );
                     },
                   ),
