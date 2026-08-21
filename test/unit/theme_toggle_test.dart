@@ -19,7 +19,7 @@ class _ThemeHarness extends StatefulWidget {
 }
 
 class _ThemeHarnessState extends State<_ThemeHarness> {
-  ThemeMode themeMode = ThemeMode.dark;
+  ThemeMode themeMode = ThemeMode.light;
 
   void _toggle() {
     setState(() {
@@ -64,21 +64,21 @@ void main() {
     return tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode!;
   }
 
-  testWidgets('sidebar toggle flips themeMode dark -> light -> dark',
+  testWidgets('sidebar toggle flips themeMode light -> dark -> light',
       (tester) async {
     await tester.pumpWidget(const _ThemeHarness());
-    expect(await readMode(tester), ThemeMode.dark);
-    // Dark active -> "switch to light" icon is shown.
-    expect(find.byIcon(Icons.light_mode_outlined), findsOneWidget);
-
-    await tester.tap(find.byIcon(Icons.light_mode_outlined));
     expect(await readMode(tester), ThemeMode.light);
+    // Light active -> "switch to dark" icon is shown.
     expect(find.byIcon(Icons.dark_mode_outlined), findsOneWidget);
-    expect(Theme.of(tester.element(find.byType(AppShell))).brightness,
-        Brightness.light);
 
     await tester.tap(find.byIcon(Icons.dark_mode_outlined));
     expect(await readMode(tester), ThemeMode.dark);
+    expect(find.byIcon(Icons.light_mode_outlined), findsOneWidget);
+    expect(Theme.of(tester.element(find.byType(AppShell))).brightness,
+        Brightness.dark);
+
+    await tester.tap(find.byIcon(Icons.light_mode_outlined));
+    expect(await readMode(tester), ThemeMode.light);
   });
 
   testWidgets(

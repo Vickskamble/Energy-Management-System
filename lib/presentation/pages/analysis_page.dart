@@ -204,14 +204,6 @@ class _AnalysisContentState extends State<_AnalysisContent> {
             _buildFilterRow(),
             const SizedBox(height: 12),
           ],
-          if (_meterNames.isNotEmpty) ...[
-            _buildMeterTrends(),
-            const SizedBox(height: 24),
-            _buildMdBreachPrediction(),
-            const SizedBox(height: 24),
-            _buildSystemIssues(),
-            const SizedBox(height: 24),
-          ],
           if (_filtered.isNotEmpty) ...[
             TodShiftSection(
               logs: _filtered,
@@ -220,9 +212,19 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   : 'All Sites',
             ),
             const SizedBox(height: 24),
+          ],
+          if (_meterNames.isNotEmpty) ...[
+            _buildMeterTrends(),
+            const SizedBox(height: 24),
+          ],
+          if (_filtered.isNotEmpty) ...[
+            _buildPowerQualityTrends(),
+            const SizedBox(height: 24),
             _buildBillAnalysis(),
             const SizedBox(height: 24),
-            _buildPowerQualityTrends(),
+            _buildMdBreachPrediction(),
+            const SizedBox(height: 24),
+            _buildSystemIssues(),
             const SizedBox(height: 24),
             _buildMonthComparison(),
             const SizedBox(height: 24),

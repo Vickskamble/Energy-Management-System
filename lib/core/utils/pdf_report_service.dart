@@ -1,6 +1,7 @@
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../domain/entities/energy_log_entity.dart';
+import '../calculation/bill_breakdown.dart';
 import '../calculation/bill_calculator.dart';
 import 'export_service_io.dart'
     if (dart.library.js_interop) 'export_service_web.dart'
@@ -15,6 +16,9 @@ class PdfReportService {
     String? subtitle,
   }) async {
     final doc = pw.Document();
+    final breakdown = logs.isNotEmpty
+        ? BillCalculator.calculate(logs: logs)
+        : null;
 
     doc.addPage(
       pw.MultiPage(
@@ -43,7 +47,15 @@ class PdfReportService {
               ),
             ),
           pw.SizedBox(height: 8),
-          _summaryTable(logs),
+          _summaryTable(logs, breakdown),
+          if (breakdown != null) ...[
+            pw.SizedBox(height: 16),
+            _costBreakdown(breakdown),
+            pw.SizedBox(height: 16),
+            _demandPfAnalysis(breakdown),
+            pw.SizedBox(height: 16),
+            _todDistribution(breakdown),
+          ],
           pw.SizedBox(height: 20),
           pw.Text(
             'Reading History',
@@ -59,11 +71,12 @@ class PdfReportService {
     await save.saveBytes(bytes, 'ems_report.pdf', 'application/pdf');
   }
 
-  static pw.Widget _summaryTable(List<EnergyLogEntity> logs) {
+  static pw.Widget _summaryTable(
+    List<EnergyLogEntity> logs,
+    BillBreakdown? breakdown,
+  ) {
     final totalKwh = logs.fold<double>(0, (sum, l) => sum + l.kwh);
-    final totalBill = logs.isEmpty
-        ? 0.0
-        : BillCalculator.calculate(logs: logs).netBill;
+    final totalBill = breakdown?.netBill ?? 0;
     final peakMd = logs.fold<double>(
       0,
       (peak, l) => l.mdRecorded * l.multiplyingFactor > peak
@@ -85,7 +98,7 @@ class PdfReportService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(
-            'Summary',
+            'Executive Summary',
             style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 6),
@@ -97,11 +110,250 @@ class PdfReportService {
               _summaryItem('Peak MD (kVA)', peakMd.toStringAsFixed(1)),
               _summaryItem('Avg PF', avgPf.toStringAsFixed(3)),
               _summaryItem(
-                'Est. Total Bill',
+                'Net Bill',
                 '₹${totalBill.toStringAsFixed(0)}',
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _costBreakdown(BillBreakdown b) {
+    final currencyFmt = (double v) => '₹${v.toStringAsFixed(0)}';
+    final rows = <(String, double)>[
+      ('Energy Charges', b.energyCharges),
+      ('Demand Charges', b.demandCharges),
+      ('FAC', b.facCharges),
+      ('Wheeling', b.wheelingCharges),
+      ('Electricity Duty', b.electricityDuty),
+      ('Taxes', b.taxes),
+      if (b.fixedCharge > 0) ('Fixed Charge', b.fixedCharge),
+      if (b.pfRebate > 0) ('PF Rebate', -b.pfRebate),
+      if (b.pfSurcharge > 0) ('PF Surcharge', b.pfSurcharge),
+      if (b.subsidy > 0) ('Subsidy', -b.subsidy),
+      if (b.lfIncentive > 0) ('LF Incentive', -b.lfIncentive),
+    ];
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Cost Breakdown',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 6),
+        pw.TableHelper.fromTextArray(
+          headers: ['Component', 'Amount'],
+          data: [
+            ...rows.map((r) => [r.$1, currencyFmt(r.$2)]),
+            ['Net Total', currencyFmt(b.netBill)],
+          ],
+          headerStyle: pw.TextStyle(
+            fontSize: 8,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.white,
+          ),
+          headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+          cellStyle: pw.TextStyle(fontSize: 8),
+          cellAlignments: {
+            0: pw.Alignment.centerLeft,
+            1: pw.Alignment.centerRight,
+          },
+          border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _demandPfAnalysis(BillBreakdown b) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Demand & Power Factor Analysis',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 6),
+        _infoRow('Billing Demand', '${b.billingDemand.toStringAsFixed(1)} kVA'),
+        _infoRow('Contract Demand', '${b.contractDemand.toStringAsFixed(0)} kVA'),
+        _infoRow(
+          'Demand Utilization',
+          '${((b.billingDemand / b.contractDemand) * 100).clamp(0, 999).toStringAsFixed(0)}%',
+        ),
+        _infoRow('Combined PF', b.powerFactor.toStringAsFixed(3)),
+        _infoRow('Load Factor', '${(b.loadFactor * 100).toStringAsFixed(1)}%'),
+        _infoRow('Avg Unit Cost', '₹${b.averageUnitCost.toStringAsFixed(2)}/unit'),
+      ],
+    );
+  }
+
+  static pw.Widget _todDistribution(BillBreakdown b) {
+    final zones = ['A', 'B', 'C', 'D'];
+    final zoneTime = {'A': '00-06', 'B': '06-09', 'C': '09-17', 'D': '17-24'};
+    final totalUnits = b.totalUnits;
+    final rows = <pw.Widget>[];
+    for (final z in zones) {
+      final units = b.todZoneUnits[z] ?? 0;
+      final charges = b.todZoneCharges[z] ?? 0;
+      final pct = totalUnits > 0 ? (units / totalUnits * 100) : 0.0;
+      rows.add(
+        pw.Row(
+          children: [
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                'Zone $z (${zoneTime[z]})',
+                style: pw.TextStyle(fontSize: 8),
+              ),
+            ),
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                '${units.toStringAsFixed(0)} units',
+                style: pw.TextStyle(fontSize: 8),
+                textAlign: pw.TextAlign.center,
+              ),
+            ),
+            pw.Expanded(
+              flex: 1,
+              child: pw.Text(
+                '${pct.toStringAsFixed(1)}%',
+                style: pw.TextStyle(fontSize: 8),
+                textAlign: pw.TextAlign.center,
+              ),
+            ),
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                '₹${charges.toStringAsFixed(0)}',
+                style: pw.TextStyle(fontSize: 8),
+                textAlign: pw.TextAlign.right,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'ToD Zone Distribution',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Row(
+          children: [
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                'Zone',
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                'Units',
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+                textAlign: pw.TextAlign.center,
+              ),
+            ),
+            pw.Expanded(
+              flex: 1,
+              child: pw.Text(
+                'Share',
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+                textAlign: pw.TextAlign.center,
+              ),
+            ),
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                'Charge',
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+                textAlign: pw.TextAlign.right,
+              ),
+            ),
+          ],
+        ),
+        pw.Divider(height: 8, color: PdfColors.grey400),
+        ...rows,
+        pw.Divider(height: 8, color: PdfColors.grey400),
+        pw.Row(
+          children: [
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                'Net ToD',
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                '${totalUnits.toStringAsFixed(0)} units',
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+                textAlign: pw.TextAlign.center,
+              ),
+            ),
+            pw.Expanded(
+              flex: 1,
+              child: pw.Text(
+                '100%',
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+                textAlign: pw.TextAlign.center,
+              ),
+            ),
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                '₹${b.todCharges.toStringAsFixed(0)}',
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+                textAlign: pw.TextAlign.right,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _infoRow(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+          pw.Text(value, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
         ],
       ),
     );
@@ -131,26 +383,22 @@ class PdfReportService {
       headers: [
         'Date',
         'Meter',
-        'Reading kWh',
         'Consumed kWh',
-        'Reading kVAh',
+        'Consumed kVAh',
         'PF',
         'MD (kVA)',
         'Est. Bill (₹)',
-        'Sync',
       ],
       data: sorted
           .map(
             (l) => [
               '${l.loggedAt.day.toString().padLeft(2, '0')}/${l.loggedAt.month.toString().padLeft(2, '0')}/${l.loggedAt.year.toString().substring(2)} ${l.loggedAt.hour.toString().padLeft(2, '0')}:${l.loggedAt.minute.toString().padLeft(2, '0')}',
               l.meterName,
-              l.currentKwh != null ? l.currentKwh!.toStringAsFixed(1) : '—',
               l.kwh.toStringAsFixed(1),
-              l.currentKvah != null ? l.currentKvah!.toStringAsFixed(1) : '—',
+              l.kvah.toStringAsFixed(1),
               l.powerFactor.toStringAsFixed(3),
               (l.mdRecorded * l.multiplyingFactor).toStringAsFixed(1),
               l.estimatedBill.toStringAsFixed(0),
-              l.isSynced ? 'Cloud' : 'Pending',
             ],
           )
           .toList(),
@@ -169,8 +417,6 @@ class PdfReportService {
         4: pw.Alignment.centerRight,
         5: pw.Alignment.centerRight,
         6: pw.Alignment.centerRight,
-        7: pw.Alignment.centerRight,
-        8: pw.Alignment.center,
       },
       border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
       headerAlignments: {
@@ -181,8 +427,6 @@ class PdfReportService {
         4: pw.Alignment.centerRight,
         5: pw.Alignment.centerRight,
         6: pw.Alignment.centerRight,
-        7: pw.Alignment.centerRight,
-        8: pw.Alignment.center,
       },
     );
   }

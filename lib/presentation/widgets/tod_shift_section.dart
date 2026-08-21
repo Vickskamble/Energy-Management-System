@@ -828,20 +828,19 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                 : LayoutBuilder(
                     builder: (context, constraints) {
                       final plotW = constraints.maxWidth - 44.0;
-                      const minBarW = 14.0;
-                      const maxBarW = 44.0;
+                      const minBarW = 22.0;
+                      const maxBarW = 48.0;
                       final barW = (plotW / days.length)
                           .clamp(minBarW, maxBarW);
-                      final needsScroll = days.length > 20;
+                      final needsScroll = barW < maxBarW && days.length > 8;
                       final chartW = needsScroll
-                          ? days.length * minBarW + 44.0
+                          ? days.length * maxBarW + 44.0
                           : plotW + 44.0;
-                      // Height scales with data: 220 for few days, up to 340 for many.
                       final plotH = days.length <= 7
-                          ? 220.0
+                          ? 240.0
                           : days.length <= 14
-                              ? 260.0
-                              : 300.0;
+                              ? 280.0
+                              : 320.0;
                       return SizedBox(
                         height: plotH + 26,
                         child: needsScroll
@@ -853,7 +852,7 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                                     days: days,
                                     plotW: chartW - 44,
                                     plotH: plotH,
-                                    barW: barW,
+                                    barW: maxBarW,
                                     maxTotal: maxTotal,
                                   ),
                                 ),

@@ -3,10 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/app_logger.dart';
 import '../../core/widgets/app_card.dart';
-import '../../core/widgets/app_section.dart';
+import '../../data/models/energy_log_model.dart';
 import '../../data/repositories/energy_repository.dart';
 import '../../domain/entities/energy_log_entity.dart';
+import '../bloc/energy_bloc.dart';
+import '../bloc/energy_event.dart';
 
 class ReadingHistoryPage extends StatefulWidget {
   const ReadingHistoryPage({super.key});
@@ -99,52 +102,56 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dim = isDark ? AppColors.textDarkSecondary : AppColors.textSecondary;
 
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.page),
-      children: [
-        AppSectionHeader(
-          title: 'Reading History',
-          subtitle: 'Browse all readings by year, month and day',
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Reading History'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.pop(context),
         ),
-        const SizedBox(height: 12),
-        _buildFilterRow(),
-        const SizedBox(height: 16),
-        if (_allLogs.isEmpty)
-          AppCard(
-            child: SizedBox(
-              height: 120,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.history, size: 32, color: dim),
-                    const SizedBox(height: 8),
-                    Text('No readings found', style: TextStyle(fontSize: 13, color: dim)),
-                  ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.page),
+        children: [
+          _buildFilterRow(),
+          const SizedBox(height: 16),
+          if (_allLogs.isEmpty)
+            AppCard(
+              child: SizedBox(
+                height: 120,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.history, size: 32, color: dim),
+                      const SizedBox(height: 8),
+                      Text('No readings found', style: TextStyle(fontSize: 13, color: dim)),
+                    ],
+                  ),
                 ),
               ),
+            )
+          else ...[
+            Text(
+              '${filtered.length} reading(s) — tap to edit',
+              style: TextStyle(fontSize: 12, color: dim),
             ),
-          )
-        else ...[
-          Text(
-            '${filtered.length} reading(s)',
-            style: TextStyle(fontSize: 12, color: dim),
-          ),
-          const SizedBox(height: 8),
-          for (final log in visible) _buildReadingCard(log),
-          if (_visibleCount < filtered.length)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Center(
-                child: TextButton.icon(
-                  onPressed: () => setState(() => _visibleCount += _pageSize),
-                  icon: const Icon(Icons.expand_more_rounded),
-                  label: const Text('Load More'),
+            const SizedBox(height: 8),
+            for (final log in visible) _buildReadingCard(log),
+            if (_visibleCount < filtered.length)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Center(
+                  child: TextButton.icon(
+                    onPressed: () => setState(() => _visibleCount += _pageSize),
+                    icon: const Icon(Icons.expand_more_rounded),
+                    label: const Text('Load More'),
+                  ),
                 ),
               ),
-            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -232,44 +239,50 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
 
     return AppCard(
       margin: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.schedule, size: 14, color: AppColors.primary),
-              const SizedBox(width: 6),
-              Text(
-                _fmtDate(log.loggedAt),
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _showEditDialog(log),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.schedule, size: 14, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(
+                  _fmtDate(log.loggedAt),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
-                child: Text(
-                  log.meterName,
-                  style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    log.meterName,
+                    style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              _chip('kWh', actualKwh.toStringAsFixed(1)),
-              _chip('kVAh', actualKvah.toStringAsFixed(1)),
-              _chip('MD', '${actualMd.toStringAsFixed(1)} kVA'),
-              _chip('PF', '${(pf * 100).toStringAsFixed(1)}%'),
-              _chip('MF', '${mf}x'),
-            ],
-          ),
-        ],
+                const SizedBox(width: 6),
+                Icon(Icons.edit_outlined, size: 14, color: AppColors.textSecondary),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                _chip('kWh', actualKwh.toStringAsFixed(1)),
+                _chip('kVAh', actualKvah.toStringAsFixed(1)),
+                _chip('MD', '${actualMd.toStringAsFixed(1)} kVA'),
+                _chip('PF', '${(pf * 100).toStringAsFixed(1)}%'),
+                _chip('MF', '${mf}x'),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -293,6 +306,221 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showEditDialog(EnergyLogEntity log) async {
+    final kwhCtrl = TextEditingController(text: log.kwh.toStringAsFixed(2));
+    final kvahCtrl = TextEditingController(text: log.kvah.toStringAsFixed(2));
+    final rkvarhLagCtrl = TextEditingController(
+      text: log.rkvarhLag.toStringAsFixed(2),
+    );
+    final rkvarhLeadCtrl = TextEditingController(
+      text: log.rkvarhLead.toStringAsFixed(2),
+    );
+    final mdCtrl = TextEditingController(
+      text: log.mdRecorded.toStringAsFixed(2),
+    );
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          var date = log.loggedAt;
+          return AlertDialog(
+            title: const Text('Edit Reading'),
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: kwhCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Consumed kWh',
+                        prefixIcon: Icon(Icons.bolt_outlined),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        final val = double.tryParse(v ?? '');
+                        if (val == null || val <= 0) {
+                          return 'Enter a positive value';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: kvahCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Consumed kVAh',
+                        prefixIcon: Icon(Icons.speed_outlined),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        final val = double.tryParse(v ?? '');
+                        if (val == null || val <= 0) {
+                          return 'Enter a positive value';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: mdCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'MD Recorded (kVA)',
+                        prefixIcon: Icon(Icons.trending_up),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        final val = double.tryParse(v ?? '');
+                        if (val == null || val <= 0) {
+                          return 'Enter a positive value';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: rkvarhLagCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'rkVARh (Lag)',
+                              prefixIcon: Icon(Icons.warning_outlined),
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return null;
+                              return double.tryParse(v.trim()) == null
+                                  ? 'Enter a valid number'
+                                  : null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: rkvarhLeadCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'rkVARh (Lead)',
+                              prefixIcon: Icon(Icons.check_circle_outline),
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return null;
+                              return double.tryParse(v.trim()) == null
+                                  ? 'Enter a valid number'
+                                  : null;
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.event_outlined, size: 20),
+                      title: Text(
+                        DateFormat('dd MMM yyyy, HH:mm').format(date),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      trailing: const Icon(
+                        Icons.edit_calendar_outlined,
+                        size: 18,
+                      ),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: dialogCtx,
+                          initialDate: date,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked == null) return;
+                        if (!dialogCtx.mounted) return;
+                        final time = await showTimePicker(
+                          context: dialogCtx,
+                          initialTime: TimeOfDay.fromDateTime(date),
+                        );
+                        if (time == null) return;
+                        setDialogState(() {
+                          date = DateTime(
+                            picked.year,
+                            picked.month,
+                            picked.day,
+                            time.hour,
+                            time.minute,
+                          );
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  final updatedModel = EnergyLogModel.create(
+                    id: log.id,
+                    meterName: log.meterName,
+                    kwh: double.parse(kwhCtrl.text.trim()),
+                    kvah: double.parse(kvahCtrl.text.trim()),
+                    currentKwh: log.currentKwh,
+                    currentKvah: log.currentKvah,
+                    rkvarhLag: double.tryParse(rkvarhLagCtrl.text.trim()) ?? 0,
+                    rkvarhLead: double.tryParse(rkvarhLeadCtrl.text.trim()) ?? 0,
+                    mdRecorded: double.parse(mdCtrl.text.trim()),
+                    loggedAt: date,
+                    contractDemand: log.contractDemand,
+                    userId: log.userId,
+                    isSynced: log.isSynced,
+                    multiplyingFactor: log.multiplyingFactor,
+                  );
+                  Navigator.pop(dialogCtx);
+                  try {
+                    await context.read<EnergyRepository>().updateReading(
+                      updatedModel,
+                    );
+                    if (mounted) {
+                      context.read<EnergyBloc>().add(
+                        const LoadInitialDashboardData(),
+                      );
+                      _loadLogs();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Reading updated'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    AppLogger.e('Update failed', e);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Update failed: $e'),
+                          backgroundColor: Colors.red.shade700,
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
