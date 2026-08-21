@@ -155,20 +155,30 @@ class _TodShiftSectionState extends State<TodShiftSection> {
     return list.length > 8 ? list.sublist(list.length - 8) : list;
   }
 
-  /// ToD ₹ contributed by a shift: the shift's units (day-aware buckets) ×
-  /// hours/8 per window zone × zone rate — the trial's BOUNDS() pro-rata.
-  /// Zone units already carry the day-aware allocation, so this never
-  /// double-counts and always sums to the net ToD.
-  double _shiftAmount({required int shift, required List<(String, double)> zones}) {
+  /// ToD ₹ contributed by a shift — computed directly from zone units to
+  /// avoid double-counting. For each day, the shift's zone shares are
+  /// multiplied by the zone rate and summed.
+  ///
+  /// Zone → shift mapping (fixed by MSEDCL billing windows):
+  ///   Day (06–14):    zone B (pure) + 5/8 of zone C
+  ///   Evening (14–22): 3/8 of zone C + 5/7 of zone D
+  ///   Night (22–06): 2/7 of zone D + zone A (pure)
+  static const _shiftZoneFractions = <int, List<(String, double)>>{
+    0: [('B', 1.0), ('C', 5 / 8)],   // Day
+    1: [('C', 3 / 8), ('D', 5 / 7)], // Evening
+    2: [('D', 2 / 7), ('A', 1.0)],   // Night
+  };
+
+  double _shiftAmount({required int shift}) {
     final shares = _shares;
     var amt = 0.0;
     for (final d in TodCalculator.days(
       logs: widget.logs,
       onKvah: AppConfig.billOnKvah,
     )) {
-      final units = d.shiftUnits[shift];
-      for (final (z, hours) in zones) {
-        amt += units * hours / 8 * (shares[z] ?? 0) * _energyRate;
+      for (final (z, frac) in _shiftZoneFractions[shift]!) {
+        final zUnits = d.zoneUnits[z] ?? 0;
+        amt += zUnits * frac * (shares[z] ?? 0) * _energyRate;
       }
     }
     return amt;
@@ -246,9 +256,9 @@ class _TodShiftSectionState extends State<TodShiftSection> {
     final days = _perDay;
     final cd = _contractDemand;
 
-    final dayAmt = _shiftAmount(shift: 0, zones: const [('B', 3), ('C', 5)]);
-    final eveAmt = _shiftAmount(shift: 1, zones: const [('C', 3), ('D', 5)]);
-    final nightAmt = _shiftAmount(shift: 2, zones: const [('D', 2), ('A', 6)]);
+    final dayAmt = _shiftAmount(shift: 0);
+    final eveAmt = _shiftAmount(shift: 1);
+    final nightAmt = _shiftAmount(shift: 2);
 
     final nfGroups = NumberFormat.decimalPattern('en_IN');
 
