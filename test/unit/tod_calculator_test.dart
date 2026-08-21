@@ -121,5 +121,95 @@ void main() {
       expect(structured.shiftUnits[1], closeTo(112.5, 0.001));
       expect(structured.shiftUnits[2], closeTo(112.5, 0.001));
     });
+
+    test('total shift ToD equals net zone ToD for single-reading days', () {
+      const shares = {'A': 1.0, 'B': 1.0, 'C': 0.85, 'D': 1.25};
+      const rate = 8.44;
+      final result = TodCalculator.calculate(
+        logs: [_log(name: 'r1', kwh: 92, kvah: 100, hour: 0)],
+        zoneShares: shares,
+        energyRatePerUnit: rate,
+      );
+      final buckets = TodCalculator.days(
+        logs: [_log(name: 'r1', kwh: 92, kvah: 100, hour: 0)],
+      );
+      // Reconstruct shift amounts using zone fractions (same as UI)
+      const frac = <int, List<(String, double)>>{
+        0: [('B', 1.0), ('C', 5 / 8)],
+        1: [('C', 3 / 8), ('D', 5 / 7)],
+        2: [('D', 2 / 7), ('A', 1.0)],
+      };
+      var shiftTotal = 0.0;
+      for (var s = 0; s < 3; s++) {
+        for (final d in buckets) {
+          for (final (z, f) in frac[s]!) {
+            shiftTotal += (d.zoneUnits[z] ?? 0) * f * (shares[z] ?? 0) * rate;
+          }
+        }
+      }
+      expect(shiftTotal, closeTo(result.netCharges, 0.01));
+    });
+
+    test('total shift ToD equals net zone ToD for shift-structured days', () {
+      const shares = {'A': 1.0, 'B': 1.0, 'C': 0.85, 'D': 1.25};
+      const rate = 8.44;
+      final logs = [
+        _log(name: 'day', kwh: 92, kvah: 100, hour: 6),
+        _log(name: 'eve', kwh: 92, kvah: 100, hour: 14),
+        _log(name: 'night', kwh: 92, kvah: 100, hour: 22),
+      ];
+      final result = TodCalculator.calculate(
+        logs: logs,
+        zoneShares: shares,
+        energyRatePerUnit: rate,
+      );
+      final buckets = TodCalculator.days(logs: logs);
+      const frac = <int, List<(String, double)>>{
+        0: [('B', 1.0), ('C', 5 / 8)],
+        1: [('C', 3 / 8), ('D', 5 / 7)],
+        2: [('D', 2 / 7), ('A', 1.0)],
+      };
+      var shiftTotal = 0.0;
+      for (var s = 0; s < 3; s++) {
+        for (final d in buckets) {
+          for (final (z, f) in frac[s]!) {
+            shiftTotal += (d.zoneUnits[z] ?? 0) * f * (shares[z] ?? 0) * rate;
+          }
+        }
+      }
+      expect(shiftTotal, closeTo(result.netCharges, 0.01));
+    });
+
+    test('total shift ToD equals net zone ToD for mixed days', () {
+      const shares = {'A': 1.0, 'B': 1.0, 'C': 0.85, 'D': 1.25};
+      const rate = 8.44;
+      final logs = [
+        _log(name: 'totalizer', kwh: 92, kvah: 100, hour: 0,
+            at: DateTime(2026, 7, 2, 0)),
+        _log(name: 'day', kwh: 103.5, kvah: 112.5, hour: 6),
+        _log(name: 'eve', kwh: 103.5, kvah: 112.5, hour: 14),
+        _log(name: 'night', kwh: 103.5, kvah: 112.5, hour: 22),
+      ];
+      final result = TodCalculator.calculate(
+        logs: logs,
+        zoneShares: shares,
+        energyRatePerUnit: rate,
+      );
+      final buckets = TodCalculator.days(logs: logs);
+      const frac = <int, List<(String, double)>>{
+        0: [('B', 1.0), ('C', 5 / 8)],
+        1: [('C', 3 / 8), ('D', 5 / 7)],
+        2: [('D', 2 / 7), ('A', 1.0)],
+      };
+      var shiftTotal = 0.0;
+      for (var s = 0; s < 3; s++) {
+        for (final d in buckets) {
+          for (final (z, f) in frac[s]!) {
+            shiftTotal += (d.zoneUnits[z] ?? 0) * f * (shares[z] ?? 0) * rate;
+          }
+        }
+      }
+      expect(shiftTotal, closeTo(result.netCharges, 0.01));
+    });
   });
 }
