@@ -105,7 +105,7 @@ class _AppShellState extends State<AppShell> {
             ListTile(
               selected: widget.selectedIndex == 8,
               leading: const Icon(Icons.history_rounded),
-              title: const Text('Readings'),
+              title: const Text('Reading History'),
               onTap: () {
                 Navigator.of(context).pop();
                 widget.onItemSelected(8);
@@ -272,7 +272,7 @@ class _AppShellState extends State<AppShell> {
       case 5:
         return 'Settings';
       case 8:
-        return 'Readings';
+        return 'Reading History';
       default:
         return '';
     }

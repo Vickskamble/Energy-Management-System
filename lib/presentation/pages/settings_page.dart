@@ -19,10 +19,9 @@ import '../bloc/energy_bloc.dart';
 import '../bloc/energy_event.dart';
 
 class SettingsScreen extends StatefulWidget {
-  final bool isDark;
   final VoidCallback? onToggleTheme;
 
-  const SettingsScreen({super.key, this.isDark = false, this.onToggleTheme});
+  const SettingsScreen({super.key, this.onToggleTheme});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -59,9 +58,13 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _roundToTen = AppConstants.roundToTen;
   bool _billOnKvah = AppConstants.billOnKvah;
 
-  Color get _dim => widget.isDark
-      ? AppColors.textDarkSecondary
-      : const Color(0xFF475569);
+  /// Live theme state — read from the inherited Theme so the switch keeps
+  /// tracking the real theme when it flips while this pushed route is open,
+  /// instead of a stale constructor snapshot.
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+
+  Color get _dim =>
+      _isDark ? AppColors.textDarkSecondary : const Color(0xFF475569);
 
   /// Labels for the preceding 11 months (oldest → most recent).
   List<String> get _precedingMonthLabels {
@@ -301,10 +304,10 @@ class _SettingsScreenState extends State<SettingsScreen>
               SwitchListTile(
                 title: const Text('Dark Mode', style: TextStyle(fontSize: 14)),
                 subtitle: Text(
-                  widget.isDark ? 'Dark theme active' : 'Light theme active',
+                  _isDark ? 'Dark theme active' : 'Light theme active',
                   style: const TextStyle(fontSize: 12),
                 ),
-                value: widget.isDark,
+                value: _isDark,
                 onChanged: (_) => widget.onToggleTheme?.call(),
                 contentPadding: EdgeInsets.zero,
               ),
@@ -322,133 +325,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (mustBePositive && val <= 0) return 'Must be positive';
     if (val < 0) return 'Cannot be negative';
     return null;
-  }
-
-  Widget _buildBillingRulesCard() {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Billing rules',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: widget.isDark
-                      ? AppColors.textOnDark
-                      : AppColors.textPrimary,
-                ),
-              ),
-              Text(
-                'applies to every estimate instantly',
-                style: TextStyle(fontSize: 11, color: _dim),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'These rules feed the billing engine directly — dashboard, '
-            'analysis and reports all recompute with the saved tariff.',
-            style: TextStyle(fontSize: 11, color: _dim),
-          ),
-          const SizedBox(height: 14),
-          _ruleField(
-            _floorCtrl,
-            'Minimum billable demand (floor)',
-            '% of Contract Demand',
-            onChanged: (v) {
-              final d = double.tryParse(v);
-              if (d != null && d >= 0 && d <= 100) {
-                AppConfig.billingDemandFloorPct = d;
-              }
-            },
-          ),
-          const SizedBox(height: 12),
-          _ruleField(
-            _ratchetCtrl,
-            'Ratchet floor',
-            '% of the highest of the preceding 11 months',
-            onChanged: (v) {
-              final d = double.tryParse(v);
-              if (d != null && d >= 0 && d <= 100) {
-                AppConfig.ratchetFloorPctOfRatchet = d;
-              }
-            },
-          ),
-          const SizedBox(height: 12),
-          _ruleField(
-            _facPsCtrl,
-            'Fuel Adjustment Charge (FAC)',
-            'paise per unit (e.g. 15.37)',
-            onChanged: (v) {
-              final d = double.tryParse(v);
-              if (d != null && d >= 0) {
-                AppConfig.facRatePerUnit = d / 100;
-                _facCtrl.text = (d / 100).toStringAsFixed(2);
-              }
-            },
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Load Factor incentive',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: _dim,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _ruleField(
-                  _lfTCtrl,
-                  'Threshold LF',
-                  '%',
-                  onChanged: (v) {
-                    final d = double.tryParse(v);
-                    if (d != null && d >= 0) AppConfig.lfThresholdPct = d;
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ruleField(
-                  _lfRCtrl,
-                  'Rate / 1% above',
-                  '% of Energy Charges',
-                  onChanged: (v) {
-                    final d = double.tryParse(v);
-                    if (d != null && d >= 0) AppConfig.lfRatePct = d;
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ruleField(
-                  _lfSCtrl,
-                  'Sealing cap',
-                  '%',
-                  onChanged: (v) {
-                    final d = double.tryParse(v);
-                    if (d != null && d >= 0) AppConfig.lfSealingPct = d;
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Zero your Load Factor fields → incentive switches off. '
-            'Floor / Ratchet 0 → switches off too.',
-            style: TextStyle(fontSize: 11, color: _dim),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _ruleField(
@@ -600,361 +476,758 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  // ── Billing tab — HTML 4-card grid + supporting cards ──────────────
   Widget _buildBilling() {
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.page),
-      children: [
-        AppSectionHeader(
-          title: 'Billing',
-          subtitle: 'Tariff configuration used for all bill estimates',
-        ),
-        _buildBillingRulesCard(),
-        AppCard(
-          child: Form(
-            key: _tariffFormKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Form(
+      key: _tariffFormKey,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.page),
+        children: [
+          AppSectionHeader(
+            title: 'Billing',
+            subtitle: 'Tariff configuration used for all bill estimates',
+          ),
+
+          // ── Row 1: Tariff Presets + Billing Rules ───────────────────
+          _twoColRow(
+            left: _buildTariffPresetsCard(),
+            right: _buildBillingRulesCard(),
+          ),
+          const SizedBox(height: 12),
+
+          // ── Row 2: LF Incentive + PF Incentive ─────────────────────
+          _twoColRow(
+            left: _buildLfIncentiveCard(),
+            right: _buildPfIncentiveCard(),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Full-width: Tariff Rates ────────────────────────────────
+          _buildTariffRatesCard(),
+          const SizedBox(height: 12),
+
+          // ── Full-width: MD & Preceding Demands ──────────────────────
+          _buildMdPrecedingCard(),
+          const SizedBox(height: 12),
+
+          // ── Full-width: Rebates & Adjustments ──────────────────────
+          _buildRebatesCard(),
+          const SizedBox(height: 16),
+
+          Text(
+            'Saving updates the tariff used for all future bill estimates.',
+            style: TextStyle(fontSize: 12, color: _dim),
+          ),
+          const SizedBox(height: 8),
+          AppButton(
+            label: 'Save Tariff',
+            icon: Icons.save_outlined,
+            onPressed: _saveTariff,
+            expanded: true,
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _resetTariff,
+            child: const Text('Reset to defaults'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Two-column row that stacks on narrow screens.
+  Widget _twoColRow({required Widget left, required Widget right}) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 600;
+        if (isWide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: left),
+              const SizedBox(width: 12),
+              Expanded(child: right),
+            ],
+          );
+        }
+        return Column(
+          children: [
+            left,
+            const SizedBox(height: 12),
+            right,
+          ],
+        );
+      },
+    );
+  }
+
+  // ── Card 1: Tariff Presets ──────────────────────────────────────
+  Widget _buildTariffPresetsCard() {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Tariff presets',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _isDark
+                      ? AppColors.textOnDark
+                      : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  '3 verified',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<TariffCategory>(
+            initialValue: _category,
+            isExpanded: true,
+            isDense: true,
+            decoration: const InputDecoration(
+              labelText: 'Category',
+              isDense: true,
+            ),
+            items: [
+              for (final c in TariffCategory.values)
+                DropdownMenuItem(value: c, child: Text(c.label)),
+            ],
+            onChanged: (v) {
+              if (v != null) _applyPreset(v, _version);
+            },
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<TariffVersion>(
+            initialValue: _version,
+            isExpanded: true,
+            isDense: true,
+            decoration: const InputDecoration(
+              labelText: 'Tariff Year',
+              isDense: true,
+            ),
+            items: [
+              for (final v in TariffVersion.values)
+                DropdownMenuItem(value: v, child: Text(v.label)),
+            ],
+            onChanged: (v) {
+              if (v != null) _applyPreset(_category, v);
+            },
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${_category.label} ${_version.label}',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Legacy = real bill verified (8.44/650/0.81). '
+            'FY26-27 = Case 75/2025. MPERC = LV-4 doc.',
+            style: TextStyle(fontSize: 10, color: _dim),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Card 2: Billing Rules ───────────────────────────────────────
+  Widget _buildBillingRulesCard() {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Billing rules',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _isDark
+                      ? AppColors.textOnDark
+                      : AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                'applies instantly',
+                style: TextStyle(fontSize: 10, color: _dim),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Rules feed the billing engine — dashboard, analysis & reports recompute.',
+            style: TextStyle(fontSize: 10, color: _dim),
+          ),
+          const SizedBox(height: 12),
+          _ruleField(
+            _mdCtrl,
+            'Contract Demand',
+            'kVA',
+            onChanged: (v) {
+              final d = double.tryParse(v);
+              if (d != null && d > 0) AppConfig.contractDemandKva = d;
+            },
+          ),
+          const SizedBox(height: 10),
+          _ruleField(
+            _floorCtrl,
+            'Demand floor',
+            '% of CD',
+            onChanged: (v) {
+              final d = double.tryParse(v);
+              if (d != null && d >= 0 && d <= 100) {
+                AppConfig.billingDemandFloorPct = d;
+              }
+            },
+          ),
+          const SizedBox(height: 10),
+          _ruleField(
+            _ratchetCtrl,
+            'Ratchet',
+            '% of prev-11m high',
+            onChanged: (v) {
+              final d = double.tryParse(v);
+              if (d != null && d >= 0 && d <= 100) {
+                AppConfig.ratchetFloorPctOfRatchet = d;
+              }
+            },
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Billing unit',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _dim),
+          ),
+          const SizedBox(height: 4),
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(
+                value: true,
+                label: Text('kVAh', style: TextStyle(fontSize: 12)),
+              ),
+              ButtonSegment(
+                value: false,
+                label: Text('kWh', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+            selected: {_billOnKvah},
+            onSelectionChanged: (v) => setState(() => _billOnKvah = v.first),
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _ruleField(
+            _facPsCtrl,
+            'FAC',
+            'paise per unit',
+            onChanged: (v) {
+              final d = double.tryParse(v);
+              if (d != null && d >= 0) {
+                AppConfig.facRatePerUnit = d / 100;
+                _facCtrl.text = (d / 100).toStringAsFixed(2);
+              }
+            },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Changes apply instantly — all screens recompute.',
+            style: TextStyle(fontSize: 10, color: _dim),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Card 3: LF Incentive ────────────────────────────────────────
+  Widget _buildLfIncentiveCard() {
+    final currentLf = AppConfig.lfIncentivePercent;
+    final kpi = currentLf > 0
+        ? 'Current LF incentive: ${currentLf.toStringAsFixed(1)}%'
+        : 'LF incentive off (0%)';
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'LF incentive',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _isDark
+                      ? AppColors.textOnDark
+                      : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'per-preset',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _ruleField(
+            _lfTCtrl,
+            'Threshold',
+            '% LF',
+            onChanged: (v) {
+              final d = double.tryParse(v);
+              if (d != null && d >= 0) AppConfig.lfThresholdPct = d;
+            },
+          ),
+          const SizedBox(height: 10),
+          _ruleField(
+            _lfRCtrl,
+            'Rate / 1% above',
+            '% of EC',
+            onChanged: (v) {
+              final d = double.tryParse(v);
+              if (d != null && d >= 0) AppConfig.lfRatePct = d;
+            },
+          ),
+          const SizedBox(height: 10),
+          _ruleField(
+            _lfSCtrl,
+            'Sealing cap',
+            '%',
+            onChanged: (v) {
+              final d = double.tryParse(v);
+              if (d != null && d >= 0) AppConfig.lfSealingPct = d;
+            },
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
               children: [
-                Text(
-                  'Tariff category & year',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _dim,
+                Icon(Icons.info_outline, size: 14, color: _dim),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    kpi,
+                    style: TextStyle(fontSize: 10, color: _dim),
                   ),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<TariffCategory>(
-                  initialValue: _category,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Category (MERC)',
-                    isDense: true,
-                  ),
-                  items: [
-                    for (final c in TariffCategory.values)
-                      DropdownMenuItem(
-                        value: c,
-                        child: Text(c.label),
-                      ),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) _applyPreset(v, _version);
-                  },
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<TariffVersion>(
-                  initialValue: _version,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Tariff Year',
-                    isDense: true,
-                  ),
-                  items: [
-                    for (final v in TariffVersion.values)
-                      DropdownMenuItem(
-                        value: v,
-                        child: Text(v.label),
-                      ),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) _applyPreset(_category, v);
-                  },
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Energy charges',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _dim,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _rateField(
-                  _tariffCtrl,
-                  'Energy Tariff (₹ per kWh)',
-                  'e.g. 6.40',
-                  mustBePositive: true,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Demand & ancillary charges',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _dim,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _rateField(
-                        _demandCtrl,
-                        'Demand (₹ per kVA)',
-                        'e.g. 650',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _rateField(
-                        _facCtrl,
-                        'FAC (₹ per unit)',
-                        'e.g. 0.30',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _rateField(
-                        _wheelingCtrl,
-                        'Wheeling (₹ per unit)',
-                        'e.g. 0.61',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _rateField(
-                        _dutyCtrl,
-                        'Elec. Duty (% of EC)',
-                        '0 = exempt (HT)',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _rateField(
-                        _taxCtrl,
-                        'Tax (% of EC)',
-                        'e.g. 1.25',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _rateField(
-                        _subsidyCtrl,
-                        'Subsidy (%)',
-                        '0 = none',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'MD (contract demand) & ratchet',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _dim,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _rateField(
-                        _mdCtrl,
-                        'MD (kVA)',
-                        'e.g. 201',
-                        mustBePositive: true,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(child: _md75PercentTile()),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Billing demand = max(recorded MD, highest demand of the '
-                  'preceding 11 months). 75% of MD is only a REFERENCE level '
-                  'to stay above — it is never used in the bill. Recorded '
-                  'monthly highs enter automatically and stay in the window '
-                  'for the next 11 months until a higher reading breaks them. '
-                  'Enter demands from your past bills only for months with no '
-                  'app data — empty fields are ignored.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: _dim,
-                  ),
-                ),
-                ExpansionTile(
-                  title: const Text('Advanced tariff settings'),
-                  subtitle: const Text(
-                    'Only adjust these if you are familiar with tariff mechanics',
-                  ),
-                  initiallyExpanded: false,
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: const EdgeInsets.only(top: 8, bottom: 8),
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 12),
-                        for (var i = 0; i < 11; i += 2) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _rateField(
-                          _precedingCtrls[i],
-                          'M-${11 - i} (${_precedingMonthLabels[i]})',
-                          'kVA if known',
-                          optional: true,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      if (i + 1 < 11)
-                        Expanded(
-                          child: _rateField(
-                            _precedingCtrls[i + 1],
-                            'M-${10 - i} (${_precedingMonthLabels[i + 1]})',
-                            'kVA if known',
-                            optional: true,
-                          ),
-                        )
-                      else
-                        const Expanded(child: SizedBox()),
-                    ],
-                  ),
-                  if (i + 2 < 11) const SizedBox(height: 12),
-                ],
-                const SizedBox(height: 16),
-                Text(
-                  'Rebates & adjustments',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _dim,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _rateField(
-                        _icrRateCtrl,
-                        'ICR (₹/unit)',
-                        '0 = off',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _rateField(
-                        _icrUnitsCtrl,
-                        'Last-yr same month units',
-                        'kVAh if known',
-                        optional: true,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Incremental Consumption Rebate — applies ₹/unit on the '
-                  'consumption growth when it exceeds last year\u2019s same '
-                  'month by ≥ 10%.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: _dim,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _rateField(
-                        _lfCtrl,
-                        'LF incentive (%)',
-                        '0 = off',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _rateField(
-                        _ppdCtrl,
-                        'PPD (%)',
-                        'e.g. 2.0',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _rateField(
-                        _bulkCtrl,
-                        'Bulk rebate (%)',
-                        '0 = off',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _rateField(
-                        _arrearsCtrl,
-                        'Arrears/DPC (₹)',
-                        '0 = none',
-                        optional: true,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  title: const Text(
-                    'Round bill to nearest ₹10',
-                    style: TextStyle(fontSize: 14),
-                  ),
-                  value: _roundToTen,
-                  onChanged: (v) => setState(() => _roundToTen = v),
-                  contentPadding: EdgeInsets.zero,
-                ),
-                SwitchListTile(
-                  title: const Text(
-                    'Bill on kVAh (PF-adjusted)',
-                    style: TextStyle(fontSize: 14),
-                  ),
-                  subtitle: const Text(
-                    'On = kVAh (official), Off = kWh',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  value: _billOnKvah,
-                  onChanged: (v) => setState(() => _billOnKvah = v),
-                  contentPadding: EdgeInsets.zero,
-                ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Saving updates the tariff used for all future bill estimates.',
-                  style: TextStyle(fontSize: 12, color: _dim),
-                ),
-                const SizedBox(height: 8),
-                AppButton(
-                  label: 'Save Tariff',
-                  icon: Icons.save_outlined,
-                  onPressed: _saveTariff,
-                  expanded: true,
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: _resetTariff,
-                  child: const Text('Reset to defaults'),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  // ── Card 4: PF Incentive / Surcharge ────────────────────────────
+  Widget _buildPfIncentiveCard() {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'PF incentive / surcharge',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _isDark
+                      ? AppColors.textOnDark
+                      : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'tables',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.amber,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _pfInfoRow(
+            'MSEDCL: ≥ 0.95 rebate 1%',
+            color: Colors.green,
+          ),
+          _pfInfoRow(
+            'MSEDCL: < 0.90 penalty 5%',
+            color: AppColors.danger,
+          ),
+          const Divider(height: 16),
+          _pfInfoRow(
+            'MPERC LV-4: 86–100% → 0.5–10% rebate',
+            color: Colors.green,
+          ),
+          _pfInfoRow(
+            'MPERC: < 80% → 1–10% surcharge',
+            color: AppColors.danger,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Bill verified: PF 0.94 → no charge, PF 0.99 → no charge.',
+            style: TextStyle(fontSize: 10, color: _dim),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pfInfoRow(String text, {required Color color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Icon(Icons.circle, size: 6, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Full-width: Tariff Rates ────────────────────────────────────
+  Widget _buildTariffRatesCard() {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Tariff rates',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: _isDark
+                  ? AppColors.textOnDark
+                  : AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Directly from tariff order — edit only for non-standard categories.',
+            style: TextStyle(fontSize: 10, color: _dim),
+          ),
+          const SizedBox(height: 12),
+          _rateField(
+            _tariffCtrl,
+            'Energy Tariff (₹ per unit)',
+            'e.g. 8.44',
+            mustBePositive: true,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _rateField(
+                  _demandCtrl,
+                  'Demand (₹ per kVA)',
+                  'e.g. 650',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _rateField(
+                  _wheelingCtrl,
+                  'Wheeling (₹ per unit)',
+                  'e.g. 0.81',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _rateField(
+                  _dutyCtrl,
+                  'Elec. Duty (% of EC)',
+                  '0 = exempt (HT)',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _rateField(
+                  _taxCtrl,
+                  'Tax (% of EC)',
+                  'e.g. 1.25',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _rateField(
+                  _subsidyCtrl,
+                  'Subsidy (%)',
+                  '0 = none',
+                  optional: true,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(child: SizedBox()),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Full-width: MD & Preceding Demands ──────────────────────────
+  Widget _buildMdPrecedingCard() {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'MD & preceding demands',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: _isDark
+                  ? AppColors.textOnDark
+                  : AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Billing demand = max(recorded MD, highest of preceding 11 months). '
+            '75% is a reference floor — never used in bill.',
+            style: TextStyle(fontSize: 10, color: _dim),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _rateField(
+                  _mdCtrl,
+                  'MD (kVA)',
+                  'e.g. 201',
+                  mustBePositive: true,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: _md75PercentTile()),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ExpansionTile(
+            title: const Text('Preceding 11 months', style: TextStyle(fontSize: 13)),
+            subtitle: const Text(
+              'Enter only for months with no app data',
+              style: TextStyle(fontSize: 11),
+            ),
+            initiallyExpanded: false,
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(top: 8, bottom: 8),
+            children: [
+              for (var i = 0; i < 11; i += 2) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: _rateField(
+                        _precedingCtrls[i],
+                        'M-${11 - i} (${_precedingMonthLabels[i]})',
+                        'kVA',
+                        optional: true,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    if (i + 1 < 11)
+                      Expanded(
+                        child: _rateField(
+                          _precedingCtrls[i + 1],
+                          'M-${10 - i} (${_precedingMonthLabels[i + 1]})',
+                          'kVA',
+                          optional: true,
+                        ),
+                      )
+                    else
+                      const Expanded(child: SizedBox()),
+                  ],
+                ),
+                if (i + 2 < 11) const SizedBox(height: 12),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Full-width: Rebates & Adjustments ───────────────────────────
+  Widget _buildRebatesCard() {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Rebates & adjustments',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: _isDark
+                  ? AppColors.textOnDark
+                  : AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Incremental Consumption Rebate (ICR) — applies ₹/unit on '
+            'consumption growth ≥ 10% vs last year\u2019s same month.',
+            style: TextStyle(fontSize: 10, color: _dim),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _rateField(
+                  _icrRateCtrl,
+                  'ICR (₹/unit)',
+                  '0 = off',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _rateField(
+                  _icrUnitsCtrl,
+                  'Last-yr same month units',
+                  'kVAh',
+                  optional: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _rateField(
+                  _lfCtrl,
+                  'LF incentive (%)',
+                  '0 = off',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _rateField(
+                  _ppdCtrl,
+                  'PPD (%)',
+                  'e.g. 2.0',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _rateField(
+                  _bulkCtrl,
+                  'Bulk rebate (%)',
+                  '0 = off',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _rateField(
+                  _arrearsCtrl,
+                  'Arrears/DPC (₹)',
+                  '0 = none',
+                  optional: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            title: const Text(
+              'Round bill to nearest ₹10',
+              style: TextStyle(fontSize: 14),
+            ),
+            value: _roundToTen,
+            onChanged: (v) => setState(() => _roundToTen = v),
+            contentPadding: EdgeInsets.zero,
+          ),
+          SwitchListTile(
+            title: const Text(
+              'Bill on kVAh (PF-adjusted)',
+              style: TextStyle(fontSize: 14),
+            ),
+            subtitle: const Text(
+              'On = kVAh (official), Off = kWh',
+              style: TextStyle(fontSize: 12),
+            ),
+            value: _billOnKvah,
+            onChanged: (v) => setState(() => _billOnKvah = v),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ],
+      ),
     );
   }
 

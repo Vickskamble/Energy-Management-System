@@ -249,24 +249,6 @@ class _AnalysisContentState extends State<_AnalysisContent> {
             ),
             const SizedBox(height: 24),
           ],
-          AppSectionHeader(
-            title: 'Reading History',
-            subtitle:
-                '${_filtered.length} reading(s) — tap edit or delete to correct data',
-          ),
-          const SizedBox(height: 8),
-          _buildLogList(_filtered),
-          if (_visibleCount < _filtered.length)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Center(
-                child: TextButton.icon(
-                  onPressed: () => setState(() => _visibleCount += _pageSize),
-                  icon: const Icon(Icons.expand_more_rounded),
-                  label: const Text('Load More'),
-                ),
-              ),
-            ),
         ],
       ),
     );

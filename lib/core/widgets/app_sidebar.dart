@@ -84,7 +84,7 @@ class _AppSidebarState extends State<AppSidebar> {
       SidebarItem(
         icon: Icons.history_outlined,
         activeIcon: Icons.history_rounded,
-        label: 'Readings',
+        label: 'Reading History',
         index: 8,
       ),
       SidebarItem(
