@@ -671,11 +671,12 @@ class _TodShiftSectionState extends State<TodShiftSection> {
       required double barW,
       required double maxTotal,
     }) {
-      // Smart Y-axis: 3-5 gridlines, format large numbers (1k, 2k).
+      // Smart Y-axis: tight ceiling ~5 % above max, 4 gridlines, nice steps.
       final rawStep = maxTotal > 0 ? maxTotal / 4 : 1.0;
       final mag = rawStep >= 1000 ? 1000.0 : rawStep >= 100 ? 100.0 : rawStep >= 10 ? 10.0 : 1.0;
       final step = (rawStep / mag).ceil() * mag;
-      final gridCount = step > 0 ? (maxTotal / step).ceil() : 4;
+      final gridCount = 4;
+      final yMax = step * gridCount; // ceiling bars + labels share
       final yFmt = (double v) {
         if (v >= 1000) return '${(v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1)}k';
         return '${v.round()}';
@@ -732,9 +733,9 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                             children: [
                               for (var s = 2; s >= 0; s--)
                                 Container(
-                                  height: maxTotal <= 0
+                                  height: yMax <= 0
                                       ? 0
-                                      : d.kwh[s] / maxTotal *
+                                      : d.kwh[s] / yMax *
                                           plotH,
                                   color: _shiftColors[s],
                                 ),

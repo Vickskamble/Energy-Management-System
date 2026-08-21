@@ -488,18 +488,8 @@ class _SettingsScreenState extends State<SettingsScreen>
             subtitle: 'Tariff configuration used for all bill estimates',
           ),
 
-          // ── Row 1: Tariff Presets + Billing Rules ───────────────────
-          _twoColRow(
-            left: _buildTariffPresetsCard(),
-            right: _buildBillingRulesCard(),
-          ),
-          const SizedBox(height: 12),
-
-          // ── Row 2: LF Incentive + PF Incentive ─────────────────────
-          _twoColRow(
-            left: _buildLfIncentiveCard(),
-            right: _buildPfIncentiveCard(),
-          ),
+          // ── 4-card grid (HTML prototype g2: auto-fit 2-col) ──────────
+          _billingGrid(),
           const SizedBox(height: 16),
 
           // ── Full-width: Tariff Rates ────────────────────────────────
@@ -555,6 +545,33 @@ class _SettingsScreenState extends State<SettingsScreen>
             left,
             const SizedBox(height: 12),
             right,
+          ],
+        );
+      },
+    );
+  }
+
+  /// 4-card responsive grid matching HTML prototype `grid g2`.
+  Widget _billingGrid() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cards = [
+          _buildTariffPresetsCard(),
+          _buildBillingRulesCard(),
+          _buildLfIncentiveCard(),
+          _buildPfIncentiveCard(),
+        ];
+        final gap = 12.0;
+        // 2 columns if wide enough for two 340-min cards, else 1
+        final cols = constraints.maxWidth >= 700 ? 2 : 1;
+        final cardW = cols == 1
+            ? constraints.maxWidth
+            : (constraints.maxWidth - gap) / 2;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final c in cards) SizedBox(width: cardW, child: c),
           ],
         );
       },
