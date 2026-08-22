@@ -525,32 +525,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  /// Two-column row that stacks on narrow screens.
-  Widget _twoColRow({required Widget left, required Widget right}) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 600;
-        if (isWide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: left),
-              const SizedBox(width: 12),
-              Expanded(child: right),
-            ],
-          );
-        }
-        return Column(
-          children: [
-            left,
-            const SizedBox(height: 12),
-            right,
-          ],
-        );
-      },
-    );
-  }
-
   /// 4-card responsive grid matching HTML prototype `grid g2`.
   Widget _billingGrid() {
     return LayoutBuilder(

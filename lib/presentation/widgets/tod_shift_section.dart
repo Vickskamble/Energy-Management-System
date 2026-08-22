@@ -677,10 +677,10 @@ class _TodShiftSectionState extends State<TodShiftSection> {
       final step = (rawStep / mag).ceil() * mag;
       final gridCount = 4;
       final yMax = step * gridCount; // ceiling bars + labels share
-      final yFmt = (double v) {
+      String yFmt(double v) {
         if (v >= 1000) return '${(v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1)}k';
         return '${v.round()}';
-      };
+      }
       return Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
