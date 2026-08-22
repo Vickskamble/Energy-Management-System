@@ -753,10 +753,12 @@ class _TodShiftSectionState extends State<TodShiftSection> {
     }
 
     Widget dailyChart() {
-      final maxTotal = days.fold<double>(
-        0,
-        (m, d) => d.kwh.fold<double>(m, (a, b) => a + b > m ? a + b : m),
-      );
+      final rawTotals = [
+        for (final d in days) d.kwh.fold<double>(0, (a, b) => a + b),
+      ]..sort();
+      // 90th-percentile ceiling so one outlier day doesn't dwarf all bars.
+      final p90idx = (rawTotals.length * 0.9).floor().clamp(0, rawTotals.length - 1);
+      final maxTotal = rawTotals[p90idx];
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
