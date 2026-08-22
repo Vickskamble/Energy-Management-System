@@ -292,10 +292,11 @@ class MeterManagementPage extends StatelessWidget {
                     );
               try {
                 if (existing != null) {
-                  repo.updateMeter(meter);
+                  await repo.updateMeter(meter);
                 } else {
-                  repo.saveMeter(meter);
+                  await repo.saveMeter(meter);
                 }
+                if (!ctx.mounted) return;
                 nav.pop(true);
               } catch (e) {
                 messenger.showSnackBar(
