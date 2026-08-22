@@ -12,7 +12,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const RESEND_FROM = Deno.env.get("RESEND_FROM") ?? "PowerEMS Alerts <alerts@powerems.in>";
+const RESEND_FROM = Deno.env.get("RESEND_FROM") ?? "PowerEMS Alerts <alerts@brilliants.in>";
 
 function buildDigestHtml(userEmail: string, alerts: Record<string, unknown>[]): string {
   const rows = alerts
