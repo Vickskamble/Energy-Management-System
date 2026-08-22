@@ -19,6 +19,17 @@ class EnergyLogEntity {
   final bool isSynced;
   final String? userId;
 
+  /// Export (solar) consumption in kWh — raw meter diff, before MF.
+  /// Null for non-solar consumers.
+  final double? exportKwh;
+
+  /// Export (solar) consumption in kVAh — raw meter diff, before MF.
+  final double? exportKvah;
+
+  /// Total solar generation in kWh — raw meter diff, before MF.
+  /// May exceed [exportKwh] when some generation is self-consumed.
+  final double? generationKwh;
+
   final double energyCharges;
   final double demandCharges;
   final double facCharges;
@@ -55,6 +66,9 @@ class EnergyLogEntity {
     required this.loggedAt,
     this.isSynced = false,
     this.userId,
+    this.exportKwh,
+    this.exportKvah,
+    this.generationKwh,
     this.energyCharges = 0,
     this.demandCharges = 0,
     this.facCharges = 0,
@@ -87,6 +101,9 @@ class EnergyLogEntity {
     DateTime? loggedAt,
     bool? isSynced,
     String? userId,
+    double? exportKwh,
+    double? exportKvah,
+    double? generationKwh,
     double? multiplyingFactor,
     double? energyCharges,
     double? demandCharges,
@@ -118,6 +135,9 @@ class EnergyLogEntity {
       loggedAt: loggedAt ?? this.loggedAt,
       isSynced: isSynced ?? this.isSynced,
       userId: userId ?? this.userId,
+      exportKwh: exportKwh ?? this.exportKwh,
+      exportKvah: exportKvah ?? this.exportKvah,
+      generationKwh: generationKwh ?? this.generationKwh,
       energyCharges: energyCharges ?? this.energyCharges,
       demandCharges: demandCharges ?? this.demandCharges,
       facCharges: facCharges ?? this.facCharges,

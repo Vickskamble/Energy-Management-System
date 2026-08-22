@@ -28,6 +28,13 @@ class EnergyLogModel {
   final bool isSynced;
   final String? userId;
 
+  /// Export (solar) consumption in kWh — raw meter diff, before MF.
+  final double? exportKwh;
+  final double? exportKvah;
+
+  /// Total solar generation in kWh — raw meter diff, before MF.
+  final double? generationKwh;
+
   final double energyCharges;
   final double demandCharges;
   final double facCharges;
@@ -59,6 +66,9 @@ class EnergyLogModel {
     required this.loggedAt,
     this.isSynced = false,
     this.userId,
+    this.exportKwh,
+    this.exportKvah,
+    this.generationKwh,
     this.energyCharges = 0,
     this.demandCharges = 0,
     this.facCharges = 0,
@@ -91,6 +101,9 @@ class EnergyLogModel {
     loggedAt: loggedAt,
     isSynced: isSynced,
     userId: userId,
+    exportKwh: exportKwh,
+    exportKvah: exportKvah,
+    generationKwh: generationKwh,
     energyCharges: energyCharges,
     demandCharges: demandCharges,
     facCharges: facCharges,
@@ -123,6 +136,9 @@ class EnergyLogModel {
     loggedAt: entity.loggedAt,
     isSynced: entity.isSynced,
     userId: entity.userId,
+    exportKwh: entity.exportKwh,
+    exportKvah: entity.exportKvah,
+    generationKwh: entity.generationKwh,
     energyCharges: entity.energyCharges,
     demandCharges: entity.demandCharges,
     facCharges: entity.facCharges,
@@ -155,6 +171,10 @@ class EnergyLogModel {
     'logged_at': loggedAt.toUtc().toIso8601String(),
     'is_synced': isSynced,
     if (userId != null) 'user_id': userId,
+    if (exportKwh != null) 'export_kwh': _toPrecision(exportKwh!, 2),
+    if (exportKvah != null) 'export_kvah': _toPrecision(exportKvah!, 2),
+    if (generationKwh != null)
+      'generation_kwh': _toPrecision(generationKwh!, 2),
     'energy_charges': _toPrecision(energyCharges, 2),
     'demand_charges': _toPrecision(demandCharges, 2),
     'fac_charges': _toPrecision(facCharges, 2),
@@ -188,6 +208,9 @@ class EnergyLogModel {
       loggedAt: DateTime.parse(map['logged_at'] as String).toLocal(),
       isSynced: map['is_synced'] == true || map['is_synced'] == 1,
       userId: map['user_id'] as String?,
+      exportKwh: _parseNullableDouble(map['export_kwh']),
+      exportKvah: _parseNullableDouble(map['export_kvah']),
+      generationKwh: _parseNullableDouble(map['generation_kwh']),
       energyCharges: _parseDouble(map['energy_charges']),
       demandCharges: _parseDouble(map['demand_charges']),
       facCharges: _parseDouble(map['fac_charges']),
@@ -220,6 +243,10 @@ class EnergyLogModel {
     'estimated_bill': (estimatedBill * 100).round() / 100,
     'logged_at': loggedAt.toUtc().toIso8601String(),
     if (userId != null) 'user_id': userId,
+    if (exportKwh != null) 'export_kwh': (exportKwh! * 100).round() / 100,
+    if (exportKvah != null) 'export_kvah': (exportKvah! * 100).round() / 100,
+    if (generationKwh != null)
+      'generation_kwh': (generationKwh! * 100).round() / 100,
     'energy_charges': (energyCharges * 100).round() / 100,
     'demand_charges': (demandCharges * 100).round() / 100,
     'fac_charges': (facCharges * 100).round() / 100,
@@ -252,6 +279,9 @@ class EnergyLogModel {
       estimatedBill: (json['estimated_bill'] as num).toDouble(),
       loggedAt: DateTime.parse(json['logged_at'] as String).toLocal(),
       userId: json['user_id'] as String?,
+      exportKwh: (json['export_kwh'] as num?)?.toDouble(),
+      exportKvah: (json['export_kvah'] as num?)?.toDouble(),
+      generationKwh: (json['generation_kwh'] as num?)?.toDouble(),
       energyCharges: (json['energy_charges'] as num?)?.toDouble() ?? 0,
       demandCharges: (json['demand_charges'] as num?)?.toDouble() ?? 0,
       facCharges: (json['fac_charges'] as num?)?.toDouble() ?? 0,
@@ -286,6 +316,9 @@ class EnergyLogModel {
     String? userId,
     bool isSynced = false,
     double multiplyingFactor = AppConstants.multiplyingFactor,
+    double? exportKwh,
+    double? exportKvah,
+    double? generationKwh,
   }) {
     final pf = powerFactor ?? CalculationEngine.calculatePowerFactor(kwh, kvah);
     final totalUnits = kwh * multiplyingFactor;
@@ -378,6 +411,12 @@ class EnergyLogModel {
       loggedAt: loggedAt ?? DateTime.now(),
       isSynced: isSynced,
       userId: uid,
+      exportKwh: exportKwh == null ? null : (exportKwh * 100).round() / 100,
+      exportKvah:
+          exportKvah == null ? null : (exportKvah * 100).round() / 100,
+      generationKwh: generationKwh == null
+          ? null
+          : (generationKwh * 100).round() / 100,
       energyCharges: (energyCharges * 100).round() / 100,
       demandCharges: (demandCharges * 100).round() / 100,
       facCharges: (facCharges * 100).round() / 100,
@@ -450,6 +489,9 @@ class EnergyLogModel {
         loggedAt: m.loggedAt,
         isSynced: m.isSynced,
         userId: m.userId,
+        exportKwh: m.exportKwh,
+        exportKvah: m.exportKvah,
+        generationKwh: m.generationKwh,
         energyCharges: m.energyCharges,
         demandCharges: m.demandCharges,
         facCharges: m.facCharges,

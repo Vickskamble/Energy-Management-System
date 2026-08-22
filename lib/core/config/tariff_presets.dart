@@ -7,7 +7,9 @@ library;
 
 /// Consumer category — determines which charge structure applies.
 enum TariffCategory {
-  htIndustrial('ht_industrial', 'HT-I Industry'),
+  htIndustrial('ht_industrial', 'HT-I A Industry'),
+  htIndustrialSeasonal(
+      'ht_industrial_seasonal', 'HT-I B Seasonal Industry'),
   htCommercial('ht_commercial', 'HT-II Commercial'),
   ltResidential('lt_residential', 'LT-I Residential'),
   ltIndustrial('lt_industrial', 'LT-V Industry (≤20 kW)');
@@ -131,6 +133,16 @@ class TariffPresets {
           wheelingRate: version == TariffVersion.fy2526 ? 0.81 : 0.74,
           dutyPercent: 0,
           defaultContractDemand: 201.0,
+        );
+      case TariffCategory.htIndustrialSeasonal:
+        return TariffPreset(
+          category: category,
+          version: version,
+          energyRate: version == TariffVersion.fy2526 ? 8.70 : 8.47,
+          demandRate: version == TariffVersion.fy2526 ? 549.0 : 650.0,
+          wheelingRate: version == TariffVersion.fy2526 ? 0.81 : 0.81,
+          dutyPercent: 0,
+          defaultContractDemand: 790.0,
         );
       case TariffCategory.htCommercial:
         return TariffPreset(

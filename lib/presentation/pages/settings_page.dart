@@ -45,6 +45,11 @@ class _SettingsScreenState extends State<SettingsScreen>
   final _ppdCtrl = TextEditingController();
   final _bulkCtrl = TextEditingController();
   final _arrearsCtrl = TextEditingController();
+  final _regionSubsidyCtrl = TextEditingController();
+  final _section106Ctrl = TextEditingController();
+  final _tcsCtrl = TextEditingController();
+  final _goMFixedCtrl = TextEditingController();
+  final _goMTodCtrl = TextEditingController();
   final _precedingCtrls = List.generate(11, (_) => TextEditingController());
   final _tariffFormKey = GlobalKey<FormState>();
 
@@ -100,6 +105,21 @@ class _SettingsScreenState extends State<SettingsScreen>
     _arrearsCtrl.text = AppConfig.arrearsDpcAmount == 0
         ? ''
         : AppConfig.arrearsDpcAmount.toStringAsFixed(0);
+    _regionSubsidyCtrl.text = AppConfig.regionSubsidyAmount == 0
+        ? ''
+        : AppConfig.regionSubsidyAmount.toStringAsFixed(0);
+    _section106Ctrl.text = AppConfig.rebateSection106 == 0
+        ? ''
+        : AppConfig.rebateSection106.toStringAsFixed(0);
+    _tcsCtrl.text = AppConfig.taxCollectionAtSource == 0
+        ? ''
+        : AppConfig.taxCollectionAtSource.toStringAsFixed(0);
+    _goMFixedCtrl.text = AppConfig.goMSubsidyFixed == 0
+        ? ''
+        : AppConfig.goMSubsidyFixed.toStringAsFixed(0);
+    _goMTodCtrl.text = AppConfig.goMSubsidyTod == 0
+        ? ''
+        : AppConfig.goMSubsidyTod.toStringAsFixed(0);
     _roundToTen = AppConfig.roundToTen;
     _billOnKvah = AppConfig.billOnKvah;
     _floorCtrl.text =
@@ -169,6 +189,11 @@ class _SettingsScreenState extends State<SettingsScreen>
     _ppdCtrl.dispose();
     _bulkCtrl.dispose();
     _arrearsCtrl.dispose();
+    _regionSubsidyCtrl.dispose();
+    _section106Ctrl.dispose();
+    _tcsCtrl.dispose();
+    _goMFixedCtrl.dispose();
+    _goMTodCtrl.dispose();
     _mdCtrl.removeListener(_onMdChanged);
     _mdCtrl.dispose();
     for (final c in _precedingCtrls) {
@@ -485,6 +510,16 @@ class _SettingsScreenState extends State<SettingsScreen>
       AppConfig.arrearsDpcAmount = double.tryParse(_arrearsCtrl.text.trim()) ?? 0;
       AppConfig.roundToTen = _roundToTen;
       AppConfig.billOnKvah = _billOnKvah;
+      AppConfig.regionSubsidyAmount =
+          double.tryParse(_regionSubsidyCtrl.text.trim()) ?? 0;
+      AppConfig.rebateSection106 =
+          double.tryParse(_section106Ctrl.text.trim()) ?? 0;
+      AppConfig.taxCollectionAtSource =
+          double.tryParse(_tcsCtrl.text.trim()) ?? 0;
+      AppConfig.goMSubsidyFixed =
+          double.tryParse(_goMFixedCtrl.text.trim()) ?? 0;
+      AppConfig.goMSubsidyTod =
+          double.tryParse(_goMTodCtrl.text.trim()) ?? 0;
       await TariffStore.saveAll(
         tariffPerUnit: double.parse(_tariffCtrl.text.trim()),
         demandChargePerKva: double.parse(_demandCtrl.text.trim()),
@@ -498,6 +533,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           for (final c in _precedingCtrls)
             double.tryParse(c.text.trim()) ?? 0,
         ],
+        regionSubsidyAmount: AppConfig.regionSubsidyAmount,
+        rebateSection106: AppConfig.rebateSection106,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -532,6 +569,11 @@ class _SettingsScreenState extends State<SettingsScreen>
     AppConfig.roundToTen = AppConstants.roundToTen;
     AppConfig.billOnKvah = AppConstants.billOnKvah;
     AppConfig.facRatesByMonth = {};
+    AppConfig.regionSubsidyAmount = 0;
+    AppConfig.rebateSection106 = 0;
+    AppConfig.taxCollectionAtSource = 0;
+    AppConfig.goMSubsidyFixed = 0;
+    AppConfig.goMSubsidyTod = 0;
     setState(() {
       _taxCtrl.text = AppConfig.taxPercent.toStringAsFixed(2);
       _icrRateCtrl.text = AppConfig.icrRatePerUnit.toStringAsFixed(2);
@@ -540,6 +582,11 @@ class _SettingsScreenState extends State<SettingsScreen>
       _ppdCtrl.text = AppConfig.ppdPercent.toStringAsFixed(1);
       _bulkCtrl.text = AppConfig.bulkRebatePercent.toStringAsFixed(1);
       _arrearsCtrl.text = '';
+      _regionSubsidyCtrl.text = '';
+      _section106Ctrl.text = '';
+      _tcsCtrl.text = '';
+      _goMFixedCtrl.text = '';
+      _goMTodCtrl.text = '';
       _roundToTen = AppConfig.roundToTen;
       _billOnKvah = AppConfig.billOnKvah;
       _subsidyCtrl.text = AppConfig.subsidyPercent.toStringAsFixed(2);
@@ -565,6 +612,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         subsidyPercent: AppConfig.subsidyPercent,
         contractDemandKva: AppConfig.contractDemandKva,
         precedingDemandKva: AppConfig.precedingDemandKva,
+        regionSubsidyAmount: 0,
+        rebateSection106: 0,
       );
     } catch (e) {
       if (!mounted) return;
@@ -1317,6 +1366,81 @@ class _SettingsScreenState extends State<SettingsScreen>
             value: _billOnKvah,
             onChanged: (v) => setState(() => _billOnKvah = v),
             contentPadding: EdgeInsets.zero,
+          ),
+          const Divider(height: 24),
+          Text(
+            'Subsidies & adjustments',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: _isDark
+                  ? AppColors.textOnDark
+                  : AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Flat ₹ deductions applied to the bill. Region subsidy and '
+            'Section 106 rebate reduce the total before PPD.',
+            style: TextStyle(fontSize: 10, color: _dim),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _rateField(
+                  _regionSubsidyCtrl,
+                  'Region subsidy (₹)',
+                  '0 = none',
+                  optional: true,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _rateField(
+                  _section106Ctrl,
+                  'Section 106 rebate (₹)',
+                  '0 = none',
+                  optional: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _rateField(
+                  _tcsCtrl,
+                  'Tax Coll. at Source (₹)',
+                  '0 = none',
+                  optional: true,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _rateField(
+                  _goMFixedCtrl,
+                  'GoM subsidy — Fixed (₹)',
+                  '0 = none',
+                  optional: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _rateField(
+                  _goMTodCtrl,
+                  'GoM subsidy — TOD (₹)',
+                  '0 = none',
+                  optional: true,
+                ),
+              ),
+              const Spacer(flex: 1),
+            ],
           ),
         ],
       ),

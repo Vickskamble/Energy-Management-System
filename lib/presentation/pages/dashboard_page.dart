@@ -648,6 +648,28 @@ class _DashboardContentState extends State<_DashboardContent> {
     return manual > peak ? manual : peak;
   }
 
+  bool get _hasSolarData =>
+      _selectedLogs.any((l) => (l.generationKwh ?? 0) > 0);
+
+  double get _totalGeneration =>
+      _selectedLogs.fold(0.0, (s, l) => s + (l.generationKwh ?? 0));
+
+  double get _totalExport =>
+      _selectedLogs.fold(0.0, (s, l) => s + (l.exportKwh ?? 0));
+
+  double get _solarSelfConsumptionPct {
+    final gen = _totalGeneration;
+    if (gen <= 0) return 0;
+    return ((gen - _totalExport) / gen * 100).clamp(0, 100);
+  }
+
+  double get _gridIndependencePct {
+    final totalConsumed = _breakdown?.totalUnits ?? 0;
+    if (totalConsumed <= 0) return 0;
+    return (_totalGeneration / (totalConsumed + _totalExport) * 100)
+        .clamp(0, 100);
+  }
+
   /// Distinct days in the visible period with any shift reading whose
   /// MD × MF crosses 95% of the contract demand — same rule as the trial UI.
   int _mdBreachDays(
@@ -1121,12 +1143,26 @@ class _DashboardContentState extends State<_DashboardContent> {
                 pct: 70,
                 badgeNew: true,
               ),
+              if (_hasSolarData)
+                TrialKpiCard(
+                  title: 'Solar generation',
+                  value: '${_totalGeneration.round()} kWh',
+                  sub: 'export ${_totalExport.round()} · self-consume ${_solarSelfConsumptionPct.round()}%',
+                  color: const Color(0xFF059669),
+                  pct: _gridIndependencePct.clamp(0, 100),
+                  badgeNew: true,
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
 
           _buildMdBreachCard(periodLogs),
           const SizedBox(height: AppSpacing.lg),
+
+          if (_hasSolarData) ...[
+            _buildSolarSummaryCard(),
+            const SizedBox(height: AppSpacing.lg),
+          ],
 
           const SizedBox(height: AppSpacing.xxl),
 
@@ -1350,6 +1386,120 @@ class _DashboardContentState extends State<_DashboardContent> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildSolarSummaryCard() {
+    final generation = _totalGeneration;
+    final export = _totalExport;
+    final selfConsumed = generation - export;
+    final selfPct = _solarSelfConsumptionPct;
+    final gridPct = _gridIndependencePct;
+    final totalUnits = _breakdown?.totalUnits ?? 0;
+    final unitCost = totalUnits > 0
+        ? (_breakdown?.netBill ?? 0) / totalUnits
+        : 0.0;
+    final savedAmount = selfConsumed * unitCost;
+
+    final items = [
+      ('Generation', '${generation.round()} kWh', const Color(0xFF059669)),
+      ('Self-Consumed', '${selfConsumed.round()} kWh', AppColors.primary),
+      ('Export to Grid', '${export.round()} kWh', AppColors.warning),
+      ('Self-Consumption', '${selfPct.round()}%', AppColors.success),
+      ('Grid Independence', '${gridPct.round()}%', AppColors.info),
+      ('Est. Savings', _money(savedAmount), AppColors.success),
+    ];
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.solar_power_outlined,
+                size: 18,
+                color: Color(0xFF059669),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Solar / Net Metering',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF059669).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'LIVE',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF059669),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final crossCount = constraints.maxWidth > 500 ? 3 : 2;
+              return Wrap(
+                spacing: AppSpacing.lg,
+                runSpacing: AppSpacing.md,
+                children: [
+                  for (final (label, value, color) in items)
+                    SizedBox(
+                      width: (constraints.maxWidth -
+                              (crossCount - 1) * AppSpacing.lg) /
+                          crossCount,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            label.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.color,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            value,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.statusText(
+                                color,
+                                Theme.of(context).brightness ==
+                                    Brightness.dark,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 

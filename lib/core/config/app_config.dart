@@ -23,6 +23,9 @@ class AppConfig {
   static List<double> _precedingDemandKva = List.filled(11, 0);
   static double _regionSubsidyAmount = 0.0;
   static double _rebateSection106 = 0.0;
+  static double _taxCollectionAtSource = 0.0;
+  static double _goMSubsidyFixed = 0.0;
+  static double _goMSubsidyTod = 0.0;
 
   /// Selected MERC tariff category (HT-I Industry by default).
   static TariffCategory tariffCategory = TariffCategory.htIndustrial;
@@ -125,6 +128,24 @@ class AppConfig {
   static double get rebateSection106 => _rebateSection106;
   static set rebateSection106(double value) {
     if (value >= 0) _rebateSection106 = value;
+  }
+
+  /// Tax Collection at Source — flat ₹ deducted from bill (credit for consumer).
+  static double get taxCollectionAtSource => _taxCollectionAtSource;
+  static set taxCollectionAtSource(double value) {
+    if (value >= 0) _taxCollectionAtSource = value;
+  }
+
+  /// GoM subsidy — fixed component (₹ deducted from bill for Vidarbha/Marathwada/etc).
+  static double get goMSubsidyFixed => _goMSubsidyFixed;
+  static set goMSubsidyFixed(double value) {
+    if (value >= 0) _goMSubsidyFixed = value;
+  }
+
+  /// GoM subsidy — TOD-based component (₹ deducted from bill).
+  static double get goMSubsidyTod => _goMSubsidyTod;
+  static set goMSubsidyTod(double value) {
+    if (value >= 0) _goMSubsidyTod = value;
   }
 
   /// TOD multipliers [ZoneA, ZoneB, ZoneC, ZoneD].
@@ -422,6 +443,10 @@ class TariffStore {
 
     setDouble('region_subsidy_amount', (v) => AppConfig.regionSubsidyAmount = v);
     setDouble('rebate_section_106', (v) => AppConfig.rebateSection106 = v);
+    setDouble('tax_collection_at_source',
+        (v) => AppConfig.taxCollectionAtSource = v);
+    setDouble('go_m_subsidy_fixed', (v) => AppConfig.goMSubsidyFixed = v);
+    setDouble('go_m_subsidy_tod', (v) => AppConfig.goMSubsidyTod = v);
 
     final todRaw = map['tod_multipliers'];
     if (todRaw is List && todRaw.length == 4) {
@@ -497,6 +522,9 @@ class TariffStore {
             precedingDemandKva ?? AppConfig.precedingDemandKva,
         'region_subsidy_amount': regionSubsidyAmount,
         'rebate_section_106': rebateSection106,
+        'tax_collection_at_source': AppConfig.taxCollectionAtSource,
+        'go_m_subsidy_fixed': AppConfig.goMSubsidyFixed,
+        'go_m_subsidy_tod': AppConfig.goMSubsidyTod,
         'tod_multipliers': todMultipliers ?? AppConfig.todMultipliers,
         'tod_zone_shares': AppConfig.todZoneShares,
         'tod_zone_shares_winter': AppConfig.todZoneSharesWinter,

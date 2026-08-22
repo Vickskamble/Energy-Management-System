@@ -548,6 +548,9 @@ class _ExcelImportPreviewDialogState extends State<ExcelImportPreviewDialog> {
           loggedAt: e.loggedAt,
           multiplyingFactor:
               meter?.multiplyingFactor ?? AppConstants.multiplyingFactor,
+          exportKwh: e.exportKwh,
+          exportKvah: e.exportKvah,
+          generationKwh: e.generationKwh,
         ),
       );
     }
@@ -888,6 +891,17 @@ class ExcelDraftEditor {
         text: draft.powerFactor != null
             ? draft.powerFactor!.toStringAsFixed(3)
             : '',
+      ),
+      exportKwhCtrl = TextEditingController(
+        text: draft.exportKwh != null ? draft.exportKwh!.toStringAsFixed(2) : '',
+      ),
+      exportKvahCtrl = TextEditingController(
+        text: draft.exportKvah != null ? draft.exportKvah!.toStringAsFixed(2) : '',
+      ),
+      generationKwhCtrl = TextEditingController(
+        text: draft.generationKwh != null
+            ? draft.generationKwh!.toStringAsFixed(2)
+            : '',
       );
 
   final ExcelReadingDraft draft;
@@ -901,6 +915,9 @@ class ExcelDraftEditor {
   final TextEditingController leadCtrl;
   final TextEditingController mdCtrl;
   final TextEditingController pfCtrl;
+  final TextEditingController exportKwhCtrl;
+  final TextEditingController exportKvahCtrl;
+  final TextEditingController generationKwhCtrl;
 
   static String _fmt(double v) => v > 0 ? v.toStringAsFixed(2) : '';
 
@@ -928,6 +945,21 @@ class ExcelDraftEditor {
     final v = double.tryParse(pfCtrl.text.trim());
     if (v == null || v <= 0) return null;
     return v > 1 ? v / 100 : v;
+  }
+
+  double? get exportKwh {
+    final v = double.tryParse(exportKwhCtrl.text.trim());
+    return v == null || v <= 0 ? null : v;
+  }
+
+  double? get exportKvah {
+    final v = double.tryParse(exportKvahCtrl.text.trim());
+    return v == null || v <= 0 ? null : v;
+  }
+
+  double? get generationKwh {
+    final v = double.tryParse(generationKwhCtrl.text.trim());
+    return v == null || v <= 0 ? null : v;
   }
 
   /// Importable when it has consumption or an actual reading, plus MD.
@@ -960,5 +992,8 @@ class ExcelDraftEditor {
     leadCtrl.dispose();
     mdCtrl.dispose();
     pfCtrl.dispose();
+    exportKwhCtrl.dispose();
+    exportKvahCtrl.dispose();
+    generationKwhCtrl.dispose();
   }
 }

@@ -36,6 +36,9 @@ class BillCalculator {
     bool? useWinterTod,
     double regionSubsidy = 0,
     double rebateSection106 = 0,
+    double taxCollectionAtSource = 0,
+    double goMSubsidyFixed = 0,
+    double goMSubsidyTod = 0,
     List<EnergyLogEntity>? ratchetLogs,
     int ratchetMonths = AppConstants.ratchetWindowMonths,
     List<double>? manualRatchetDemandKva,
@@ -68,6 +71,8 @@ class BillCalculator {
 
     double totalKwh = 0;
     double totalKvah = 0;
+    double totalExportKwh = 0;
+    double totalGenerationKwh = 0;
     double peakMd = 0;
     double sumMd = 0;
     int mdCount = 0;
@@ -75,8 +80,19 @@ class BillCalculator {
     for (final log in logs) {
       // Applying each meter's CT/PT ratio keeps the combined PF correct when
       // multiple meters with different multipliers are billed together.
-      totalKwh += log.kwh * log.multiplyingFactor;
-      totalKvah += log.kvah * log.multiplyingFactor;
+      final importKwh = log.kwh * log.multiplyingFactor;
+      final importKvah = log.kvah * log.multiplyingFactor;
+      totalKwh += importKwh;
+      totalKvah += importKvah;
+
+      // Solar: accumulate export and generation (MF-adjusted).
+      if (log.exportKwh != null && log.exportKwh! > 0) {
+        totalExportKwh += log.exportKwh! * log.multiplyingFactor;
+      }
+      if (log.generationKwh != null && log.generationKwh! > 0) {
+        totalGenerationKwh += log.generationKwh! * log.multiplyingFactor;
+      }
+
       final actualMd = log.mdRecorded * log.multiplyingFactor;
       if (actualMd > peakMd) peakMd = actualMd;
       sumMd += actualMd;
@@ -96,8 +112,13 @@ class BillCalculator {
     // distort the bill.
     double totalUnits = 0;
     for (final log in logs) {
-      totalUnits +=
+      final importUnits =
           (effectiveBillOnKvah ? log.kvah : log.kwh) * log.multiplyingFactor;
+      // Solar net billing: subtract export from import for net billed units.
+      final exportUnits = log.exportKwh != null && log.exportKwh! > 0
+          ? log.exportKwh! * log.multiplyingFactor
+          : 0.0;
+      totalUnits += (importUnits - exportUnits).clamp(0.0, double.infinity);
     }
     final billingDemand = EnergyCalculator.calculateBillingDemand(
       peakMd,
@@ -223,7 +244,10 @@ class BillCalculator {
               bulkRebate -
               subsidy -
               regionSubsidy -
-              rebateSection106) *
+              rebateSection106 -
+              taxCollectionAtSource -
+              goMSubsidyFixed -
+              goMSubsidyTod) *
             effectivePpdPercent /
             100
         : 0.0;
@@ -241,6 +265,9 @@ class BillCalculator {
       todCharges: todCharges,
       regionSubsidy: regionSubsidy,
       rebateSection106: rebateSection106,
+      taxCollectionAtSource: taxCollectionAtSource,
+      goMSubsidyFixed: goMSubsidyFixed,
+      goMSubsidyTod: goMSubsidyTod,
       fixedCharge: effectiveFixedCharge,
       icrRebate: icrRebate,
       lfIncentive: lfIncentive,
@@ -284,6 +311,10 @@ class BillCalculator {
       ppdRebate: (ppdRebate * 100).roundToDouble() / 100,
       bulkRebate: (bulkRebate * 100).roundToDouble() / 100,
       arrearsDpc: (effectiveArrears * 100).roundToDouble() / 100,
+      taxCollectionAtSource:
+          (taxCollectionAtSource * 100).roundToDouble() / 100,
+      goMSubsidyFixed: (goMSubsidyFixed * 100).roundToDouble() / 100,
+      goMSubsidyTod: (goMSubsidyTod * 100).roundToDouble() / 100,
       roundingAdjustment:
           (roundingAdjustment * 100).roundToDouble() / 100,
       netBill: (netBill * 100).roundToDouble() / 100,
@@ -294,6 +325,9 @@ class BillCalculator {
       powerFactor: (powerFactor * 1000).roundToDouble() / 1000,
       loadFactor: (loadFactor * 1000).roundToDouble() / 1000,
       averageUnitCost: (averageUnitCost * 100).roundToDouble() / 100,
+      totalExportKwh: (totalExportKwh * 100).roundToDouble() / 100,
+      totalGenerationKwh:
+          (totalGenerationKwh * 100).roundToDouble() / 100,
       payableEarly: BillBreakdown.roundToTen(payableEarlyBase),
       payableAfterDpc: BillBreakdown.roundToTen(payableAfterDpcBase),
     );
@@ -482,6 +516,9 @@ class BillCalculator {
       ppdRebate: 0,
       bulkRebate: 0,
       arrearsDpc: 0,
+      taxCollectionAtSource: 0,
+      goMSubsidyFixed: 0,
+      goMSubsidyTod: 0,
       roundingAdjustment: 0,
       netBill: 0,
       billingDemand: 0,
@@ -489,6 +526,8 @@ class BillCalculator {
       powerFactor: 0,
       loadFactor: 0,
       averageUnitCost: 0,
+      totalExportKwh: 0,
+      totalGenerationKwh: 0,
     );
   }
 }

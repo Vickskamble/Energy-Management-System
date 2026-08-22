@@ -41,6 +41,9 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
   final _rkvarhLagCtrl = TextEditingController();
   final _rkvarhLeadCtrl = TextEditingController();
   final _mdRecordedCtrl = TextEditingController();
+  final _exportKwhCtrl = TextEditingController();
+  final _exportKvahCtrl = TextEditingController();
+  final _generationKwhCtrl = TextEditingController();
 
   /// Previous cumulative readings fetched from the DB for the selected
   /// date/meter — read-only, never editable by the client.
@@ -55,7 +58,10 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
       _currentKvahCtrl.text.isNotEmpty ||
       _rkvarhLagCtrl.text.isNotEmpty ||
       _rkvarhLeadCtrl.text.isNotEmpty ||
-      _mdRecordedCtrl.text.isNotEmpty;
+      _mdRecordedCtrl.text.isNotEmpty ||
+      _exportKwhCtrl.text.isNotEmpty ||
+      _exportKvahCtrl.text.isNotEmpty ||
+      _generationKwhCtrl.text.isNotEmpty;
 
   @override
   void initState() {
@@ -91,6 +97,9 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
     _rkvarhLagCtrl.dispose();
     _rkvarhLeadCtrl.dispose();
     _mdRecordedCtrl.dispose();
+    _exportKwhCtrl.dispose();
+    _exportKvahCtrl.dispose();
+    _generationKwhCtrl.dispose();
     super.dispose();
   }
 
@@ -193,6 +202,9 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
     _rkvarhLagCtrl.clear();
     _rkvarhLeadCtrl.clear();
     _mdRecordedCtrl.clear();
+    _exportKwhCtrl.clear();
+    _exportKvahCtrl.clear();
+    _generationKwhCtrl.clear();
     setState(() {
       _loggedAt = DateTime.now();
       _prevCumulativeKwh = 0;
@@ -256,6 +268,15 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
     }
 
     _lastSubmitWasManual = true;
+    final exportKwh = AppInputFormatters.parseNumber(
+      _exportKwhCtrl.text.trim(),
+    );
+    final exportKvah = AppInputFormatters.parseNumber(
+      _exportKvahCtrl.text.trim(),
+    );
+    final generationKwh = AppInputFormatters.parseNumber(
+      _generationKwhCtrl.text.trim(),
+    );
     bloc.add(
       SubmitManualReadingForm(
         meterName: _selectedMeter,
@@ -273,6 +294,9 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
             AppInputFormatters.parseNumber(_mdRecordedCtrl.text.trim()) ?? 0,
         powerFactor: null,
         loggedAt: _loggedAt,
+        exportKwh: exportKwh,
+        exportKvah: exportKvah,
+        generationKwh: generationKwh,
       ),
     );
   }
@@ -696,10 +720,113 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
                               inputFormatters: [AppInputFormatters.numeric],
                               validator: _optionalNumberValidator,
                             ),
+                           ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xxl),
+
+                      // ── Solar / Net Metering (optional) ────────────────
+                      AppCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Text(
+                                  'Solar / Net Metering',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'OPTIONAL',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'For consumers with solar panels. Export = units fed '
+                              'back to grid. Generation = total panel output.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.color,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: AppTextField(
+                                    controller: _exportKwhCtrl,
+                                    label: 'Export kWh',
+                                    hint: 'Grid export reading',
+                                    prefixIcon: Icons.solar_power_outlined,
+                                    keyboardType:
+                                        TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    inputFormatters: [
+                                      AppInputFormatters.numeric,
+                                    ],
+                                    validator: _optionalNumberValidator,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: AppTextField(
+                                    controller: _exportKvahCtrl,
+                                    label: 'Export kVAh',
+                                    hint: 'Optional',
+                                    prefixIcon: Icons.solar_power_outlined,
+                                    keyboardType:
+                                        TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    inputFormatters: [
+                                      AppInputFormatters.numeric,
+                                    ],
+                                    validator: _optionalNumberValidator,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            AppTextField(
+                              controller: _generationKwhCtrl,
+                              label: 'Total Generation kWh',
+                              hint: 'Total solar panel output',
+                              prefixIcon: Icons.bolt,
+                              keyboardType: TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              inputFormatters: [AppInputFormatters.numeric],
+                              validator: _optionalNumberValidator,
+                            ),
                           ],
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xxl),
+
                       AppButton(
                         label: 'Save Reading',
                         onPressed: isLoading ? null : _submit,

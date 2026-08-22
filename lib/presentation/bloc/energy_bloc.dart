@@ -162,6 +162,9 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
         contractDemand: AppConfig.contractDemandKva,
         loggedAt: event.loggedAt,
         multiplyingFactor: meterMf,
+        exportKwh: event.exportKwh,
+        exportKvah: event.exportKvah,
+        generationKwh: event.generationKwh,
       );
 
       // ── Step 6: Persist locally (offline-first, is_synced = false) ──────

@@ -34,5 +34,8 @@ sealed class EnergyEvent with _$EnergyEvent {
     required double mdRecorded,
     required DateTime loggedAt,
     double? powerFactor,
+    double? exportKwh,
+    double? exportKvah,
+    double? generationKwh,
   }) = SubmitManualReadingForm;
 }

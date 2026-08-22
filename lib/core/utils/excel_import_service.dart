@@ -20,36 +20,27 @@ class ExcelReadingDraft {
     this.rkvarhLead = 0,
     this.mdRecorded = 0,
     this.powerFactor,
+    this.exportKwh,
+    this.exportKvah,
+    this.generationKwh,
     required this.sourceLabel,
   });
 
   String meterName;
   DateTime loggedAt;
-
-  /// Consumed units for this period (current − previous).
   double kwh;
   double kvah;
-
-  /// ACTUAL meter readings as recorded — the meter's cumulative total.
-  /// Null when the file only carries per-day consumption values.
   double? currentKwh;
   double? currentKvah;
-
   double rkvarhLag;
   double rkvarhLead;
   double mdRecorded;
-
-  /// PF as recorded in the client's file (column "PF"). Null when the file
-  /// has no PF column — the system calculates it from kWh/kVAh instead.
   double? powerFactor;
-
-  /// Human-readable source, e.g. "Row 5" (1-based Excel row number).
+  double? exportKwh;
+  double? exportKvah;
+  double? generationKwh;
   final String sourceLabel;
 
-  /// A draft is importable when it has consumption (kWh) OR an actual meter
-  /// reading, plus a demand value. The opening row of a cumulative series
-  /// (consumption 0, but a real meter reading) counts as importable — it
-  /// anchors the actual-reading chain.
   bool get isValid => (kwh > 0 || (currentKwh ?? 0) > 0) && mdRecorded > 0;
 }
 
@@ -269,6 +260,14 @@ class ExcelImportService {
       final baseline = kwhSeries != null && i == headerRow + 1;
       if (kwh <= 0 && kvah <= 0 && md <= 0) continue;
 
+      final exportKwh =
+          cols.exportKwh != null ? _cellNumber(row[cols.exportKwh!]) : null;
+      final exportKvah =
+          cols.exportKvah != null ? _cellNumber(row[cols.exportKvah!]) : null;
+      final generationKwh = cols.generationKwh != null
+          ? _cellNumber(row[cols.generationKwh!])
+          : null;
+
       drafts.add(
         ExcelReadingDraft(
           powerFactor: pf,
@@ -281,6 +280,9 @@ class ExcelImportService {
           rkvarhLag: lag,
           rkvarhLead: lead,
           mdRecorded: md,
+          exportKwh: exportKwh,
+          exportKvah: exportKvah,
+          generationKwh: generationKwh,
           sourceLabel: baseline ? 'Row ${i + 1} (opening)' : 'Row ${i + 1}',
         ),
       );
@@ -418,6 +420,14 @@ class ExcelImportService {
         } else if (!isCurrent && !isPrev && map.kvah == null) {
           map.kvah = i;
         }
+      } else if (has(h, ['export', 'net export', 'feed'])) {
+        if (h.contains('kvah') && map.exportKvah == null) {
+          map.exportKvah = i;
+        } else if (map.exportKwh == null) {
+          map.exportKwh = i;
+        }
+      } else if (has(h, ['generation', 'solar gen', 'total gen'])) {
+        if (map.generationKwh == null) map.generationKwh = i;
       }
     }
     return map;
@@ -564,6 +574,8 @@ class ExcelImportService {
       'PF',
       'rkVARh Lag',
       'rkVARh Lead',
+      'Export kWh',
+      'Generation kWh',
     ];
     for (var c = 0; c < headers.length; c++) {
       final cell = sheet.cell(
@@ -573,8 +585,8 @@ class ExcelImportService {
     }
 
     const samples = [
-      ['01/06/2026', 'Main Meter', '1250.50', '1320.00', '145.0', '0.98', '120.0', '10.0'],
-      ['02/06/2026', 'Main Meter', '1180.00', '1245.50', '142.5', '0.97', '115.0', '8.0'],
+      ['01/06/2026', 'Main Meter', '1250.50', '1320.00', '145.0', '0.98', '120.0', '10.0', '0.0', '0.0'],
+      ['02/06/2026', 'Main Meter', '1180.00', '1245.50', '142.5', '0.97', '115.0', '8.0', '0.0', '0.0'],
     ];
     for (var r = 0; r < samples.length; r++) {
       final row = samples[r];
@@ -604,4 +616,7 @@ class ExcelColumnMap {
   int? lead;
   int? md;
   int? pf;
+  int? exportKwh;
+  int? exportKvah;
+  int? generationKwh;
 }

@@ -177,6 +177,9 @@ class EnergyCalculator {
     double ppdRebate = 0,
     double bulkRebate = 0,
     double arrearsDpc = 0,
+    double taxCollectionAtSource = 0,
+    double goMSubsidyFixed = 0,
+    double goMSubsidyTod = 0,
   }) {
     final subtotal = energyCharges +
         demandCharges +
@@ -192,6 +195,9 @@ class EnergyCalculator {
         subsidy -
         regionSubsidy -
         rebateSection106 -
+        taxCollectionAtSource -
+        goMSubsidyFixed -
+        goMSubsidyTod -
         icrRebate -
         lfIncentive -
         ppdRebate -
