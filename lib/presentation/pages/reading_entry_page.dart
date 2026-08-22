@@ -172,7 +172,7 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
       context: context,
       initialTime: TimeOfDay.fromDateTime(_loggedAt),
     );
-    if (time == null) return;
+    if (time == null || !mounted) return;
     setState(() {
       _loggedAt = DateTime(
         date.year,

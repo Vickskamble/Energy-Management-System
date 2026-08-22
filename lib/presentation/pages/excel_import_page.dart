@@ -488,18 +488,20 @@ class _ExcelImportPreviewDialogState extends State<ExcelImportPreviewDialog> {
   }
 
   Future<void> _loadMeters() async {
-    final meters = await context.read<MeterRepository>().getAllMeters();
-    if (!mounted) return;
-    setState(() {
-      _meters = meters;
-      for (final e in _editors) {
-        if (meters.isEmpty) break;
-        final known = meters.any((m) => m.name == e.meterName);
-        if (e.meterName.isEmpty || !known) {
-          e.meterName = meters.first.name;
+    try {
+      final meters = await context.read<MeterRepository>().getAllMeters();
+      if (!mounted) return;
+      setState(() {
+        _meters = meters;
+        for (final e in _editors) {
+          if (meters.isEmpty) break;
+          final known = meters.any((m) => m.name == e.meterName);
+          if (e.meterName.isEmpty || !known) {
+            e.meterName = meters.first.name;
+          }
         }
-      }
-    });
+      });
+    } catch (_) {}
   }
 
   MeterModel? _meterByName(String name) {
@@ -516,7 +518,7 @@ class _ExcelImportPreviewDialogState extends State<ExcelImportPreviewDialog> {
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         editor.dateCtrl.text =
             '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';

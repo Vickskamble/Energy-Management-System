@@ -84,7 +84,7 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
-    if (_initialized) await initialize();
+    if (!_initialized) await initialize();
     if (kIsWeb) return;
 
     // Suppress identical alerts re-firing on every dashboard auto-refresh.

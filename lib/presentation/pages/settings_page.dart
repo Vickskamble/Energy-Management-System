@@ -463,17 +463,27 @@ class _SettingsScreenState extends State<SettingsScreen>
     for (final c in _precedingCtrls) {
       c.clear();
     }
-    await TariffStore.saveAll(
-      tariffPerUnit: AppConfig.tariffPerUnit,
-      demandChargePerKva: AppConfig.demandChargePerKva,
-      facRatePerUnit: AppConfig.facRatePerUnit,
-      wheelingChargePerUnit: AppConfig.wheelingChargePerUnit,
-      electricityDutyPerUnit: AppConfig.electricityDutyPerUnit,
-      taxPerUnit: AppConfig.taxPerUnit,
-      subsidyPercent: AppConfig.subsidyPercent,
-      contractDemandKva: AppConfig.contractDemandKva,
-      precedingDemandKva: AppConfig.precedingDemandKva,
-    );
+    try {
+      await TariffStore.saveAll(
+        tariffPerUnit: AppConfig.tariffPerUnit,
+        demandChargePerKva: AppConfig.demandChargePerKva,
+        facRatePerUnit: AppConfig.facRatePerUnit,
+        wheelingChargePerUnit: AppConfig.wheelingChargePerUnit,
+        electricityDutyPerUnit: AppConfig.electricityDutyPerUnit,
+        taxPerUnit: AppConfig.taxPerUnit,
+        subsidyPercent: AppConfig.subsidyPercent,
+        contractDemandKva: AppConfig.contractDemandKva,
+        precedingDemandKva: AppConfig.precedingDemandKva,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to persist tariff reset.'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
   }
 
   // ── Billing tab — HTML 4-card grid + supporting cards ──────────────

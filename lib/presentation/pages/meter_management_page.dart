@@ -511,6 +511,7 @@ class _MeterListState extends State<_MeterList> {
                                   context,
                                   existing: meter,
                                 );
+                                if (!mounted) return;
                                 _load();
                               },
                             ),
@@ -552,7 +553,20 @@ class _MeterListState extends State<_MeterList> {
                                   ),
                                 );
                                 if (confirmed != true) return;
-                                await repo.deleteMeter(meter.id);
+                                final messenger = ScaffoldMessenger.of(context);
+                                try {
+                                  await repo.deleteMeter(meter.id);
+                                } catch (e) {
+                                  if (!mounted) return;
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text('Delete failed: $e'),
+                                      backgroundColor: Colors.red.shade700,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (!mounted) return;
                                 _load();
                               },
                             ),
@@ -579,7 +593,12 @@ class _MeterListState extends State<_MeterList> {
     return FloatingActionButton.extended(
       onPressed: () async {
         final repo = context.read<MeterRepository>();
-        final meters = await repo.getAllMeters();
+        List<MeterModel> meters;
+        try {
+          meters = await repo.getAllMeters();
+        } catch (_) {
+          meters = [];
+        }
         final canAdd = await SubscriptionStore.canAddMeter(
           currentMeterCount: meters.length,
         );

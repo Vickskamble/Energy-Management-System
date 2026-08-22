@@ -105,7 +105,8 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         ],
       ),
     );
-    if (ok == true) proceed();
+    if (!mounted || ok != true) return;
+    proceed();
   }
 
   void _goTo(int index) {

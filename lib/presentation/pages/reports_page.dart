@@ -241,7 +241,19 @@ class _ReportsContentState extends State<_ReportsContent> {
                     AppButtonOutline(
                       label: 'Export CSV',
                       icon: Icons.file_download_rounded,
-                      onPressed: () => ExportService().exportCsv(_visibleLogs),
+                      onPressed: () async {
+                        try {
+                          await ExportService().exportCsv(_visibleLogs);
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('CSV export failed. Please try again.'),
+                              backgroundColor: Colors.red.shade700,
+                            ),
+                          );
+                        }
+                      },
                     ),
                   ],
                 ),
@@ -284,7 +296,19 @@ class _ReportsContentState extends State<_ReportsContent> {
                 AppButtonOutline(
                   label: 'Export CSV',
                   icon: Icons.file_download_rounded,
-                  onPressed: () => ExportService().exportCsv(_visibleLogs),
+                  onPressed: () async {
+                    try {
+                      await ExportService().exportCsv(_visibleLogs);
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('CSV export failed. Please try again.'),
+                          backgroundColor: Colors.red.shade700,
+                        ),
+                      );
+                    }
+                  },
                 ),
               ],
             ),
@@ -1710,10 +1734,21 @@ class _ReportsContentState extends State<_ReportsContent> {
     final amount = double.tryParse(result.amount);
     if (amount == null || amount <= 0) return;
 
-    await BillReconcileStore.saveActualBill(selectedKey, amount);
-    final fac = result.fac;
-    if (fac != null && fac.isNotEmpty) {
-      await TariffStore.saveFacRate(selectedKey, double.tryParse(fac));
+    try {
+      await BillReconcileStore.saveActualBill(selectedKey, amount);
+      final fac = result.fac;
+      if (fac != null && fac.isNotEmpty) {
+        await TariffStore.saveFacRate(selectedKey, double.tryParse(fac));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to save actual bill data.'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
     }
     if (!mounted) return;
     setState(() {
@@ -1722,7 +1757,18 @@ class _ReportsContentState extends State<_ReportsContent> {
   }
 
   Future<void> _clearActualBills() async {
-    await BillReconcileStore.clear();
+    try {
+      await BillReconcileStore.clear();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to clear bill data.'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
     setState(() => _actualBills = {});
   }

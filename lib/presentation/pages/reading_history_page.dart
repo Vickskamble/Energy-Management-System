@@ -32,6 +32,8 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
     _loadLogs();
   }
 
+  String? _loadError;
+
   Future<void> _loadLogs() async {
     try {
       final logs = await context.read<EnergyRepository>().getAllLogs();
@@ -40,11 +42,14 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
           ..sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
         setState(() {
           _allLogs = sorted;
+          _loadError = null;
           final now = DateTime.now();
           _selectedYear ??= now.year;
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) setState(() => _loadError = e.toString());
+    }
   }
 
   List<int> get _availableYears {
@@ -115,7 +120,25 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
         children: [
           _buildFilterRow(),
           const SizedBox(height: 16),
-          if (_allLogs.isEmpty)
+          if (_loadError != null)
+            AppCard(
+              child: SizedBox(
+                height: 120,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline, size: 32, color: Colors.red.shade400),
+                      const SizedBox(height: 8),
+                      Text('Failed to load readings', style: TextStyle(fontSize: 13, color: Colors.red.shade400)),
+                      const SizedBox(height: 4),
+                      TextButton(onPressed: _loadLogs, child: const Text('Retry')),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else if (_allLogs.isEmpty)
             AppCard(
               child: SizedBox(
                 height: 120,
@@ -447,7 +470,7 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
                           context: dialogCtx,
                           initialTime: TimeOfDay.fromDateTime(date),
                         );
-                        if (time == null) return;
+                        if (time == null || !dialogCtx.mounted) return;
                         setDialogState(() {
                           date = DateTime(
                             picked.year,

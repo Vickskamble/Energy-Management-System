@@ -53,7 +53,8 @@ class DataResetService {
     try {
       await SupabaseClientManager.client.rpc('delete_account');
     } catch (e) {
-      AppLogger.w('delete_account RPC failed (best-effort): $e');
+      AppLogger.w('delete_account RPC failed: $e');
+      rethrow;
     }
 
     AppConfig.reset();
