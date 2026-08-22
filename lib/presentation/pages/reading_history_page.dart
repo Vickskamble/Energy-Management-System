@@ -288,8 +288,13 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
                     style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 Icon(Icons.edit_outlined, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => _confirmDelete(log),
+                  child: Icon(Icons.delete_outline, size: 14, color: AppColors.danger),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -300,12 +305,65 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
                 _chip('kWh', actualKwh.toStringAsFixed(1)),
                 _chip('kVAh', actualKvah.toStringAsFixed(1)),
                 _chip('MD', '${actualMd.toStringAsFixed(1)} kVA'),
-                _chip('PF', '${(pf * 100).toStringAsFixed(1)}%'),
+                _chip('PF', pf.toStringAsFixed(3)),
                 _chip('MF', '${mf}x'),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _confirmDelete(EnergyLogEntity log) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Reading'),
+        content: Text(
+          'Delete ${log.meterName} reading from ${_fmtDate(log.loggedAt)}?\n\n'
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await context.read<EnergyRepository>().deleteReading(log.id);
+                if (mounted) {
+                  context.read<EnergyBloc>().add(
+                    const LoadInitialDashboardData(),
+                  );
+                  _loadLogs();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Reading deleted'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                AppLogger.e('Delete failed', e);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Delete failed: $e'),
+                      backgroundColor: Colors.red.shade700,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: AppColors.danger),
+            ),
+          ),
+        ],
       ),
     );
   }

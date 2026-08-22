@@ -152,4 +152,54 @@ class EnergyLogRemoteDatasource {
       return false;
     }
   }
+
+  /// Bulk-update multiplying_factor + recalculate bill for all logs of a meter.
+  /// Returns the number of rows updated.
+  Future<int> updateMfForMeter(String meterName, double newMf) async {
+    final uid = _client.auth.currentUser?.id;
+    var query = _client
+        .from(AppConstants.energyLogsTable)
+        .select('*')
+        .eq('meter_name', meterName);
+    if (uid != null) {
+      query = query.eq('user_id', uid);
+    }
+    final data = await query;
+    final logs = (data as List<dynamic>)
+        .map((json) => EnergyLogModel.fromJson(json as Map<String, dynamic>))
+        .toList();
+
+    if (logs.isEmpty) return 0;
+
+    // Recalculate each log with the new MF so bill charges stay consistent.
+    final updated = logs.map((log) {
+      return EnergyLogModel.create(
+        id: log.id,
+        meterName: log.meterName,
+        kwh: log.kwh,
+        kvah: log.kvah,
+        currentKwh: log.currentKwh,
+        currentKvah: log.currentKvah,
+        rkvarhLag: log.rkvarhLag,
+        rkvarhLead: log.rkvarhLead,
+        powerFactor: log.powerFactor,
+        mdRecorded: log.mdRecorded,
+        contractDemand: log.contractDemand,
+        loggedAt: log.loggedAt,
+        isSynced: log.isSynced,
+        userId: log.userId,
+        multiplyingFactor: newMf,
+      );
+    }).toList();
+
+    // Batch upsert (max 500 per call for Supabase).
+    for (var i = 0; i < updated.length; i += 500) {
+      final batch = updated.sublist(
+        i,
+        i + 500 > updated.length ? updated.length : i + 500,
+      );
+      await pushLogs(batch);
+    }
+    return updated.length;
+  }
 }

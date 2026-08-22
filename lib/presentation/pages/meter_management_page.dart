@@ -291,11 +291,35 @@ class MeterManagementPage extends StatelessWidget {
                               targetCtrl.text.trim())!,
                     );
               try {
+                // Detect MF change so we can cascade to existing logs.
+                final oldMf = existing?.multiplyingFactor ?? 1.0;
+                final newMf = meter.multiplyingFactor;
+                final mfChanged = existing != null && (oldMf - newMf).abs() > 0.0001;
+
                 if (existing != null) {
                   await repo.updateMeter(meter);
                 } else {
                   await repo.saveMeter(meter);
                 }
+
+                // Cascade MF update to all existing readings for this meter.
+                if (mfChanged) {
+                  final count = await energyRepo.updateMfForMeter(
+                    meter.name,
+                    newMf,
+                  );
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'MF updated — $count reading(s) recalculated',
+                        ),
+                        backgroundColor: Colors.orange.shade800,
+                      ),
+                    );
+                  }
+                }
+
                 if (!ctx.mounted) return;
                 nav.pop(true);
               } catch (e) {
@@ -553,6 +577,7 @@ class _MeterListState extends State<_MeterList> {
                                   ),
                                 );
                                 if (confirmed != true) return;
+                                if (!mounted) return;
                                 final messenger = ScaffoldMessenger.of(context);
                                 try {
                                   await repo.deleteMeter(meter.id);

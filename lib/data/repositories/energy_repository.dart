@@ -67,6 +67,13 @@ class EnergyRepository {
     await _remote.deleteLog(id);
   }
 
+  /// Bulk-update multiplying_factor + recalculate bill for all logs of a meter.
+  /// Returns the number of rows updated.
+  Future<int> updateMfForMeter(String meterName, double newMf) async {
+    _ensureOnline();
+    return _remote.updateMfForMeter(meterName, newMf);
+  }
+
   /// Check for a duplicate reading on the SAME calendar date (same meter).
   /// One entry per meter per day — the previous reading for a day is the
   /// reading recorded on an earlier day, so a second entry on the same date
