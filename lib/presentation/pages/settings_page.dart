@@ -57,6 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   bool _roundToTen = AppConstants.roundToTen;
   bool _billOnKvah = AppConstants.billOnKvah;
+  late final TextEditingController _alertEmailCtrl;
 
   /// Live theme state — read from the inherited Theme so the switch keeps
   /// tracking the real theme when it flips while this pushed route is open,
@@ -109,6 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     _lfTCtrl.text = AppConfig.lfThresholdPct.toStringAsFixed(0);
     _lfRCtrl.text = AppConfig.lfRatePct.toStringAsFixed(3);
     _lfSCtrl.text = AppConfig.lfSealingPct.toStringAsFixed(0);
+    _alertEmailCtrl = TextEditingController(text: AppConfig.alertEmail);
     final preceding = AppConfig.precedingDemandKva;
     for (var i = 0; i < 11; i++) {
       if (preceding[i] > 0) {
@@ -172,6 +174,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     for (final c in _precedingCtrls) {
       c.dispose();
     }
+    _alertEmailCtrl.dispose();
     super.dispose();
   }
 
@@ -240,6 +243,94 @@ class _SettingsScreenState extends State<SettingsScreen>
                 Icons.business_outlined,
                 'Organization',
                 'PowerEMS Inc.',
+              ),
+              const Divider(),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.notifications_active_outlined,
+                            size: 20, color: AppColors.primary),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Alert Email',
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Receive critical PF/MD alert emails and daily digest',
+                      style: TextStyle(fontSize: 12, color: _dim),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _alertEmailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            style: const TextStyle(fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: 'you@example.com',
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: () async {
+                            final email = _alertEmailCtrl.text.trim();
+                            if (email.isNotEmpty &&
+                                !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                                    .hasMatch(email)) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Enter a valid email address'),
+                                  backgroundColor: AppColors.danger,
+                                ),
+                              );
+                              return;
+                            }
+                            try {
+                              await TariffStore.saveAlertEmail(email);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      email.isEmpty
+                                          ? 'Alert email cleared'
+                                          : 'Alert email saved',
+                                    ),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to save: $e'),
+                                    backgroundColor: AppColors.danger,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          child: const Text('Save', style: TextStyle(fontSize: 13)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               const Divider(),
               ListTile(

@@ -239,6 +239,10 @@ class AppConfig {
   /// Bill on kVAh (official) or kWh when off.
   static bool billOnKvah = AppConstants.billOnKvah;
 
+  /// Alert email address — where critical/warning emails are delivered.
+  /// Empty string means email alerts are disabled.
+  static String alertEmail = '';
+
   /// Per-month FAC rates (₹/unit) — keyed "YYYY-MM". Falls back to
   /// [facRatePerUnit] for months without an explicit rate.
   static Map<String, double> _facRatesByMonth = {};
@@ -312,6 +316,7 @@ class AppConfig {
     roundToTen = AppConstants.roundToTen;
     billOnKvah = AppConstants.billOnKvah;
     _facRatesByMonth = {};
+    alertEmail = '';
   }
 }
 
@@ -442,6 +447,10 @@ class TariffStore {
     setDouble('lf_threshold_pct', (v) => AppConfig.lfThresholdPct = v);
     setDouble('lf_rate_pct', (v) => AppConfig.lfRatePct = v);
     setDouble('lf_sealing_pct', (v) => AppConfig.lfSealingPct = v);
+
+    if (map['alert_email'] is String) {
+      AppConfig.alertEmail = map['alert_email'] as String;
+    }
   }
 
   static Future<void> saveAll({
@@ -497,6 +506,7 @@ class TariffStore {
         'lf_threshold_pct': AppConfig.lfThresholdPct,
         'lf_rate_pct': AppConfig.lfRatePct,
         'lf_sealing_pct': AppConfig.lfSealingPct,
+        'alert_email': AppConfig.alertEmail,
       };
       await SupabaseClientManager.client.from(_table).upsert({
         'user_id': uid,
@@ -523,6 +533,36 @@ class TariffStore {
       rethrow;
     }
   }
+  /// Saves (or clears) the alert email without touching other tariff settings.
+  static Future<void> saveAlertEmail(String email) async {
+    final uid = _currentUserId();
+    if (uid == null) {
+      throw const RemoteStorageException(
+          'You must be signed in to save settings.');
+    }
+    try {
+      final existing = await SupabaseClientManager.client
+          .from(_table)
+          .select('data')
+          .eq('user_id', uid)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 10));
+      final data = Map<String, Object?>.from(
+        (existing?['data'] as Map? ?? {}).cast<String, Object?>(),
+      );
+      data['alert_email'] = email;
+      AppConfig.alertEmail = email;
+      await SupabaseClientManager.client.from(_table).upsert({
+        'user_id': uid,
+        'data': data,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (e) {
+      AppLogger.e('Failed to save alert email', e);
+      rethrow;
+    }
+  }
+
   /// Saves (or clears, when [rate] is null/≤0) the per-month FAC rate for
   /// [monthKey] ("YYYY-MM") without touching the other tariff settings.
   static Future<void> saveFacRate(String monthKey, double? rate) async {

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../services/email_alert_service.dart';
+
 class NotificationService {
   static final NotificationService _instance = NotificationService._();
   static NotificationService get instance => _instance;
@@ -138,29 +140,50 @@ class NotificationService {
     double pf, {
     required String meterName,
     String? site,
-  }) =>
-      showAlert(
-        id: 1,
-        title: '⚠️ Low Power Factor — $meterName',
-        body: '${_scopeLabel(meterName, site)}'
-            'PF is ${pf.toStringAsFixed(3)} (below 0.95). '
-            'Check APFC panel to avoid 5% reactive penalty on your bill.',
-      );
+  }) async {
+    await showAlert(
+      id: 1,
+      title: 'Low Power Factor - $meterName',
+      body: '${_scopeLabel(meterName, site)}'
+          'PF is ${pf.toStringAsFixed(3)} (below 0.95). '
+          'Check APFC panel to avoid 5% reactive penalty on your bill.',
+    );
+    EmailAlertService.sendCriticalAlert(
+      type: 'pf',
+      title: 'Low Power Factor - $meterName',
+      message: '${_scopeLabel(meterName, site)}'
+          'PF is ${pf.toStringAsFixed(3)} (below 0.95). '
+          'Immediate APFC panel adjustment required to avoid penalty.',
+      site: site,
+      meter: meterName,
+    );
+  }
 
   Future<void> showMdAlert(
     double md,
     double limit, {
     required String meterName,
     String? site,
-  }) =>
-      showAlert(
-        id: 2,
-        title: '⚠️ MD Breach Risk — $meterName',
-        body: '${_scopeLabel(meterName, site)}'
-            'MD at ${md.toStringAsFixed(1)} kW, approaching '
-            '$limit kW contract limit. '
-            'Shift non-essential loads to off-peak hours.',
-      );
+  }) async {
+    await showAlert(
+      id: 2,
+      title: 'MD Breach Risk - $meterName',
+      body: '${_scopeLabel(meterName, site)}'
+          'MD at ${md.toStringAsFixed(1)} kW, approaching '
+          '$limit kW contract limit. '
+          'Shift non-essential loads to off-peak hours.',
+    );
+    EmailAlertService.sendCriticalAlert(
+      type: 'md',
+      title: 'MD Breach Risk - $meterName',
+      message: '${_scopeLabel(meterName, site)}'
+          'MD at ${md.toStringAsFixed(1)} kW, approaching '
+          '$limit kW contract demand limit. '
+          'Shift non-essential loads to off-peak hours immediately.',
+      site: site,
+      meter: meterName,
+    );
+  }
 
   /// "Meter \"X\" (Site: Y): " prefix so the client always knows which
   /// meter and site an alert belongs to.
@@ -171,17 +194,33 @@ class NotificationService {
         : 'Meter "$meterName" (Site: $s): ';
   }
 
-  Future<void> showSyncCompleteAlert(int count) => showAlert(
-    id: 3,
-    title: '☁️ Sync Complete',
-    body: '$count offline reading(s) synced to cloud.',
-  );
+  Future<void> showSyncCompleteAlert(int count) async {
+    await showAlert(
+      id: 3,
+      title: 'Sync Complete',
+      body: '$count offline reading(s) synced to cloud.',
+    );
+    EmailAlertService.sendCriticalAlert(
+      type: 'sync',
+      title: 'Sync Complete',
+      message: '$count offline reading(s) synced to cloud successfully.',
+    );
+  }
 
-  Future<void> showReadingReminder() => showAlert(
-    id: 4,
-    title: '📝 Reading Due',
-    body:
-        'Month is ending and no reading has been recorded yet — '
-        'record today to keep the bill estimate accurate.',
-  );
+  Future<void> showReadingReminder() async {
+    await showAlert(
+      id: 4,
+      title: 'Reading Due',
+      body:
+          'Month is ending and no reading has been recorded yet — '
+          'record today to keep the bill estimate accurate.',
+    );
+    EmailAlertService.sendCriticalAlert(
+      type: 'reminder',
+      title: 'Reading Due',
+      message:
+          'Month is ending and no reading has been recorded yet. '
+          'Record today to keep the bill estimate accurate.',
+    );
+  }
 }
