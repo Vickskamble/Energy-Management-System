@@ -11,7 +11,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const RESEND_FROM = Deno.env.get("RESEND_FROM") ?? "PowerEMS Alerts <alerts@brilliants.in>";
+const RESEND_FROM = Deno.env.get("RESEND_FROM") ?? "PowerEMS <supports@brilliants.in>";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
