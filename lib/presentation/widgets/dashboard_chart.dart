@@ -95,11 +95,9 @@ class DashboardChart extends StatelessWidget {
         ),
     ];
 
-    // 75% of the meter's contract demand — reference only (the user must
-    // stay ABOVE this level). Uses the contract entered when the meter was
-    // added; falls back to the global setting only when no contract exists
-    // on the logs. It is never part of the bill; billing demand = max(
-    // recorded MD, preceding-11-month high).
+    // Contract demand — the actual kVA demand level the consumer is
+    // contracted for. Falls back to the global setting when no contract
+    // exists on the logs.
     var contractDemand = 0.0;
     for (final log in logs) {
       if (log.contractDemand > contractDemand) {
@@ -107,7 +105,7 @@ class DashboardChart extends StatelessWidget {
       }
     }
     final referenceDemand =
-        contractDemand > 0 ? contractDemand * 0.75 : AppConfig.billingDemandFloorKva;
+        contractDemand > 0 ? contractDemand : AppConfig.contractDemandKva;
     final maxAvg = spots.fold(0.0, (m, s) => s.y > m ? s.y : m);
     final mdMaxY =
         (maxAvg > referenceDemand ? maxAvg : referenceDemand) * 1.2;
@@ -121,7 +119,7 @@ class DashboardChart extends StatelessWidget {
             const SizedBox(width: 16),
             _dashedLegendItem(
               AppColors.danger,
-              '75% of Contract (${referenceDemand.toInt()} kVA)',
+              'Contract Demand (${referenceDemand.toInt()} kVA)',
               dim,
             ),
           ],
@@ -217,7 +215,7 @@ class DashboardChart extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                       labelResolver: (_) =>
-                          '75% of Contract (${referenceDemand.toInt()} kVA)',
+                          'Contract Demand (${referenceDemand.toInt()} kVA)',
                     ),
                   ),
                 ],
