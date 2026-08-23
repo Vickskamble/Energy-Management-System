@@ -154,28 +154,23 @@ class ExcelImportService {
       return [];
     }
 
-    // When the kWh / kVAh columns carry CUMULATIVE meter readings (each row
-    // is the meter's current total), convert to per-day consumption by taking
-    // the difference from the previous row. The first row is the opening
-    // baseline → consumption 0.
-    final kwhCumulative =
-        cols.kwh != null && _isCumulative(rows, headerRow, cols.kwh!);
-    final kvahCumulative =
-        cols.kvah != null && _isCumulative(rows, headerRow, cols.kvah!);
-    final lagCumulative = cols.lag != null &&
-        _isCumulative(rows, headerRow, cols.lag!, minValue: 1000);
-    final leadCumulative = cols.lead != null &&
-        _isCumulative(rows, headerRow, cols.lead!, minValue: 1000);
-    final kwhSeries = kwhCumulative
-        ? _cumulativeSeries(rows, headerRow, cols.kwh!)
+    // User always enters ACTUAL cumulative meter readings. Convert to
+    // per-day consumption by taking the difference from the previous row.
+    // The first row is the opening baseline → consumption 0.
+    // When columns are mapped as currentKwh/prevKwh, use currentKwh as the
+    // cumulative source.
+    final kwhSourceCol = cols.kwh ?? cols.currentKwh;
+    final kvahSourceCol = cols.kvah ?? cols.currentKvah;
+    final kwhSeries = kwhSourceCol != null
+        ? _cumulativeSeries(rows, headerRow, kwhSourceCol)
         : null;
-    final kvahSeries = kvahCumulative
-        ? _cumulativeSeries(rows, headerRow, cols.kvah!)
+    final kvahSeries = kvahSourceCol != null
+        ? _cumulativeSeries(rows, headerRow, kvahSourceCol)
         : null;
-    final lagSeries = lagCumulative
+    final lagSeries = cols.lag != null
         ? _cumulativeSeries(rows, headerRow, cols.lag!)
         : null;
-    final leadSeries = leadCumulative
+    final leadSeries = cols.lead != null
         ? _cumulativeSeries(rows, headerRow, cols.lead!)
         : null;
 
@@ -190,62 +185,39 @@ class ExcelImportService {
           : DateTime.now();
       if (loggedAt.isAfter(DateTime.now())) continue;
 
+      // Consumed = current − previous.
+      // When both currentKwh and prevKwh columns exist, compute per-row
+      // directly. When only a single cumulative column exists, compute from
+      // consecutive rows (cumulative series).
       final double kwh;
-      if (kwhSeries != null) {
-        kwh = kwhSeries[i - (headerRow + 1)];
+      if (cols.currentKwh != null && cols.prevKwh != null) {
+        final c = _cellNumber(row[cols.currentKwh!]) ?? 0;
+        final p = _cellNumber(row[cols.prevKwh!]) ?? 0;
+        kwh = c >= p ? c - p : 0.0;
       } else {
-        kwh = _resolveConsumed(
-          row,
-          cols.kwh,
-          cols.currentKwh,
-          cols.prevKwh,
-        );
+        kwh =
+            kwhSeries != null ? kwhSeries[i - (headerRow + 1)] : 0.0;
       }
       final double kvah;
-      if (kvahSeries != null) {
-        kvah = kvahSeries[i - (headerRow + 1)];
+      if (cols.currentKvah != null && cols.prevKvah != null) {
+        final c = _cellNumber(row[cols.currentKvah!]) ?? 0;
+        final p = _cellNumber(row[cols.prevKvah!]) ?? 0;
+        kvah = c >= p ? c - p : 0.0;
       } else {
-        kvah = _resolveConsumed(
-          row,
-          cols.kvah,
-          cols.currentKvah,
-          cols.prevKvah,
-        );
+        kvah =
+            kvahSeries != null ? kvahSeries[i - (headerRow + 1)] : 0.0;
       }
 
-      // Actual (cumulative) meter readings — kept alongside consumed so the
-      // client sees real meter values on Analysis/Reports. Available when the
-      // file carries cumulative readings or explicit Current/Previous columns.
-      final double? actualKwh;
-      if (kwhSeries != null && cols.kwh != null) {
-        actualKwh = _cellNumber(row[cols.kwh!]);
-      } else if (cols.currentKwh != null) {
-        actualKwh = _cellNumber(row[cols.currentKwh!]);
-      } else {
-        actualKwh = null;
-      }
-      final double? actualKvah;
-      if (kvahSeries != null && cols.kvah != null) {
-        actualKvah = _cellNumber(row[cols.kvah!]);
-      } else if (cols.currentKvah != null) {
-        actualKvah = _cellNumber(row[cols.currentKvah!]);
-      } else {
-        actualKvah = null;
-      }
-      final double lag;
-      if (lagSeries != null) {
-        lag = lagSeries[i - (headerRow + 1)];
-      } else {
-        lag = cols.lag != null ? _cellNumber(row[cols.lag!]) ?? 0 : 0.0;
-      }
-      final double lead;
-      if (leadSeries != null) {
-        lead = leadSeries[i - (headerRow + 1)];
-      } else {
-        lead = cols.lead != null
-            ? _cellNumber(row[cols.lead!]) ?? 0
-            : 0.0;
-      }
+      // Actual (cumulative) meter reading from the Excel cell — stored so
+      // Analysis/Reports can show the real meter values.
+      final double? actualKwh =
+          kwhSourceCol != null ? _cellNumber(row[kwhSourceCol]) : null;
+      final double? actualKvah =
+          kvahSourceCol != null ? _cellNumber(row[kvahSourceCol]) : null;
+      final double lag =
+          lagSeries != null ? lagSeries[i - (headerRow + 1)] : 0.0;
+      final double lead =
+          leadSeries != null ? leadSeries[i - (headerRow + 1)] : 0.0;
       final md = cols.md != null ? _cellNumber(row[cols.md!]) ?? 0 : 0.0;
 
       // PF from the client's file is stored as-is (never recalculated).
@@ -257,7 +229,7 @@ class ExcelImportService {
               ? pfRaw / 100
               : null);
 
-      final baseline = kwhSeries != null && i == headerRow + 1;
+      final isFirstRow = i == headerRow + 1;
       if (kwh <= 0 && kvah <= 0 && md <= 0) continue;
 
       final exportKwh =
@@ -283,38 +255,11 @@ class ExcelImportService {
           exportKwh: exportKwh,
           exportKvah: exportKvah,
           generationKwh: generationKwh,
-          sourceLabel: baseline ? 'Row ${i + 1} (opening)' : 'Row ${i + 1}',
+          sourceLabel: isFirstRow ? 'Row ${i + 1} (opening)' : 'Row ${i + 1}',
         ),
       );
     }
     return drafts;
-  }
-
-  /// Heuristic: treat a column as cumulative meter readings when it holds a
-  /// mostly-monotonically-increasing series of large values (meters display
-  /// running totals like 57,037 — not small per-day consumption figures).
-  static bool _isCumulative(
-    List<List<Data?>> rows,
-    int headerRow,
-    int col, {
-    double minValue = 10000,
-  }) {
-    var minVal = double.infinity;
-    var prev = double.nan;
-    var nonDecreasing = 0;
-    var valid = 0;
-    for (var i = headerRow + 1; i < rows.length; i++) {
-      final v = _cellNumber(rows[i][col]);
-      if (v == null) continue;
-      valid++;
-      if (v < minVal) minVal = v;
-      if (!prev.isNaN) {
-        if (v >= prev) nonDecreasing++;
-      }
-      prev = v;
-    }
-    if (valid < 2) return false;
-    return nonDecreasing >= valid - 1 && minVal >= minValue;
   }
 
   /// Cumulative readings → per-row consumed (current − previous). The first
@@ -434,26 +379,6 @@ class ExcelImportService {
       }
     }
     return map;
-  }
-
-  /// Consumed value = explicit column, or current − previous when the file
-  /// carries cumulative readings.
-  static double _resolveConsumed(
-    List<Data?> row,
-    int? direct,
-    int? current,
-    int? prev,
-  ) {
-    if (direct != null) {
-      final v = _cellNumber(row[direct]);
-      if (v != null && v > 0) return v;
-    }
-    if (current != null && prev != null) {
-      final c = _cellNumber(row[current]);
-      final p = _cellNumber(row[prev]);
-      if (c != null && p != null && c >= p) return c - p;
-    }
-    return 0;
   }
 
   static bool _isRowEmpty(List<Data?> row) {

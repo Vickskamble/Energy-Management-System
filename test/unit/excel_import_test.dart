@@ -56,25 +56,24 @@ void main() {
 
       final a = drafts[0];
       expect(a.meterName, 'Meter A');
-      // Date-only cells default to midday (12:00) so imports don't land in
-      // the previous day's Night slot (midnight 00:00 = end of the prior day).
       expect(a.loggedAt, DateTime(2026, 6, 1, 12));
-      expect(a.kwh, 123.45);
-      expect(a.kvah, 130.5);
-      expect(a.rkvarhLag, 5.5);
-      expect(a.rkvarhLead, 1.25);
+      // First row = baseline (consumed 0), actual reading stored.
+      expect(a.kwh, 0);
+      expect(a.kvah, 0);
+      expect(a.rkvarhLag, 0);
+      expect(a.rkvarhLead, 0);
       expect(a.mdRecorded, 42);
-      // Small per-day values → no cumulative series, so no actual reading.
-      expect(a.currentKwh, isNull);
-      expect(a.currentKvah, isNull);
+      expect(a.currentKwh, 123.45);
+      expect(a.currentKvah, 130.5);
       expect(a.isValid, isTrue);
-      expect(a.sourceLabel, 'Row 2');
+      expect(a.sourceLabel, contains('opening'));
 
       final b = drafts[1];
       expect(b.meterName, 'Meter B');
       expect(b.loggedAt, DateTime(2026, 6, 2, 12));
-      expect(b.kwh, 200);
+      expect(b.kwh, closeTo(200 - 123.45, 0.01));
       expect(b.mdRecorded, 60);
+      expect(b.currentKwh, 200);
       expect(b.sourceLabel, 'Row 3');
     });
 
@@ -99,9 +98,11 @@ void main() {
       final drafts = await ExcelImportService.extractReadings(bytes);
 
       expect(drafts, hasLength(1));
-      expect(drafts.first.kwh, 300);
+      // Single row = baseline consumed 0, actual reading stored.
+      expect(drafts.first.kwh, 0);
+      expect(drafts.first.currentKwh, 300);
       expect(drafts.first.mdRecorded, 75);
-      expect(drafts.first.sourceLabel, 'Row 3');
+      expect(drafts.first.sourceLabel, contains('opening'));
     });
 
     test('computes consumed units from current minus previous readings',
@@ -277,8 +278,12 @@ void main() {
       final drafts = await ExcelImportService.extractReadings(bytes);
 
       expect(drafts, hasLength(2));
-      expect(drafts[0].kwh, 120);
-      expect(drafts[1].kwh, 95);
+      // Now always treated as cumulative — first row = baseline 0,
+      // second row = 95 - 120 = negative → meter reset → 0.
+      expect(drafts[0].kwh, 0);
+      expect(drafts[0].currentKwh, 120);
+      expect(drafts[1].kwh, 0);
+      expect(drafts[1].currentKwh, 95);
     });
 
     test('throws FormatException when no readable data is present', () async {
