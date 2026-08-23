@@ -335,6 +335,7 @@ class ExcelImportService {
       if (prev.isNaN) {
         series.add(0.0);
       } else {
+        // Positive diff = consumption. Decrease = meter reset → 0 (new baseline).
         series.add(v >= prev ? v - prev : 0.0);
       }
       prev = v;
@@ -383,6 +384,8 @@ class ExcelImportService {
       final isLag = h.contains('lag');
       final isLead = h.contains('lead');
       final isConst = has(h, ['const', 'multiplier', 'ct&pt', 'ct/pt']);
+      final isExport = has(h, ['export', 'feed', 'net export']);
+      final isGeneration = has(h, ['generation', 'solar gen', 'total gen']);
 
       if (map.meter == null && has(h, ['meter']) && !isConst) {
         map.meter = i;
@@ -401,6 +404,14 @@ class ExcelImportService {
           !isConst &&
           has(h, ['md', 'demand', 'mdi'])) {
         if (map.md == null || h.contains('kva')) map.md = i;
+      } else if (isGeneration) {
+        if (map.generationKwh == null) map.generationKwh = i;
+      } else if (isExport) {
+        if (isKvah && map.exportKvah == null) {
+          map.exportKvah = i;
+        } else if (!isKvah && map.exportKwh == null) {
+          map.exportKwh = i;
+        }
       } else if (!isKvah &&
           (h.contains('kwh') ||
               h.contains('reading') ||
@@ -420,14 +431,6 @@ class ExcelImportService {
         } else if (!isCurrent && !isPrev && map.kvah == null) {
           map.kvah = i;
         }
-      } else if (has(h, ['export', 'net export', 'feed'])) {
-        if (h.contains('kvah') && map.exportKvah == null) {
-          map.exportKvah = i;
-        } else if (map.exportKwh == null) {
-          map.exportKwh = i;
-        }
-      } else if (has(h, ['generation', 'solar gen', 'total gen'])) {
-        if (map.generationKwh == null) map.generationKwh = i;
       }
     }
     return map;
