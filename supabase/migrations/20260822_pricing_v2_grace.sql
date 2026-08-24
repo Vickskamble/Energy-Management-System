@@ -4,13 +4,13 @@
 -- Pricing (now the source of truth for new subscriptions; Razorpay plan is
 -- auto-created by the checkout Edge Function at the matching amount):
 --   base plan:  INR 2500/month (includes 5 meters)
---   extra meter addon: INR 149/month each (beyond the included 5)
+--   extra meter addon: INR 499/month each (beyond the included 5)
 --   free tier:  5 meters + 60 day trial from signup
 --   grace:      7 days read-only after a paid plan expires before full lockout
 
 -- 1. Update column defaults so new subscription rows start correct.
 alter table public.subscriptions alter column base_amount set default 2500;
-alter table public.subscriptions alter column meter_rate set default 149;
+alter table public.subscriptions alter column meter_rate set default 499;
 
 -- Monthly / yearly plan selection.
 alter table public.subscriptions add column if not exists plan_term text not null default 'monthly';
