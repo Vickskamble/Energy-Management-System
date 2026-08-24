@@ -542,11 +542,13 @@ class _ReportsContentState extends State<_ReportsContent> {
                         Theme.of(context).brightness == Brightness.dark
                             ? const Color(0xFF2A2A2A)
                             : Colors.white,
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      final label = DateFormat('MMM').format(monthDates[group.x]);
-                      final val = rod.toY;
-                      return BarTooltipItem(
-                        '$label: ${_fmtNum(val)} kWh',
+getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final label = DateFormat('MMM').format(monthDates[group.x]);
+                        final val = rod.toY;
+                        // Show kWh or kVAh based on billOnKvah setting
+                        final unit = AppConfig.billOnKvah ? ' kVAh' : ' kWh';
+                        return BarTooltipItem(
+                          '$label: ${_fmtNum(val)}$unit',
                         TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,

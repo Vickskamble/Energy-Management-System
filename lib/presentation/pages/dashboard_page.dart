@@ -1106,7 +1106,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               TrialKpiCard(
                 title: 'Billed demand',
                 value: '${breakdown.billingDemand.round()} kVA',
-                sub: 'Recorded ${_siteMaxDemandPeak.round()} · floor ${(breakdown.contractDemand * AppConstants.billingDemandFloorPercent).round()} · ratchet ${(_ratchetPeakKva(periodLogs, entityLogs) * AppConstants.billingDemandFloorPercentOfRatchet).round()}',
+                sub: 'Recorded ${_siteMaxDemandPeak.round()} · floor ${(breakdown.contractDemand * AppConstants.billingDemandFloorPercent).round()} · ratchet ${_ratchetPeakKva(periodLogs, entityLogs).round()}',
                 color: AppColors.warning,
                 pct: (breakdown.billingDemand / 5).clamp(0.0, 100.0),
                 badgeNew: true,

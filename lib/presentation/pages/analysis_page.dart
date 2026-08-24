@@ -572,6 +572,31 @@ class _AnalysisContentState extends State<_AnalysisContent> {
           title: 'Power Quality Trends',
           subtitle: 'Last ${recent.length} readings',
         ),
+        // Low PF limit indicator
+        if (recent.any((e) => e.powerFactor < 0.9))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    '⚠ PF < 90% limit',
+                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.danger),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Penalty zone — install capacitor bank',
+                  style: TextStyle(fontSize: 9, color: AppColors.danger),
+                ),
+              ],
+            ),
+          ),
         const SizedBox(height: 8),
         if (MediaQuery.of(context).size.width < 600)
           Column(

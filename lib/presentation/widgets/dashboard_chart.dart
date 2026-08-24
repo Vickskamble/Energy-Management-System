@@ -218,6 +218,25 @@ class DashboardChart extends StatelessWidget {
                           'Contract Demand (${referenceDemand.toInt()} kVA)',
                     ),
                   ),
+                  // Low power factor limit line (90%)
+                  if (logs.any((l) => l.powerFactor < 0.9))
+                    HorizontalLine(
+                      y: (referenceDemand * 0.9).clamp(1.0, double.infinity),
+                      color: AppColors.kpiPower,
+                      strokeWidth: 1.5,
+                      dashArray: [8, 4],
+                      label: HorizontalLineLabel(
+                        show: true,
+                        alignment: Alignment.topRight,
+                        style: TextStyle(
+                          color: AppColors.kpiPower,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        labelResolver: (_) =>
+                            'PF Limit 90%',
+                      ),
+                    ),
                 ],
               ),
               lineTouchData: LineTouchData(
