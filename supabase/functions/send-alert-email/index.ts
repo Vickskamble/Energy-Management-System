@@ -63,7 +63,7 @@ function buildHtml(title: string, message: string, severity: string, type: strin
           </table>
         </td></tr>
         <tr><td style="padding:0 24px 24px;">
-          <a href="https://vickskamble.github.io/Energy-Management-System/"
+          <a href="https://app.brilliants.in/"
              style="display:inline-block;background:#3B82F6;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
             View Dashboard
           </a>

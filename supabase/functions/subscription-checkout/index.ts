@@ -20,7 +20,7 @@ const YEARLY_AMOUNT = 25500; // INR / year (covers 5 meters)
 const YEARLY_METER_RATE = 499; // INR / month per extra meter (yearly plan)
 const TOTAL_COUNT = 24; // rolling 2-year mandate
 const PAYMENT_DONE_URL =
-  "https://Vickskamble.github.io/Energy-Management-System/payment-done.html";
+  "https://app.brilliants.in/payment-done.html";
 
 // Browser (GitHub Pages web build) calls this edge function directly, so it
 // must answer CORS preflights and attach the permissive CORS header on every

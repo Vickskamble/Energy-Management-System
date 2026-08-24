@@ -58,7 +58,7 @@ class SubscriptionConfig {
   /// Callback landing after addon (extra-meter) payment — the Razorpay
   /// payment-link redirects here, and the in-app WebView treats it as done.
   static const String paymentDoneUrl =
-      'https://Vickskamble.github.io/Energy-Management-System/payment-done.html';
+      'https://app.brilliants.in/payment-done.html';
 }
 
 /// Server-computed entitlement for the signed-in user
