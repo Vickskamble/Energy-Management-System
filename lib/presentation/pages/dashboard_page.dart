@@ -341,11 +341,17 @@ class _DashboardContentState extends State<_DashboardContent> {
     final comparison = periodLogs.isEmpty
         ? null
         : BillCalculator.compare(breakdown, previousBreakdown);
-    // Forecast is meaningful only for the live (current) month.
-    final forecast = !dayMode && isCurrentMonth
+    // Forecast: project month-end bill from readings so far.
+    // Current month → use today as reference (projects future days).
+    // Past month → use last day of selected month (shows actual, no projection).
+    final forecast = !dayMode && periodLogs.isNotEmpty
         ? BillForecastCalculator.calculate(
             monthLogs: periodLogs,
-            referenceDate: now,
+            referenceDate: isCurrentMonth
+                ? now
+                : refMonth != null
+                    ? DateTime(refMonth.year, refMonth.month + 1, 0)
+                    : now,
             ratchetLogs: entityLogs,
           )
         : null;
@@ -1863,7 +1869,9 @@ class _DashboardContentState extends State<_DashboardContent> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
-'No reading recorded for this month yet',
+                  _selection.isCurrent
+                      ? 'No reading recorded for this month yet'
+                      : 'No reading recorded for this period',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.dim(context),
