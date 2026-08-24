@@ -205,6 +205,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
             const SizedBox(height: 12),
           ],
           if (_filtered.isNotEmpty) ...[
+            _buildSystemIssues(),
+            const SizedBox(height: 24),
             TodShiftSection(
               logs: _filtered,
               siteLabel: _siteNames.length == 1
@@ -223,8 +225,6 @@ class _AnalysisContentState extends State<_AnalysisContent> {
             _buildBillAnalysis(),
             const SizedBox(height: 24),
             _buildMdBreachPrediction(),
-            const SizedBox(height: 24),
-            _buildSystemIssues(),
             const SizedBox(height: 24),
             _buildMonthComparison(),
             const SizedBox(height: 24),
@@ -572,31 +572,6 @@ class _AnalysisContentState extends State<_AnalysisContent> {
           title: 'Power Quality Trends',
           subtitle: 'Last ${recent.length} readings',
         ),
-        // Low PF limit indicator
-        if (recent.any((e) => e.powerFactor < 0.9))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.danger.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    '⚠ PF < 90% limit',
-                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.danger),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Penalty zone — install capacitor bank',
-                  style: TextStyle(fontSize: 9, color: AppColors.danger),
-                ),
-              ],
-            ),
-          ),
         const SizedBox(height: 8),
         if (MediaQuery.of(context).size.width < 600)
           Column(
@@ -612,6 +587,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                     ),
                   ],
                   unit: '',
+                  limitValue: AppConstants.pfPenaltyThreshold,
+                  limitLabel: 'PF Limit ${AppConstants.pfPenaltyThreshold}',
                   onTapPoint: (i) => showDayReadings(recent[i]),
                 ),
               ),
@@ -648,6 +625,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                       ),
                     ],
                     unit: '',
+                    limitValue: AppConstants.pfPenaltyThreshold,
+                    limitLabel: 'PF Limit ${AppConstants.pfPenaltyThreshold}',
                     onTapPoint: (i) => showDayReadings(recent[i]),
                   ),
                 ),
@@ -1410,6 +1389,8 @@ class _AnalysisContentState extends State<_AnalysisContent> {
     int xLabelStep = 1,
     void Function(int index)? onTapPoint,
     double targetKwhPerDay = 0,
+    double? limitValue,
+    String? limitLabel,
   }) {
     final rawMax = series
         .expand((s) => s.values)
@@ -1504,16 +1485,34 @@ class _AnalysisContentState extends State<_AnalysisContent> {
                   ),
               ],
               extraLinesData: ExtraLinesData(
-                horizontalLines: targetKwhPerDay > 0
-                    ? [
-                        HorizontalLine(
-                          y: targetKwhPerDay,
-                          color: AppColors.danger,
-                          strokeWidth: 1.5,
-                          dashArray: [6, 4],
-                        ),
-                      ]
-                    : const [],
+                horizontalLines: [
+                  if (targetKwhPerDay > 0)
+                    HorizontalLine(
+                      y: targetKwhPerDay,
+                      color: AppColors.danger,
+                      strokeWidth: 1.5,
+                      dashArray: [6, 4],
+                    ),
+                  if (limitValue != null)
+                    HorizontalLine(
+                      y: limitValue,
+                      color: AppColors.danger,
+                      strokeWidth: 1.5,
+                      dashArray: [8, 4],
+                      label: limitLabel != null
+                          ? HorizontalLineLabel(
+                              show: true,
+                              alignment: Alignment.topRight,
+                              style: TextStyle(
+                                color: AppColors.danger,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              labelResolver: (_) => limitLabel,
+                            )
+                          : null,
+                    ),
+                ],
               ),
               lineTouchData: LineTouchData(
                 touchCallback:

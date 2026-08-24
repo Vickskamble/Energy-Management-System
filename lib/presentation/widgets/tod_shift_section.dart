@@ -214,6 +214,51 @@ class _TodShiftSectionState extends State<TodShiftSection> {
     );
   }
 
+  void _showDayDetail(({DateTime date, List<double> kwh}) day) {
+    final total = day.kwh.fold<double>(0, (a, b) => a + b);
+    final shifts = ['Day (06–14)', 'Evening (14–22)', 'Night (22–06)'];
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(DateFormat('d MMM yyyy (EEEE)').format(day.date)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var s = 0; s < 3; s++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _shiftColors[s],
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(shifts[s], style: const TextStyle(fontSize: 13))),
+                    Text('${day.kwh[s].toStringAsFixed(0)} kWh', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            const Divider(),
+            Row(
+              children: [
+                const Expanded(child: Text('Total', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+                Text('${total.toStringAsFixed(0)} kWh', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
   Widget _segButton(String label, bool active, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
@@ -670,6 +715,7 @@ class _TodShiftSectionState extends State<TodShiftSection> {
       required double plotH,
       required double barW,
       required double maxTotal,
+      void Function(int index)? onBarTap,
     }) {
       // Smart Y-axis: tight ceiling ~5 % above max, 4 gridlines, nice steps.
       final rawStep = maxTotal > 0 ? maxTotal / 4 : 1.0;
@@ -681,6 +727,7 @@ class _TodShiftSectionState extends State<TodShiftSection> {
         if (v >= 1000) return '${(v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1)}k';
         return '${v.round()}';
       }
+      const labelH = 18.0;
       return Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -704,7 +751,7 @@ class _TodShiftSectionState extends State<TodShiftSection> {
           ),
           Expanded(
             child: SizedBox(
-              height: plotH + 14,
+              height: plotH + labelH,
               child: Stack(
                 children: [
                   for (var g = 0; g <= gridCount; g++)
@@ -712,37 +759,66 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                       left: 0,
                       right: 0,
                       top: gridCount > 0
-                          ? (plotH + 14) * g / gridCount - 1
+                          ? plotH * g / gridCount - 1
                           : 0,
                       child: Container(
                         height: 1,
                         color: _line.withValues(alpha: 0.5),
                       ),
                     ),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      for (final d in days)
-                        Container(
-                          width: barW,
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 0.5,
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: plotH,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        for (int di = 0; di < days.length; di++)
+                          GestureDetector(
+                            onTap: onBarTap != null ? () => onBarTap(di) : null,
+                            child: Container(
+                              width: barW,
+                              margin: const EdgeInsets.symmetric(horizontal: 0.5),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  for (var s = 2; s >= 0; s--)
+                                    Container(
+                                      height: yMax <= 0
+                                          ? 0
+                                          : days[di].kwh[s] / yMax * plotH,
+                                      color: _shiftColors[s],
+                                    ),
+                                ],
+                              ),
+                            ),
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              for (var s = 2; s >= 0; s--)
-                                Container(
-                                  height: yMax <= 0
-                                      ? 0
-                                      : d.kwh[s] / yMax *
-                                          plotH,
-                                  color: _shiftColors[s],
-                                ),
-                            ],
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    top: plotH + 2,
+                    left: 0,
+                    right: 0,
+                    height: labelH,
+                    child: Row(
+                      children: [
+                        for (int di = 0; di < days.length; di++)
+                          SizedBox(
+                            width: barW + 1,
+                            child: Text(
+                              DateFormat('d').format(days[di].date),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: days.length > 15 ? 7 : 9,
+                                color: _dim,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -845,7 +921,7 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                               ? 280.0
                               : 320.0;
                       return SizedBox(
-                        height: plotH + 26,
+                        height: plotH + 44,
                         child: needsScroll
                             ? SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
@@ -857,6 +933,7 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                                     plotH: plotH,
                                     barW: maxBarW,
                                     maxTotal: maxTotal,
+                                    onBarTap: (i) => _showDayDetail(days[i]),
                                   ),
                                 ),
                               )
@@ -866,6 +943,7 @@ class _TodShiftSectionState extends State<TodShiftSection> {
                                 plotH: plotH,
                                 barW: barW,
                                 maxTotal: maxTotal,
+                                onBarTap: (i) => _showDayDetail(days[i]),
                               ),
                       );
                     },

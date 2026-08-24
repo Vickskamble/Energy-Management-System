@@ -432,6 +432,8 @@ class _ReportsContentState extends State<_ReportsContent> {
           ),
         _buildExecutiveSummary(currencyFmt, entityLogs, breakdown, kpis),
         const SizedBox(height: AppSpacing.lg),
+        _buildEfficiencySavings(breakdown, kpis, entityLogs),
+        const SizedBox(height: AppSpacing.lg),
         _buildMonthlyHistory(),
         const SizedBox(height: AppSpacing.lg),
         _buildEnergyAnalysis(entityLogs),
@@ -441,8 +443,6 @@ class _ReportsContentState extends State<_ReportsContent> {
         _buildDemandPfAnalysis(currencyFmt, breakdown),
         const SizedBox(height: AppSpacing.lg),
         _buildTodDistribution(breakdown),
-        const SizedBox(height: AppSpacing.lg),
-        _buildEfficiencySavings(breakdown, kpis, entityLogs),
       ],
     );
   }
