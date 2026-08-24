@@ -1,2 +1,6 @@
-# Placeholder — CI overwrites this with real credentials (see deploy.yml).
-# Local builds use the root .env instead.
+# EMS Configuration
+# Copy this file to .env and fill in your keys
+
+SUPABASE_URL=https://onfovsadlqeebguuswzg.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_Pfr0MEUpLIytdwsahd9nCQ_cKauwJIq
+RAZORPAY_KEY_ID=rzp_live_TParWtqVyjGdQ1
