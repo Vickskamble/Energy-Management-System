@@ -650,9 +650,9 @@ class _MeterListState extends State<_MeterList> {
         title: const Text('Meter limit reached'),
         content: Text(
           'Your plan covers $currentCount meter(s). '
-          'Subscribe for ₹${SubscriptionConfig.basePricePerMonth}/month '
-          '(includes 1 meter) and add extra meters at just '
-          '₹${SubscriptionConfig.meterPricePerMonth}/month each.',
+          'Subscribe for ₹${SubscriptionConfig.monthlyBasePrice}/month '
+          '(includes ${SubscriptionConfig.includedMeters} meters) and add extra meters at just '
+          '₹${SubscriptionConfig.monthlyMeterPrice}/month each.',
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         actions: [

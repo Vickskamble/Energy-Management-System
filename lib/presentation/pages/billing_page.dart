@@ -26,8 +26,8 @@ class BillingPage extends StatefulWidget {
 
 class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   Entitlement? _entitlement;
-  int _meterCount = 0;
   int _extraMeters = 0;
+  PlanTerm _selectedTerm = PlanTerm.monthly;
   bool _loading = true;
   bool _busy = false;
   bool _paymentPending = false;
@@ -89,11 +89,10 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {
         _entitlement = ent;
-        _meterCount = meters.length;
         _extraMeters = ent.isDemo
             ? 0
-            : (meters.length - 1 > ent.extraMeters
-                ? meters.length - 1
+            : (meters.length - SubscriptionConfig.includedMeters > ent.extraMeters
+                ? meters.length - SubscriptionConfig.includedMeters
                 : ent.extraMeters);
         _loading = false;
       });
@@ -108,10 +107,22 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
     }
   }
 
-  /// Monthly price for the selected extra-meter count.
-  int get _totalMonthly =>
-      SubscriptionConfig.basePricePerMonth +
-      _extraMeters * SubscriptionConfig.meterPricePerMonth;
+  /// Price of the selected plan term for the current extra-meter count.
+  /// Monthly → per month; Yearly → per the annual total.
+  int get _selectedTotal => _selectedTerm == PlanTerm.yearly
+      ? SubscriptionConfig.yearlyTotal(_extraMeters)
+      : SubscriptionConfig.monthlyBasePrice +
+          _extraMeters * SubscriptionConfig.monthlyMeterPrice;
+
+  int get _selectedBase => _selectedTerm == PlanTerm.yearly
+      ? SubscriptionConfig.yearlyBasePrice
+      : SubscriptionConfig.monthlyBasePrice;
+
+  int get _selectedMeterRate => _selectedTerm == PlanTerm.yearly
+      ? SubscriptionConfig.yearlyMeterPrice
+      : SubscriptionConfig.monthlyMeterPrice;
+
+  String get _termLabel => _selectedTerm == PlanTerm.yearly ? '/yr' : '/mo';
 
   /// Extra meters to add for active subscribers (top-up, ₹99 each).
   int get _deltaMeters =>
@@ -122,6 +133,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
     try {
       final result = await SubscriptionStore.startCheckout(
         extraMeters: _extraMeters,
+        planTerm: _selectedTerm,
       );
       if (!mounted) return;
 
@@ -337,7 +349,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       ShareParams(
         text:
             'Try PowerEMS — free for 60 days (1 meter). Use my referral code '
-            '$code to get us both going. Pay only ₹799/mo after trial!',
+            '$code to get us both going. Pay only ₹2,500/mo after trial!',
       ),
     );
   }
@@ -548,7 +560,7 @@ body: _loading
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '₹799/month • ${ent.extraMeters} extra meter(s) • '
+                  '₹${ent.planTerm == 'yearly' ? SubscriptionConfig.yearlyBasePrice : SubscriptionConfig.monthlyBasePrice}/${ent.planTerm == 'yearly' ? 'year' : 'month'} • ${ent.extraMeters} extra meter(s) • '
                   '${end == null ? 'next billing unknown' : 'next billing ${DateFormat('d MMM yyyy').format(end)}'}',
                   style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
                 ),
@@ -598,6 +610,18 @@ body: _loading
     );
   }
 
+  Widget _buildPlanTermToggle() {
+    return SegmentedButton<PlanTerm>(
+      segments: const [
+        ButtonSegment(value: PlanTerm.monthly, label: Text('Monthly')),
+        ButtonSegment(value: PlanTerm.yearly, label: Text('Yearly')),
+      ],
+      selected: {_selectedTerm},
+      showSelectedIcon: false,
+      onSelectionChanged: (set) => setState(() => _selectedTerm = set.first),
+    );
+  }
+
   Widget _buildPricingCard(Entitlement ent) {
     return AppCard(
       child: Column(
@@ -608,9 +632,11 @@ body: _loading
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
+          _buildPlanTermToggle(),
+          const SizedBox(height: 12),
           _priceRow(
-            'Base plan (includes 1 meter)',
-            '₹${SubscriptionConfig.basePricePerMonth}/mo',
+            'Base plan (includes ${SubscriptionConfig.includedMeters} meters)',
+            '₹$_selectedBase$_termLabel',
           ),
           const Divider(height: 24),
           Row(
@@ -624,7 +650,7 @@ body: _loading
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      '₹${SubscriptionConfig.meterPricePerMonth}/mo each',
+                      '₹$_selectedMeterRate/mo each',
                       style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
                     ),
                   ],
@@ -649,15 +675,40 @@ body: _loading
             ],
           ),
           const Divider(height: 24),
+          if (_selectedTerm == PlanTerm.yearly) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.savings_outlined, color: AppColors.success, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You save ₹${SubscriptionConfig.yearlySavings(0)}/yr '
+                      '(${SubscriptionConfig.yearlySavingsPct(0).round()}% off) '
+                      'vs paying monthly.',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           _priceRow(
-            'Total per month',
-            '₹$_totalMonthly',
+            'Total per ${_selectedTerm == PlanTerm.yearly ? 'year' : 'month'}',
+            '₹$_selectedTotal',
             emphasized: true,
           ),
           const SizedBox(height: 4),
           Text(
-            'You have $_meterCount meter(s) configured. Base plan + '
-            '$_extraMeters extra meter(s) = ${_meterCount > 1 ? _meterCount : 1} total.',
+            'Base plan includes ${SubscriptionConfig.includedMeters} meters. '
+            'Adding $_extraMeters extra → '
+            '${SubscriptionConfig.includedMeters + _extraMeters} total meters allowed.',
             style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
           ),
           const SizedBox(height: 16),
@@ -668,9 +719,9 @@ body: _loading
                 color: AppColors.warning.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
-child: Text(
-                'You are subscribed — extra meters cost ₹99/meter as a '
-                'one-time top-up. Your ₹799 base plan is NOT charged again.',
+ child: Text(
+                 'You are subscribed — extra meters cost ₹$_selectedMeterRate/meter as a '
+                 'one-time top-up. Your ₹$_selectedBase base plan is NOT charged again.',
                 style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
               ),
             ),
@@ -683,11 +734,11 @@ const SizedBox(height: 12),
                         ' extra meter(s)'
                     : 'Add $_deltaMeters extra meter'
                         '${_deltaMeters == 1 ? '' : 's'} — '
-                        'pay ₹${_deltaMeters * SubscriptionConfig.meterPricePerMonth}'
+                        'pay ₹${_deltaMeters * _selectedMeterRate}'
                         ' one-time'
                 : _extraMeters == 0
-                    ? 'Subscribe — ₹${SubscriptionConfig.basePricePerMonth}/mo'
-                    : 'Subscribe — ₹$_totalMonthly/mo',
+                    ? 'Subscribe — ₹$_selectedBase$_termLabel'
+                    : 'Subscribe — ₹$_selectedTotal$_termLabel',
             onPressed:
                 _busy || (ent.subActive && _extraMeters == ent.extraMeters)
                     ? null

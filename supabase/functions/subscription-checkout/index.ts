@@ -1,7 +1,7 @@
 // SaaS subscription checkout: creates/updates a Razorpay subscription for the
 // signed-in user and returns the hosted payment-page URL (UPI/cards/autopay).
 //
-// Pricing: base INR 799/mo (includes 1st meter) + INR 99/mo per extra meter.
+// Pricing: base INR 2500/mo (includes 5 meters) + INR 499/mo per extra meter.
 //
 // Deploy: supabase functions deploy subscription-checkout --no-verify-jwt
 // Env secrets: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET (set via `supabase secrets set`)
@@ -14,8 +14,10 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID") ?? "";
 const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET") ?? "";
-const BASE_AMOUNT = 799; // INR / month
-const METER_RATE = 99; // INR / month per extra meter
+const BASE_AMOUNT = 2500; // INR / month (covers 5 meters)
+const METER_RATE = 499; // INR / month per extra meter (monthly plan)
+const YEARLY_AMOUNT = 25500; // INR / year (covers 5 meters)
+const YEARLY_METER_RATE = 499; // INR / month per extra meter (yearly plan)
 const TOTAL_COUNT = 24; // rolling 2-year mandate
 const PAYMENT_DONE_URL =
   "https://Vickskamble.github.io/Energy-Management-System/payment-done.html";
@@ -61,6 +63,27 @@ async function getOrCreateBasePlan(): Promise<string> {
   return body.id;
 }
 
+async function getOrCreateYearlyPlan(): Promise<string> {
+  const res = await rzp("/plans?count=100");
+  const { items } = await res.json();
+  const existing = items?.find(
+    (p: { item?: { name?: string }; amount?: number }) =>
+      p.item?.name === "PowerEMS Yearly" && p.amount === YEARLY_AMOUNT * 100,
+  );
+  if (existing) return existing.id;
+  const created = await rzp("/plans", {
+    method: "POST",
+    body: JSON.stringify({
+      period: "yearly",
+      interval: 1,
+      item: { name: "PowerEMS Yearly", amount: YEARLY_AMOUNT * 100, currency: "INR" },
+    }),
+  });
+  const body = await created.json();
+  if (!body.id) throw new Error(`yearly plan create failed: ${JSON.stringify(body)}`);
+  return body.id;
+}
+
 async function cancelOpenSubscription(subscriptionId: string) {
   try {
     await rzp(`/subscriptions/${subscriptionId}/cancel`, { method: "POST" });
@@ -69,18 +92,26 @@ async function cancelOpenSubscription(subscriptionId: string) {
   }
 }
 
-async function createExtraMeterLink(user: { id: string; email: string }, delta: number) {
+async function createExtraMeterLink(
+  user: { id: string; email: string },
+  delta: number,
+  planTerm: string,
+) {
+  const ratePerMonth = planTerm === "yearly" ? YEARLY_METER_RATE : METER_RATE;
+  const amount = delta * ratePerMonth * (planTerm === "yearly" ? 12 : 1) * 100;
   const res = await rzp("/payment_links", {
     method: "POST",
     body: JSON.stringify({
-      amount: delta * METER_RATE * 100,
+      amount,
       currency: "INR",
       accept_partial: false,
-      description: `PowerEMS extra meter${delta > 1 ? "s" : ""} (x${delta}) add-on`,
+      description:
+        `PowerEMS extra meter${delta > 1 ? "s" : ""} (x${delta}) add-on (${planTerm})`,
       customer: { email: user.email },
       notes: {
         user_id: user.id,
         delta_meters: delta,
+        plan_term: planTerm,
         action: "extra_meter_addon",
       },
       callback_url: PAYMENT_DONE_URL,
@@ -131,14 +162,18 @@ serve(async (req) => {
   }
 
   let extraMeters = 0;
+  let planTerm = "monthly";
   try {
     const body = await req.json();
     extraMeters = Math.max(0, Math.min(50, Number(body.extra_meters) || 0));
+    if (body.plan_term === "yearly") planTerm = "yearly";
   } catch {
-    // default 0 extra meters
+    // default 0 extra meters, monthly plan
   }
 
-  const planId = await getOrCreateBasePlan();
+  const planId = planTerm === "yearly"
+    ? await getOrCreateYearlyPlan()
+    : await getOrCreateBasePlan();
 
   const { data: existing } = await supabase
     .from("subscriptions")
@@ -149,8 +184,8 @@ serve(async (req) => {
   const existingStatus = existing?.status ?? "none";
   const isPaidBase = ["authenticated", "active"].includes(existingStatus);
 
-  // Base plan active: never re-charge ₹799 — extra meters are a one-time
-  // ₹99/meter top-up payment link; the webhook applies the delta on payment.
+  // Base plan active: extra meters are a one-time top-up payment link;
+  // the webhook applies the delta on payment. Never re-charge the base plan.
   if (isPaidBase) {
     const currentExtras = existing?.extra_meters ?? 0;
     const delta = extraMeters - currentExtras;
@@ -169,7 +204,7 @@ serve(async (req) => {
         status: existingStatus,
       });
     }
-    const link = await createExtraMeterLink(user, delta);
+    const link = await createExtraMeterLink(user, delta, planTerm);
     // Persist the link id on the subscription row BEFORE handing it to the
     // user: it is the idempotency key for applying the paid add-on (webhook
     // and/or payment-status fallback), since Razorpay delivery can be flaky.
@@ -184,6 +219,7 @@ serve(async (req) => {
     } catch (e) {
       console.error("addon link persist failed:", String(e));
     }
+    const ratePerMonth = planTerm === "yearly" ? YEARLY_METER_RATE : METER_RATE;
     return json({
       mode: "addon",
       payment_link_id: link.id,
@@ -191,13 +227,13 @@ serve(async (req) => {
       short_url: link.short_url,
       subscription_id: "",
       delta_meters: delta,
-      amount: delta * METER_RATE,
+      amount: delta * ratePerMonth * (planTerm === "yearly" ? 12 : 1),
       extra_meters: currentExtras + delta,
       status: existingStatus,
     });
   }
 
-  // No active base plan: full checkout (₹799 base + ₹99 × extra meters).
+  // No active base plan: full checkout for the selected plan term.
   if (
     existing?.razorpay_subscription_id &&
     existingStatus === "created"
@@ -205,11 +241,15 @@ serve(async (req) => {
     await cancelOpenSubscription(existing.razorpay_subscription_id);
   }
 
+  const baseAmount = planTerm === "yearly" ? YEARLY_AMOUNT : BASE_AMOUNT;
+  const meterRate = planTerm === "yearly" ? YEARLY_METER_RATE : METER_RATE;
+  const addonUnit = meterRate * (planTerm === "yearly" ? 12 : 1) * 100;
+
   const addons = extraMeters > 0
     ? [{
         item: {
           name: `Extra meter${extraMeters > 1 ? "s" : ""} (x${extraMeters})`,
-          amount: METER_RATE * 100,
+          amount: addonUnit,
           currency: "INR",
         },
         quantity: extraMeters,
@@ -222,7 +262,7 @@ serve(async (req) => {
       plan_id: planId,
       total_count: TOTAL_COUNT,
       customer_notify: 1,
-      notes: { user_id: user.id, email: user.email },
+      notes: { user_id: user.id, email: user.email, plan_term: planTerm },
       addons,
     }),
   });
@@ -236,8 +276,9 @@ serve(async (req) => {
     razorpay_subscription_id: sub.id,
     status: sub.status ?? "created",
     extra_meters: extraMeters,
-    base_amount: BASE_AMOUNT,
-    meter_rate: METER_RATE,
+    base_amount: baseAmount,
+    meter_rate: meterRate,
+    plan_term: planTerm,
   });
 
   if (upsertError) {
@@ -250,7 +291,8 @@ serve(async (req) => {
     short_url: sub.short_url,
     status: sub.status,
     extra_meters: extraMeters,
-    base_amount: BASE_AMOUNT,
-    meter_rate: METER_RATE,
+    base_amount: baseAmount,
+    meter_rate: meterRate,
+    plan_term: planTerm,
   });
 });

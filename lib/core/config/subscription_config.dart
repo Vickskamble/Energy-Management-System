@@ -4,19 +4,56 @@ import '../error/exceptions.dart';
 import '../network/supabase_client.dart';
 import '../utils/app_logger.dart';
 
+/// Billing cadence for a subscription.
+enum PlanTerm { monthly, yearly }
+
 /// SaaS pricing (mirrors supabase/migrations/20260812_subscriptions.sql and
 /// the subscription-checkout Edge Function).
 class SubscriptionConfig {
   SubscriptionConfig._();
 
-  /// Base plan — includes the 1st meter.
-  static const int basePricePerMonth = 799;
+  /// Meters included in both the monthly and yearly base plans.
+  static const int includedMeters = 5;
 
-  /// Every additional meter beyond the 1st.
-  static const int meterPricePerMonth = 99;
+  // ---- Monthly plan ----
+  /// Monthly base price (covers 5 meters).
+  static const int monthlyBasePrice = 2500;
+
+  /// Extra meter on the monthly plan, per month.
+  static const int monthlyMeterPrice = 499;
+
+  // ---- Yearly plan ----
+  /// Yearly base price (covers 5 meters).
+  static const int yearlyBasePrice = 25500;
+
+  /// Extra meter on the yearly plan, per month (billed across the year).
+  static const int yearlyMeterPrice = 499;
 
   /// Free-tier trial length.
   static const int trialDays = 60;
+
+  /// Grace window after a paid plan expires before the account is fully
+  /// locked to read-only. Data stays intact and renewal remains possible.
+  static const int graceDays = 7;
+
+  /// Annualised cost of the monthly plan for [extraMeters] beyond the base.
+  static int monthlyAnnualised(int extraMeters) =>
+      (monthlyBasePrice + extraMeters * monthlyMeterPrice) * 12;
+
+  /// Total yearly-plan cost for [extraMeters] beyond the base.
+  static int yearlyTotal(int extraMeters) =>
+      yearlyBasePrice + extraMeters * yearlyMeterPrice * 12;
+
+  /// Savings of the yearly plan vs 12× the monthly plan (base-focused).
+  static int yearlySavings(int extraMeters) =>
+      monthlyAnnualised(extraMeters) - yearlyTotal(extraMeters);
+
+  /// Savings percentage of the yearly plan vs 12× the monthly plan.
+  static double yearlySavingsPct(int extraMeters) {
+    final annual = monthlyAnnualised(extraMeters);
+    if (annual == 0) return 0;
+    return (yearlySavings(extraMeters) / annual) * 100;
+  }
 
   /// Callback landing after addon (extra-meter) payment — the Razorpay
   /// payment-link redirects here, and the in-app WebView treats it as done.
@@ -32,12 +69,15 @@ class Entitlement {
   final bool subActive;
   final bool creditActive;
   final bool readOnly;
+  final bool inGrace;
   final DateTime? trialEnd;
   final DateTime? creditEnd;
   final DateTime? currentPeriodEnd;
+  final DateTime? graceEnd;
   final DateTime? ownerAccessUntil;
   final String subscriptionStatus;
   final String referralCode;
+  final String planTerm;
   final int metersAllowed;
   final int extraMeters;
   final int freeMonthsCredit;
@@ -48,12 +88,15 @@ class Entitlement {
     required this.subActive,
     required this.creditActive,
     required this.readOnly,
+    required this.inGrace,
     this.trialEnd,
     this.creditEnd,
     this.currentPeriodEnd,
+    this.graceEnd,
     this.ownerAccessUntil,
     required this.subscriptionStatus,
     required this.referralCode,
+    this.planTerm = 'monthly',
     required this.metersAllowed,
     required this.extraMeters,
     required this.freeMonthsCredit,
@@ -72,12 +115,15 @@ class Entitlement {
       subActive: json['sub_active'] == true,
       creditActive: json['credit_active'] == true,
       readOnly: json['read_only'] == true,
-      trialEnd: parse('trial_end'),
-      creditEnd: parse('credit_end'),
-      currentPeriodEnd: parse('current_period_end'),
-      ownerAccessUntil: parse('owner_access_until'),
-      subscriptionStatus: (json['subscription_status'] ?? 'none') as String,
-      referralCode: (json['referral_code'] ?? '') as String,
+      inGrace: json['in_grace'] == true,
+       trialEnd: parse('trial_end'),
+       creditEnd: parse('credit_end'),
+       currentPeriodEnd: parse('current_period_end'),
+       graceEnd: parse('grace_end'),
+       ownerAccessUntil: parse('owner_access_until'),
+       subscriptionStatus: (json['subscription_status'] ?? 'none') as String,
+       referralCode: (json['referral_code'] ?? '') as String,
+       planTerm: (json['plan_term'] ?? 'monthly') as String,
       metersAllowed: (json['meters_allowed'] as num?)?.toInt() ?? 1,
       extraMeters: (json['extra_meters'] as num?)?.toInt() ?? 0,
       freeMonthsCredit: (json['free_months_credit'] as num?)?.toInt() ?? 0,
@@ -110,8 +156,8 @@ class RedeemResult {
 }
 
 /// Result of starting a checkout: either a full Razorpay subscription
-/// (₹799 base + ₹99 × meters) or a one-time extra-meter top-up payment link
-/// (₹99 × delta) for users with an active base plan.
+/// (₹2,500 base incl. 5 meters + ₹149 × extra meters) or a one-time
+/// extra-meter top-up payment link (₹149 × delta) for active subscribers.
 class CheckoutResult {
   final String mode;
 
@@ -188,13 +234,20 @@ class SubscriptionStore {
   }
 
   /// Start (or re-create, on extra-meter change) a Razorpay subscription.
+  /// [planTerm] selects the monthly or yearly Razorpay plan.
   /// Returns the hosted payment page URL for the user to pay.
-  static Future<CheckoutResult> startCheckout({required int extraMeters}) async {
+  static Future<CheckoutResult> startCheckout({
+    required int extraMeters,
+    required PlanTerm planTerm,
+  }) async {
     try {
       final res = await SupabaseClientManager.client.functions
           .invoke(
             'subscription-checkout',
-            body: {'extra_meters': extraMeters},
+            body: {
+              'extra_meters': extraMeters,
+              'plan_term': planTerm == PlanTerm.yearly ? 'yearly' : 'monthly',
+            },
           )
           .timeout(const Duration(seconds: 30));
       final data = (res.data as Map?)?.cast<String, dynamic>() ?? {};
