@@ -1,5 +1,8 @@
+import 'dart:js_interop';
+
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:web/web.dart' as web;
 
 import '../services/email_alert_service.dart';
 
@@ -81,19 +84,17 @@ class NotificationService {
     _initialized = true;
   }
 
+  /// Whether browser notification permission has been requested yet.
+  bool _webPermissionRequested = false;
+
   Future<void> showAlert({
     required int id,
     required String title,
     required String body,
   }) async {
     if (!_initialized) await initialize();
-    if (kIsWeb) return;
 
-    // Suppress identical alerts re-firing on every dashboard auto-refresh.
-    // Keyed by alert type (id) with a 5-minute quiet window so a borderline
-    // PF/MD that jitters between refreshes does not spam the tray; the
-    // alert reappears only after the window lapses. Different alert types
-    // always fire independently.
+    // De-duplication: suppress identical alerts for 5 minutes.
     final now = DateTime.now();
     if (_lastAlertKey == id.toString() &&
         _lastAlertAt != null &&
@@ -102,6 +103,11 @@ class NotificationService {
     }
     _lastAlertKey = '$id';
     _lastAlertAt = now;
+
+    if (kIsWeb) {
+      _showWebNotification(title, body);
+      return;
+    }
 
     if (defaultTargetPlatform == TargetPlatform.windows) {
       const windowsDetails = WindowsNotificationDetails();
@@ -192,6 +198,26 @@ class NotificationService {
     return s.isEmpty
         ? 'Meter "$meterName": '
         : 'Meter "$meterName" (Site: $s): ';
+  }
+
+  /// Browser Notification API for web — shows a native browser notification.
+  /// Falls back silently if permission denied or API unavailable.
+  void _showWebNotification(String title, String body) {
+    try {
+      // Request permission on first call.
+      if (!_webPermissionRequested) {
+        _webPermissionRequested = true;
+        web.Notification.requestPermission().toDart;
+      }
+      // Check current permission.
+      final permission = web.Notification.permission;
+      if (permission == 'granted') {
+        final options = web.NotificationOptions(body: body);
+        web.Notification(title, options);
+      }
+    } catch (_) {
+      // Browser Notification API not available or blocked — silently skip.
+    }
   }
 
   Future<void> showSyncCompleteAlert(int count) async {

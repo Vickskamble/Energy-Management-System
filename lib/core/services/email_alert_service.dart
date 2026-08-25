@@ -22,7 +22,14 @@ class EmailAlertService {
     String? site,
     String? meter,
   }) async {
-    if (!_supabaseReady() || _alertEmail == null) return false;
+    if (!_supabaseReady()) {
+      AppLogger.e('Email alert blocked: Supabase not ready (init=${SupabaseClientManager.isInitialized}, user=${SupabaseClientManager.client.auth.currentUser != null})');
+      return false;
+    }
+    if (_alertEmail == null) {
+      AppLogger.e('Email alert blocked: alertEmail not configured in Settings');
+      return false;
+    }
     try {
       final result = await SupabaseClientManager.client.functions
           .invoke(
@@ -51,7 +58,14 @@ class EmailAlertService {
     String? site,
     String? meter,
   }) async {
-    if (!_supabaseReady() || _alertEmail == null) return false;
+    if (!_supabaseReady()) {
+      AppLogger.e('Warning alert blocked: Supabase not ready');
+      return false;
+    }
+    if (_alertEmail == null) {
+      AppLogger.e('Warning alert blocked: alertEmail not configured');
+      return false;
+    }
     try {
       final result = await SupabaseClientManager.client.functions
           .invoke(
