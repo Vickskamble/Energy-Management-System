@@ -53,20 +53,22 @@ class EmailAlertService {
   }) async {
     if (!_supabaseReady() || _alertEmail == null) return false;
     try {
-      final uid = SupabaseClientManager.client.auth.currentUser!.id;
-      await SupabaseClientManager.client.from('alert_log').insert({
-        'user_id': uid,
-        'alert_type': type,
-        'severity': 'warning',
-        'site': site,
-        'meter': meter,
-        'title': title,
-        'message': message,
-        'emailed': false,
-      });
-      return true;
+      final result = await SupabaseClientManager.client.functions
+          .invoke(
+            'send-alert-email',
+            body: {
+              'type': type,
+              'severity': 'warning',
+              'title': title,
+              'message': message,
+              'site': ?site,
+              'meter': ?meter,
+            },
+          )
+          .timeout(const Duration(seconds: 15));
+      return result.data['success'] == true;
     } catch (e) {
-      AppLogger.e('Failed to log warning alert', e);
+      AppLogger.e('Failed to send warning email alert', e);
       return false;
     }
   }
