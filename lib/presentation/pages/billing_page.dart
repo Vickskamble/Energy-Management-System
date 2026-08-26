@@ -1,22 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/config/subscription_config.dart';
-import '../../core/network/supabase_client.dart';
+import '../../core/services/quotation_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
-import '../../data/repositories/meter_repository.dart';
 import 'razorpay_checkout_page.dart';
 
-/// Plan & Billing: current entitlement, meter add-ons, Razorpay checkout,
-/// and the referral program (referrer gets +1 month per referred client).
+/// Plan & Billing: 3-tier plan cards, hybrid payment (Razorpay + UTR),
+/// quotation PDF, referral program, and owner key.
 class BillingPage extends StatefulWidget {
   const BillingPage({super.key});
 
@@ -26,12 +24,12 @@ class BillingPage extends StatefulWidget {
 
 class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   Entitlement? _entitlement;
-  int _extraMeters = 0;
+  PlanTier _selectedTier = PlanTier.growth;
   PlanTerm _selectedTerm = PlanTerm.monthly;
+  int _extraDataPoints = 0;
   bool _loading = true;
   bool _busy = false;
   bool _paymentPending = false;
-  int _expectedExtraMeters = 0;
   String? _error;
   Timer? _pollTimer;
   Timer? _paymentPollTimer;
@@ -39,6 +37,13 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   bool _ownerBusy = false;
   String? _ownerError;
   DateTime? _ownerUntil;
+
+  // UTR state
+  bool _showUtrEntry = false;
+  final _utrCtrl = TextEditingController();
+  final _utrAmountCtrl = TextEditingController();
+  bool _utrBusy = false;
+  String? _utrResult;
 
   @override
   void initState() {
@@ -54,6 +59,8 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
     _pollTimer?.cancel();
     _paymentPollTimer?.cancel();
     _ownerKeyCtrl.dispose();
+    _utrCtrl.dispose();
+    _utrAmountCtrl.dispose();
     super.dispose();
   }
 
@@ -62,10 +69,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) _load(silent: true);
   }
 
-  /// Loads plan + meter entitlements. [silent] skips the full-screen spinner
-  /// so the 30s background poll never flickers the page.
   Future<void> _load({bool silent = false}) async {
-    final meterRepo = context.read<MeterRepository>();
     setState(() {
       if (!silent) {
         _loading = true;
@@ -73,9 +77,6 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       }
     });
     try {
-      // Re-confirm any add-on payment whose checkout page was closed before
-      // confirmation completed — payment-status flips the plan server-side
-      // even when the webhook never delivered.
       final pendingLink = await SubscriptionStore.getPendingCheckoutLink();
       if (pendingLink != null && pendingLink.isNotEmpty) {
         final paid = await SubscriptionStore.isPaymentDone(paymentLinkId: pendingLink);
@@ -85,71 +86,62 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
         }
       }
       final ent = await SubscriptionStore.getEntitlement(force: true);
-      final meters = await meterRepo.getAllMeters();
       if (!mounted) return;
       setState(() {
         _entitlement = ent;
-        _extraMeters = ent.isDemo
-            ? 0
-            : (meters.length - SubscriptionConfig.includedMeters > ent.extraMeters
-                ? meters.length - SubscriptionConfig.includedMeters
-                : ent.extraMeters);
         _loading = false;
+        // Restore current plan selection from entitlement
+        final tier = SubscriptionConfig.tierFromString(ent.planName);
+        if (tier != null) _selectedTier = tier;
+        final term = SubscriptionConfig.termFromString(ent.planTerm);
+        if (term != null) _selectedTerm = term;
+        _extraDataPoints = ent.extraDataPoints;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        if (!silent) {
-          _error = 'Could not load your plan. Check your connection and retry.';
-        }
+        if (!silent) _error = 'Could not load your plan. Check your connection and retry.';
       });
     }
   }
 
-  /// Price of the selected plan term for the current extra-meter count.
-  /// Monthly → per month; Yearly → per the annual total.
-  int get _selectedTotal => _selectedTerm == PlanTerm.yearly
-      ? SubscriptionConfig.yearlyTotal(_extraMeters)
-      : SubscriptionConfig.monthlyBasePrice +
-          _extraMeters * SubscriptionConfig.monthlyMeterPrice;
+  // ---------------------------------------------------------------------------
+  // Pricing helpers
+  // ---------------------------------------------------------------------------
 
-  int get _selectedBase => _selectedTerm == PlanTerm.yearly
-      ? SubscriptionConfig.yearlyBasePrice
-      : SubscriptionConfig.monthlyBasePrice;
+  int get _totalPrice =>
+      SubscriptionConfig.totalAmount(_selectedTier, _selectedTerm, _extraDataPoints);
 
-  int get _selectedMeterRate => _selectedTerm == PlanTerm.yearly
-      ? SubscriptionConfig.yearlyMeterPrice
-      : SubscriptionConfig.monthlyMeterPrice;
+  String get _termLabel => SubscriptionConfig.termLabel(_selectedTerm);
+  String get _periodLabel => _selectedTerm == PlanTerm.yearly
+      ? 'year'
+      : _selectedTerm == PlanTerm.quarterly
+          ? 'quarter'
+          : 'month';
+  int get _dpTotal =>
+      SubscriptionConfig.includedDataPoints(_selectedTier) + _extraDataPoints;
 
-  String get _termLabel => _selectedTerm == PlanTerm.yearly ? '/yr' : '/mo';
+  // ---------------------------------------------------------------------------
+  // Razorpay checkout
+  // ---------------------------------------------------------------------------
 
-  /// Extra meters to add for active subscribers (top-up, ₹99 each).
-  int get _deltaMeters =>
-      _entitlement == null ? 0 : _extraMeters - _entitlement!.extraMeters;
-
-  Future<void> _subscribe() async {
+  Future<void> _subscribeRazorpay() async {
     setState(() => _busy = true);
     try {
       final result = await SubscriptionStore.startCheckout(
-        extraMeters: _extraMeters,
+        planTier: _selectedTier,
+        extraDataPoints: _extraDataPoints,
         planTerm: _selectedTerm,
       );
       if (!mounted) return;
 
       if (result.isNoop) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Your plan is already up to date.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        _showStatus('Your plan is already up to date.', Colors.green);
         return;
       }
 
       bool paidInApp = false;
-      // Remember the add-on link so a closed/refreshed checkout never loses
-      // the payment: payment-status re-checks Razorpay directly on next load.
       if (result.isAddon) {
         await SubscriptionStore.setPendingCheckoutLink(result.paymentLinkId);
       }
@@ -164,21 +156,14 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
                   ? '${SubscriptionConfig.paymentDoneUrl}?'
                   : null,
               fallbackUrl: result.paymentUrl,
-              amountLabel: 'Monthly subscription',
+              amountLabel: '$planNameLabel subscription',
             ),
           ),
         );
         paidInApp = attempt?.status == PaymentAttemptStatus.completed;
         if (paidInApp && mounted) {
-          _showStatus(
-            'Payment received — confirming with the bank…',
-            Colors.green,
-          );
-          // Hit payment-status right now so the server flips the DB row
-          // immediately — the 3-s poll below is a safety net only.
-          final confirmId = result.isAddon
-              ? result.paymentLinkId
-              : result.subscriptionId;
+          _showStatus('Payment received — confirming with the bank…', Colors.green);
+          final confirmId = result.isAddon ? result.paymentLinkId : result.subscriptionId;
           if (confirmId.isNotEmpty) {
             final confirmed = await SubscriptionStore.isPaymentDone(
               paymentLinkId: result.isAddon ? confirmId : null,
@@ -191,9 +176,6 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
           }
           _load();
         }
-        // In-app checkout starts the same instant-confirmation polling as
-        // the browser path: the direct Razorpay status check + webhook
-        // update flip the plan within seconds — no manual refresh needed.
         _startPaymentPolling(result);
       } else {
         final paymentUri = result.isAddon
@@ -213,8 +195,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       SubscriptionStore.invalidateCache();
       if (mounted && !paidInApp) {
         _showStatus(
-          'Payment page opened — your plan updates automatically '
-          'after payment.',
+          'Payment page opened — your plan updates automatically after payment.',
           Colors.green,
         );
         _load();
@@ -227,8 +208,139 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
     }
   }
 
-  /// Replace any visible snackbar instead of stacking a new one (payment
-  /// flows previously queued up to 3 green toasts at once).
+  String get planNameLabel => SubscriptionConfig.planName(_selectedTier);
+
+  Uri _webCheckoutUri(CheckoutResult result) {
+    final page = Uri.base.resolve('checkout.html');
+    return page.replace(
+      queryParameters: {
+        'key': dotenv.env['RAZORPAY_KEY_ID'] ?? '',
+        'subscription_id': result.subscriptionId,
+        'description': '$planNameLabel subscription — ₹${result.amount}/$_periodLabel',
+        'done_url': SubscriptionConfig.paymentDoneUrl,
+        'cancel_url': SubscriptionConfig.paymentDoneUrl,
+      },
+    );
+  }
+
+  void _startPaymentPolling(CheckoutResult result) {
+    _paymentPollTimer?.cancel();
+    if (mounted) setState(() => _paymentPending = true);
+    var ticks = 0;
+    _paymentPollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      ticks++;
+      if (!mounted) return;
+      Entitlement? ent;
+      try {
+        ent = await SubscriptionStore.getEntitlement(force: true);
+      } catch (_) {
+        ent = null;
+      }
+      if (!mounted) return;
+      final paid = ent != null && ent.subActive;
+      if (paid) {
+        _paymentPollTimer?.cancel();
+        setState(() => _paymentPending = false);
+        _showStatus('Payment received — your plan has been updated!', Colors.green);
+        _load();
+        return;
+      }
+      if (ticks >= 240) {
+        _paymentPollTimer?.cancel();
+        if (!mounted) return;
+        setState(() => _paymentPending = false);
+        _showStatus(
+          'Payment pending — your plan updates automatically once received.',
+          Colors.orange,
+        );
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // UTR (Bank Transfer) flow
+  // ---------------------------------------------------------------------------
+
+  Future<void> _submitUTR() async {
+    final utr = _utrCtrl.text.trim();
+    final amountText = _utrAmountCtrl.text.trim();
+    if (utr.isEmpty) {
+      setState(() => _utrResult = 'Enter the UTR number from your bank.');
+      return;
+    }
+    if (amountText.isEmpty) {
+      setState(() => _utrResult = 'Enter the amount you paid.');
+      return;
+    }
+    final amountPaid = int.tryParse(amountText);
+    if (amountPaid == null || amountPaid <= 0) {
+      setState(() => _utrResult = 'Enter a valid amount (e.g. 2500).');
+      return;
+    }
+    setState(() {
+      _utrBusy = true;
+      _utrResult = null;
+    });
+    try {
+      final res = await SubscriptionStore.submitUTR(
+        utrNumber: utr,
+        amountPaid: amountPaid,
+        planTier: _selectedTier,
+        planTerm: _selectedTerm,
+        extraDataPoints: _extraDataPoints,
+        bankName: BankDetails.bankName,
+      );
+      if (!mounted) return;
+      if (res['verified'] == true) {
+        setState(() => _utrResult = '✅ Payment verified! Your plan is now active.');
+        _load();
+      } else if (res['error'] == 'DUPLICATE_UTR') {
+        setState(() => _utrResult = '⚠ This UTR has already been used.');
+      } else if (res['error'] == 'AMOUNT_MISMATCH') {
+        setState(
+          () => _utrResult = '⚠ Amount mismatch — expected ₹${res['expected']}, '
+              'got ₹${res['received']}. Please check and re-enter.',
+        );
+      } else {
+        setState(() => _utrResult = 'UTR submitted — pending verification.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _utrResult = 'Error: $e');
+    } finally {
+      if (mounted) setState(() => _utrBusy = false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Quotation PDF
+  // ---------------------------------------------------------------------------
+
+  Future<void> _shareQuotation() async {
+    final number = QuotationService.generateQuotationNumber();
+    await QuotationService.share(
+      quotationNumber: number,
+      planTier: _selectedTier,
+      planTerm: _selectedTerm,
+      extraDataPoints: _extraDataPoints,
+    );
+  }
+
+  Future<void> _openBankPaymentPage() async {
+    final url = SubscriptionConfig.bankPaymentUrl;
+    final opened = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && mounted) {
+      _showStatus('Could not open bank payment page.', Colors.orange);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Misc
+  // ---------------------------------------------------------------------------
+
   void _showStatus(String text, Color background) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -244,170 +356,14 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
     _showStatus('Referral code copied!', Colors.green);
   }
 
-  /// In-app checkout page for web subscriptions: Razorpay Checkout JS hosted
-  /// on our domain renders the desktop layout and redirects back to
-  /// [SubscriptionConfig.paymentDoneUrl] after payment.
-  Uri _webCheckoutUri(CheckoutResult result) {
-    final page = Uri.base.resolve('checkout.html');
-    return page.replace(
-      queryParameters: {
-        'key': dotenv.env['RAZORPAY_KEY_ID'] ?? '',
-        'subscription_id': result.subscriptionId,
-        'description': 'Monthly subscription — ₹${result.amount}/mo',
-        'done_url': SubscriptionConfig.paymentDoneUrl,
-        'cancel_url': SubscriptionConfig.paymentDoneUrl,
-      },
-    );
-  }
-
-  /// Watch for the payment to complete. Two sources:
-  ///  1. Razorpay direct (via the payment-status Edge Function) — confirms
-  ///     the payment the moment it happens, no webhook wait.
-  ///  2. The entitlement flip — the webhook updates the plan; once
-  ///     [SubscriptionStore.getEntitlement] reflects it the UI refreshes.
-  /// Runs every 3s for up to 12 minutes; the banner stays visible meanwhile.
-  void _startPaymentPolling(CheckoutResult result) {
-    _paymentPollTimer?.cancel();
-    if (mounted) {
-      setState(() {
-        _paymentPending = true;
-        _expectedExtraMeters = result.extraMeters;
-      });
-    }
-    final subscriptionId = result.subscriptionId;
-    final paymentLinkId = result.paymentLinkId;
-    var ticks = 0;
-    var confirmed = false;
-    _paymentPollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      ticks++;
-      if (!mounted) return;
-      Entitlement? ent;
-      try {
-        ent = await SubscriptionStore.getEntitlement(force: true);
-      } catch (_) {
-        ent = null;
-      }
-      if (!mounted) return;
-      final paid = ent != null &&
-          (result.isAddon
-              ? ent.extraMeters >= _expectedExtraMeters
-              : ent.subActive || ent.creditActive);
-      if (paid) {
-        _paymentPollTimer?.cancel();
-        setState(() => _paymentPending = false);
-        _showStatus(
-          'Payment received — your plan has been updated!',
-          Colors.green,
-        );
-        _load();
-        return;
-      }
-      if (!confirmed) {
-        var rzpPaid = false;
-        try {
-          final res = await SupabaseClientManager.client.functions.invoke(
-            'payment-status',
-            body: subscriptionId.isNotEmpty
-                ? {'subscription_id': subscriptionId}
-                : {'payment_link_id': paymentLinkId},
-          );
-          rzpPaid = (res.data as Map?)?['paid'] == true;
-        } catch (_) {
-          rzpPaid = false;
-        }
-        if (rzpPaid) {
-          confirmed = true;
-          if (!mounted) return;
-          _showStatus(
-            'Payment confirmed — your plan is activating (please wait a moment)…',
-            Colors.green,
-          );
-          _load();
-        }
-      } else if (ticks % 6 == 0) {
-        // Confirmed already — keep nudging the entitlement until the
-        // webhook flips the subscription.
-        _load();
-      }
-      if (ticks >= 240) {
-        _paymentPollTimer?.cancel();
-        if (!mounted) return;
-        setState(() => _paymentPending = false);
-        _showStatus(
-          'Payment confirmation pending — your plan updates automatically '
-          'once the payment is received.',
-          Colors.orange,
-        );
-      }
-    });
-  }
-
   Future<void> _shareReferral() async {
     final code = _entitlement?.referralCode ?? '';
     if (code.isEmpty) return;
     await SharePlus.instance.share(
       ShareParams(
         text:
-            'Try PowerEMS — free for 60 days (1 meter). Use my referral code '
-            '$code to get us both going. Pay only ₹2,500/mo after trial!',
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Plan & Billing')),
-body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _buildError()
-              : Column(
-                  children: [
-                    if (_paymentPending) _buildPaymentPendingBanner(),
-                    Expanded(child: _buildContent()),
-                  ],
-                ),
-  );
-  }
-
-  Widget _buildPaymentPendingBanner() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page, vertical: 10),
-      color: AppColors.kpiSavings.withValues(alpha: 0.12),
-      child: Row(
-        children: [
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Complete the payment in the payment window — your plan will update here automatically',
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildError() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.dim(context)),
-            const SizedBox(height: 12),
-            Text(_error!, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            AppButton(label: 'Retry', onPressed: _load),
-          ],
-        ),
+            'Try PowerEMS — free for 30 days! Use my referral code '
+            '$code to get us both +1 free month.',
       ),
     );
   }
@@ -437,6 +393,64 @@ body: _loading
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Plan & Billing')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _buildError()
+              : Column(
+                  children: [
+                    if (_paymentPending) _buildPaymentPendingBanner(),
+                    Expanded(child: _buildContent()),
+                  ],
+                ),
+    );
+  }
+
+  Widget _buildPaymentPendingBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page, vertical: 10),
+      color: AppColors.kpiSavings.withValues(alpha: 0.12),
+      child: const Row(
+        children: [
+          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Payment in progress — your plan updates automatically',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.dim(context)),
+            const SizedBox(height: 12),
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            AppButton(label: 'Retry', onPressed: _load),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildContent() {
     final ent = _entitlement!;
     return SingleChildScrollView(
@@ -450,10 +464,16 @@ body: _loading
               if (ent.readOnly) _buildReadOnlyBanner(),
               if (ent.trialActive && !ent.subActive) _buildTrialCard(ent),
               if (ent.subActive) _buildActiveCard(ent),
-              if (!ent.subActive && ent.freeMonthsCredit > 0)
-                _buildCreditCard(ent),
+              if (!ent.subActive && ent.freeMonthsCredit > 0) _buildCreditCard(ent),
               const SizedBox(height: AppSpacing.md),
-              _buildPricingCard(ent),
+              _buildTermToggle(),
+              const SizedBox(height: AppSpacing.sm),
+              ...PlanTier.values.map((tier) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildPlanCard(tier, ent),
+                  )),
+              const SizedBox(height: AppSpacing.md),
+              _buildPaymentSection(ent),
               const SizedBox(height: AppSpacing.md),
               _buildReferralCard(ent),
               const SizedBox(height: AppSpacing.md),
@@ -471,6 +491,10 @@ body: _loading
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Status cards
+  // ---------------------------------------------------------------------------
+
   Widget _buildReadOnlyBanner() {
     return AppCard(
       color: AppColors.danger.withValues(alpha: 0.08),
@@ -480,8 +504,8 @@ body: _loading
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Your free trial has ended. You can still view your data, but '
-              'new readings and meters are locked. Subscribe to continue.',
+              'Your free trial has ended. New readings and meters are locked. '
+              'Subscribe to continue.',
               style: TextStyle(fontSize: 13),
             ),
           ),
@@ -499,8 +523,7 @@ body: _loading
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 44, height: 44,
             decoration: BoxDecoration(
               color: AppColors.info.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
@@ -518,13 +541,8 @@ body: _loading
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  end == null
-                      ? '1 meter included'
-                      : '1 meter included • ends ${DateFormat('d MMM yyyy').format(end)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.dim(context),
-                  ),
+                  '1 data point included • ends ${end == null ? '—' : DateFormat('d MMM yyyy').format(end)}',
+                  style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
                 ),
               ],
             ),
@@ -536,13 +554,14 @@ body: _loading
 
   Widget _buildActiveCard(Entitlement ent) {
     final end = ent.currentPeriodEnd ?? ent.accessEndsAt;
+    final tier = SubscriptionConfig.tierFromString(ent.planName);
+    final tierName = tier != null ? SubscriptionConfig.planName(tier) : ent.planName;
     return AppCard(
       color: AppColors.success.withValues(alpha: 0.08),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 44, height: 44,
             decoration: BoxDecoration(
               color: AppColors.success.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
@@ -554,13 +573,13 @@ body: _loading
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Active subscription',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                Text(
+                  'Active — $tierName plan',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '₹${ent.planTerm == 'yearly' ? SubscriptionConfig.yearlyBasePrice : SubscriptionConfig.monthlyBasePrice}/${ent.planTerm == 'yearly' ? 'year' : 'month'} • ${ent.extraMeters} extra meter(s) • '
+                  '${ent.dataPointsAllowed} data point(s) • ${ent.extraDataPoints > 0 ? '${ent.extraDataPoints} extra • ' : ''}'
                   '${end == null ? 'next billing unknown' : 'next billing ${DateFormat('d MMM yyyy').format(end)}'}',
                   style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
                 ),
@@ -578,8 +597,7 @@ body: _loading
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 44, height: 44,
             decoration: BoxDecoration(
               color: AppColors.warning.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
@@ -610,10 +628,15 @@ body: _loading
     );
   }
 
-  Widget _buildPlanTermToggle() {
+  // ---------------------------------------------------------------------------
+  // Term toggle
+  // ---------------------------------------------------------------------------
+
+  Widget _buildTermToggle() {
     return SegmentedButton<PlanTerm>(
       segments: const [
         ButtonSegment(value: PlanTerm.monthly, label: Text('Monthly')),
+        ButtonSegment(value: PlanTerm.quarterly, label: Text('Quarterly')),
         ButtonSegment(value: PlanTerm.yearly, label: Text('Yearly')),
       ],
       selected: {_selectedTerm},
@@ -622,165 +645,324 @@ body: _loading
     );
   }
 
-  Widget _buildPricingCard(Entitlement ent) {
+  // ---------------------------------------------------------------------------
+  // Plan cards (Starter / Growth / Pro)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildPlanCard(PlanTier tier, Entitlement ent) {
+    final plan = SubscriptionConfig.plans[tier]!;
+    final isSelected = _selectedTier == tier;
+    final isActivePlan = ent.subActive &&
+        SubscriptionConfig.tierFromString(ent.planName) == tier;
+    final basePrice = SubscriptionConfig.baseAmount(tier, _selectedTerm);
+    final dpRate = SubscriptionConfig.extraDPRate(tier, _selectedTerm);
+    final total = isSelected
+        ? SubscriptionConfig.totalAmount(tier, _selectedTerm, _extraDataPoints)
+        : basePrice;
+
+    return GestureDetector(
+      onTap: () => setState(() {
+        _selectedTier = tier;
+        if (!ent.subActive) _extraDataPoints = 0;
+      }),
+      child: AppCard(
+        color: isSelected
+            ? AppColors.primary.withValues(alpha: 0.06)
+            : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Plan name + radio
+            Row(
+              children: [
+                Icon(
+                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                  color: isSelected ? AppColors.primary : AppColors.dim(context),
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  plan.name,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isSelected ? AppColors.primary : null,
+                  ),
+                ),
+                if (isActivePlan) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'ACTIVE',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                Text(
+                  '₹$basePrice$_termLabel',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: isSelected ? AppColors.primary : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Data points
+            Row(
+              children: [
+                Icon(Icons.hub_outlined, size: 16, color: AppColors.dim(context)),
+                const SizedBox(width: 6),
+                Text(
+                  '${plan.includedDataPoints} data points included',
+                  style: TextStyle(fontSize: 13, color: AppColors.dim(context)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            // Extra DP pricing
+            Row(
+              children: [
+                Icon(Icons.add_circle_outline, size: 16, color: AppColors.dim(context)),
+                const SizedBox(width: 6),
+                Text(
+                  'Extra: ₹$dpRate$_termLabel per data point',
+                  style: TextStyle(fontSize: 13, color: AppColors.dim(context)),
+                ),
+              ],
+            ),
+            // Extra DP counter (only on selected plan for non-active users)
+            if (isSelected && !ent.subActive) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text('Extra data points', style: TextStyle(fontSize: 13, color: AppColors.dim(context))),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: _extraDataPoints <= 0 || _busy
+                        ? null
+                        : () => setState(() => _extraDataPoints--),
+                  ),
+                  Text(
+                    '$_extraDataPoints',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: _extraDataPoints >= SubscriptionConfig.maxExtraDataPoints || _busy
+                        ? null
+                        : () => setState(() => _extraDataPoints++),
+                  ),
+                ],
+              ),
+              if (_extraDataPoints > 0)
+                Text(
+                  '+ ₹${_extraDataPoints * dpRate} extra = ₹$total total',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.dim(context),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Payment section (Razorpay + Bank Transfer)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildPaymentSection(Entitlement ent) {
+    final isActive = ent.subActive;
+    final hasExtra = isActive && _extraDataPoints > ent.extraDataPoints;
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Your plan',
+            'Payment',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          _buildPlanTermToggle(),
-          const SizedBox(height: 12),
-          _priceRow(
-            'Base plan (includes ${SubscriptionConfig.includedMeters} meters)',
-            '₹$_selectedBase$_termLabel',
-          ),
-          const Divider(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Extra meters',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      '₹$_selectedMeterRate/mo each',
-                      style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.remove_circle_outline),
-                onPressed: ent.isDemo || _extraMeters <= 0 || _busy
-                    ? null
-                    : () => setState(() => _extraMeters--),
-              ),
-              Text(
-                '$_extraMeters',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline),
-                onPressed: _busy || _extraMeters >= 20
-                    ? null
-                    : () => setState(() => _extraMeters++),
-              ),
-            ],
-          ),
-          const Divider(height: 24),
-          if (_selectedTerm == PlanTerm.yearly) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.savings_outlined, color: AppColors.success, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'You save ₹${SubscriptionConfig.yearlySavings(0)}/yr '
-                      '(${SubscriptionConfig.yearlySavingsPct(0).round()}% off) '
-                      'vs paying monthly.',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          _priceRow(
-            'Total per ${_selectedTerm == PlanTerm.yearly ? 'year' : 'month'}',
-            '₹$_selectedTotal',
-            emphasized: true,
           ),
           const SizedBox(height: 4),
           Text(
-            'Base plan includes ${SubscriptionConfig.includedMeters} meters. '
-            'Adding $_extraMeters extra → '
-            '${SubscriptionConfig.includedMeters + _extraMeters} total meters allowed.',
-            style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
+            'Total: ₹$_totalPrice $_periodLabel for $_dpTotal data point(s)',
+            style: TextStyle(fontSize: 13, color: AppColors.dim(context)),
           ),
           const SizedBox(height: 16),
-          if (ent.subActive && _extraMeters > ent.extraMeters) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
- child: Text(
-                 'You are subscribed — extra meters cost ₹$_selectedMeterRate/meter as a '
-                 'one-time top-up. Your ₹$_selectedBase base plan is NOT charged again.',
-                style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
-              ),
-            ),
-const SizedBox(height: 12),
-          ],
+
+          // Razorpay button
           AppButton(
-            label: ent.subActive
-                ? _extraMeters == ent.extraMeters
-                    ? 'No changes — you already pay for $_extraMeters'
-                        ' extra meter(s)'
-                    : 'Add $_deltaMeters extra meter'
-                        '${_deltaMeters == 1 ? '' : 's'} — '
-                        'pay ₹${_deltaMeters * _selectedMeterRate}'
-                        ' one-time'
-                : _extraMeters == 0
-                    ? 'Subscribe — ₹$_selectedBase$_termLabel'
-                    : 'Subscribe — ₹$_selectedTotal$_termLabel',
-            onPressed:
-                _busy || (ent.subActive && _extraMeters == ent.extraMeters)
-                    ? null
-                    : _subscribe,
+            label: isActive
+                ? hasExtra
+                    ? 'Pay ₹${_totalPrice - SubscriptionConfig.baseAmount(ent.subActive ? SubscriptionConfig.tierFromString(ent.planName)! : _selectedTier, _selectedTerm)} for $_extraDataPoints extra'
+                    : 'No payment needed — you are on $planNameLabel'
+                : 'Pay ₹$_totalPrice via Razorpay',
+            onPressed: _busy || (isActive && !hasExtra) ? null : _subscribeRazorpay,
             loading: _busy,
             expanded: true,
+            icon: Icons.payment_rounded,
+          ),
+          const SizedBox(height: 12),
+
+          // Divider
+          Row(
+            children: [
+              const Expanded(child: Divider()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'OR',
+                  style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
+                ),
+              ),
+              const Expanded(child: Divider()),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Bank Transfer button
+          AppButton(
+            label: 'Bank Transfer (NEFT / RTGS)',
+            onPressed: _busy ? null : _openBankPaymentPage,
+            expanded: true,
+            color: AppColors.info,
+            icon: Icons.account_balance_rounded,
           ),
           const SizedBox(height: 8),
           Text(
-            'Powered by Razorpay — UPI, cards & netbanking. 60-day free trial '
-            'on every new account.',
+            'Pay via bank transfer, then enter your UTR below.',
             style: TextStyle(fontSize: 11, color: AppColors.dim(context)),
           ),
+          const SizedBox(height: 12),
+
+          // UTR entry
+          if (_showUtrEntry) ...[
+            const Divider(height: 24),
+            const Text(
+              'UTR Payment Entry',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            // Bank details display
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _bankRow('Account Name', BankDetails.accountName),
+                  _bankRow('Account No.', BankDetails.accountNumber),
+                  _bankRow('IFSC', BankDetails.ifsc),
+                  _bankRow('Bank', BankDetails.bankName),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _utrCtrl,
+              decoration: InputDecoration(
+                labelText: 'UTR Number',
+                hintText: 'e.g. 298765432101',
+                isDense: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              keyboardType: TextInputType.text,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _utrAmountCtrl,
+              decoration: InputDecoration(
+                labelText: 'Amount Paid (₹)',
+                hintText: 'e.g. 2500',
+                isDense: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            AppButton(
+              label: _utrBusy ? 'Verifying…' : 'Submit UTR',
+              onPressed: _utrBusy ? null : _submitUTR,
+              loading: _utrBusy,
+              expanded: true,
+            ),
+            if (_utrResult != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _utrResult!,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _utrResult!.startsWith('✅')
+                      ? AppColors.success
+                      : _utrResult!.startsWith('⚠')
+                          ? AppColors.warning
+                          : AppColors.dim(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+          ],
+
+          // Show/hide UTR entry
+          TextButton.icon(
+            onPressed: () => setState(() => _showUtrEntry = !_showUtrEntry),
+            icon: Icon(
+              _showUtrEntry ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+              size: 18,
+            ),
+            label: Text(_showUtrEntry ? 'Hide UTR entry' : 'Paid via bank transfer? Enter UTR'),
+          ),
+
+          // Quotation
+          if (!isActive) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _shareQuotation,
+              icon: const Icon(Icons.description_outlined, size: 18),
+              label: const Text('Download / share quotation PDF'),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _priceRow(String label, String value, {bool emphasized = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: emphasized ? 14 : 13,
-            fontWeight: emphasized ? FontWeight.w700 : FontWeight.w400,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: emphasized ? 16 : 13,
-            fontWeight: FontWeight.w700,
-            color: emphasized
-                ? AppColors.primary
-                : Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-      ],
+  Widget _bankRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, color: AppColors.dim(context))),
+          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        ],
+      ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Referral card
+  // ---------------------------------------------------------------------------
 
   Widget _buildReferralCard(Entitlement ent) {
     final code = ent.referralCode;
@@ -801,7 +983,7 @@ const SizedBox(height: 12),
           const SizedBox(height: 8),
           Text(
             'Every client who signs up with your code and subscribes gives '
-            'you +1 free month. No limit on referrals.',
+            'you +1 free month. No limit.',
             style: TextStyle(fontSize: 13, color: AppColors.dim(context)),
           ),
           const SizedBox(height: 16),
@@ -809,16 +991,11 @@ const SizedBox(height: 12),
             children: [
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                    ),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                   ),
                   child: Text(
                     code.isEmpty ? '—' : code,
@@ -851,6 +1028,10 @@ const SizedBox(height: 12),
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Owner key card
+  // ---------------------------------------------------------------------------
+
   Widget _buildOwnerKeyCard() {
     final ent = _entitlement;
     final activeUntil = ent?.ownerAccessUntil;
@@ -871,7 +1052,7 @@ const SizedBox(height: 12),
           const SizedBox(height: 8),
           Text(
             'Enter the owner key to unlock 6 months of full access — '
-            'unlimited meters, no read-only lock.',
+            'unlimited data points, no read-only lock.',
             style: TextStyle(fontSize: 13, color: AppColors.dim(context)),
           ),
           if (activeUntil != null && activeUntil.isAfter(DateTime.now())) ...[
@@ -884,13 +1065,11 @@ const SizedBox(height: 12),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.verified_rounded,
-                      size: 18, color: AppColors.success),
+                  const Icon(Icons.verified_rounded, size: 18, color: AppColors.success),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Full access active until '
-                      '${DateFormat('d MMM yyyy').format(activeUntil)}.',
+                      'Full access active until ${DateFormat('d MMM yyyy').format(activeUntil)}.',
                       style: const TextStyle(fontSize: 13),
                     ),
                   ),
@@ -905,19 +1084,14 @@ const SizedBox(height: 12),
                 'Key accepted — full access granted until '
                 '${DateFormat('d MMM yyyy').format(_ownerUntil!)}.',
                 style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.success,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 13, color: AppColors.success, fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           if (_ownerError != null)
             Padding(
               padding: const EdgeInsets.only(top: 10),
-              child: Text(
-                _ownerError!,
-                style: const TextStyle(fontSize: 13, color: AppColors.danger),
-              ),
+              child: Text(_ownerError!, style: const TextStyle(fontSize: 13, color: AppColors.danger)),
             ),
           const SizedBox(height: 14),
           Row(
@@ -930,9 +1104,7 @@ const SizedBox(height: 12),
                   decoration: InputDecoration(
                     hintText: 'Enter owner key',
                     isDense: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onSubmitted: (_) => _redeemOwnerKey(),
                 ),

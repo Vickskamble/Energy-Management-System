@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PowerEMS — Bank Transfer Payment</title>
+  <style>
+    :root { --blue: #1e3a5f; --green: #16a34a; --grey: #6b7280; --light: #f9fafb; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--light); color: #111; line-height: 1.5;
+      display: flex; justify-content: center; padding: 32px 16px;
+    }
+    .container { max-width: 560px; width: 100%; }
+    .header { text-align: center; margin-bottom: 32px; }
+    .header h1 { font-size: 22px; color: var(--blue); }
+    .header p { font-size: 14px; color: var(--grey); margin-top: 4px; }
+    .card {
+      background: #fff; border-radius: 16px; padding: 24px; margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .card h2 { font-size: 16px; margin-bottom: 16px; color: var(--blue); }
+    .bank-row {
+      display: flex; justify-content: space-between; padding: 8px 0;
+      border-bottom: 1px solid #f3f4f6; font-size: 14px;
+    }
+    .bank-row:last-child { border-bottom: none; }
+    .bank-label { color: var(--grey); }
+    .bank-value { font-weight: 600; }
+    .copy-btn {
+      background: none; border: 1px solid #d1d5db; border-radius: 8px;
+      padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--blue);
+    }
+    .copy-btn:hover { background: #eef2ff; }
+    .copy-btn.copied { background: #dcfce7; color: var(--green); border-color: var(--green); }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #374151; }
+    .form-group input {
+      width: 100%; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 12px;
+      font-size: 15px; outline: none; transition: border 0.2s;
+    }
+    .form-group input:focus { border-color: var(--blue); }
+    .btn {
+      width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 15px;
+      font-weight: 700; cursor: pointer; transition: background 0.2s;
+    }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover { background: #152d4d; }
+    .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
+    .result { margin-top: 16px; padding: 14px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+    .result.ok { background: #dcfce7; color: var(--green); }
+    .result.err { background: #fef2f2; color: #dc2626; }
+    .result.wait { background: #eff6ff; color: #2563eb; }
+    .back { display: block; text-align: center; margin-top: 16px; color: var(--blue); font-size: 13px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>PowerEMS — Bank Transfer</h1>
+    <p>Transfer the amount below via NEFT/RTGS, then enter your UTR to activate your plan.</p>
+  </div>
+
+  <div class="card">
+    <h2>Bank Account Details</h2>
+    <div class="bank-row">
+      <span class="bank-label">Account Name</span>
+      <span class="bank-value" id="accName">Brilliants</span>
+      <button class="copy-btn" onclick="copy('accName', this)">Copy</button>
+    </div>
+    <div class="bank-row">
+      <span class="bank-label">Account Number</span>
+      <span class="bank-value" id="accNo">09288100004458</span>
+      <button class="copy-btn" onclick="copy('accNo', this)">Copy</button>
+    </div>
+    <div class="bank-row">
+      <span class="bank-label">IFSC</span>
+      <span class="bank-value" id="ifsc">BARB0HINGAN</span>
+      <button class="copy-btn" onclick="copy('ifsc', this)">Copy</button>
+    </div>
+    <div class="bank-row">
+      <span class="bank-label">Bank</span>
+      <span class="bank-value">Bank of Baroda</span>
+    </div>
+    <div class="bank-row">
+      <span class="bank-label">Amount to Pay</span>
+      <span class="bank-value" id="amountDisplay" style="font-size:18px;color:var(--blue);">—</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Enter Your UTR</h2>
+    <p style="font-size:13px;color:var(--grey);margin-bottom:16px;">
+      After transferring, enter the 12-digit UTR number from your bank and the amount you paid.
+    </p>
+    <div class="form-group">
+      <label for="utr">UTR Number</label>
+      <input id="utr" type="text" placeholder="e.g. 298765432101" maxlength="27" />
+    </div>
+    <div class="form-group">
+      <label for="amount">Amount Paid (₹)</label>
+      <input id="amount" type="number" placeholder="e.g. 2500" min="1" />
+    </div>
+    <div class="form-group">
+      <label for="bankName">Your Bank Name (optional)</label>
+      <input id="bankName" type="text" placeholder="e.g. SBI, HDFC" />
+    </div>
+    <button class="btn btn-primary" id="submitBtn" onclick="submitUTR()">Submit UTR</button>
+    <div id="resultBox" style="display:none;" class="result"></div>
+  </div>
+
+  <a class="back" href="https://app.brilliants.in" target="_blank">← Back to PowerEMS</a>
+</div>
+
+<script>
+// Pricing — must match subscription_config.dart exactly
+const PLANS = {
+  starter:  { monthly: 999,  quarterly: 2697, yearly: 9990,  extraMonthly: 299, extraQuarterly: 249, extraYearly: 199 },
+  growth:   { monthly: 2500, quarterly: 6750, yearly: 25500, extraMonthly: 499, extraQuarterly: 399, extraYearly: 299 },
+  pro:      { monthly: 5000, quarterly: 13500, yearly: 50000, extraMonthly: 799, extraQuarterly: 649, extraYearly: 499 }
+};
+
+const params = new URLSearchParams(window.location.search);
+const planName = params.get('plan') || 'growth';
+const planTerm = params.get('term') || 'monthly';
+const extraDP = parseInt(params.get('extra') || '0', 10);
+
+function computeTotal() {
+  const p = PLANS[planName] || PLANS.growth;
+  let base = planTerm === 'yearly' ? p.yearly : planTerm === 'quarterly' ? p.quarterly : p.monthly;
+  let rate = planTerm === 'yearly' ? p.extraYearly : planTerm === 'quarterly' ? p.extraQuarterly : p.extraMonthly;
+  return base + extraDP * rate;
+}
+
+const total = computeTotal();
+document.getElementById('amountDisplay').textContent = '₹' + total.toLocaleString('en-IN');
+document.getElementById('amount').value = total;
+
+function copy(id, btn) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+async function submitUTR() {
+  const utr = document.getElementById('utr').value.trim();
+  const amount = parseInt(document.getElementById('amount').value, 10);
+  const bankName = document.getElementById('bankName').value.trim();
+  const resultBox = document.getElementById('resultBox');
+  const btn = document.getElementById('submitBtn');
+
+  if (!utr) { showResult('Enter the UTR number from your bank.', 'err'); return; }
+  if (!amount || amount <= 0) { showResult('Enter a valid amount.', 'err'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Verifying…';
+  resultBox.style.display = 'none';
+
+  try {
+    // Note: This web page is standalone — for a real implementation, call the
+    // verify-utr Edge Function from the Flutter app. This page is a helper
+    // that shows bank details and lets users note the UTR to enter in-app.
+    showResult(
+      'UTR recorded. Please open the PowerEMS app and enter this UTR in Plan & Billing → Bank Transfer → Enter UTR to activate your plan.',
+      'wait'
+    );
+  } catch (e) {
+    showResult('Error: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit UTR';
+  }
+}
+
+function showResult(text, cls) {
+  const box = document.getElementById('resultBox');
+  box.textContent = text;
+  box.className = 'result ' + cls;
+  box.style.display = 'block';
+}
+</script>
+</body>
+</html>

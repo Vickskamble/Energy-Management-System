@@ -4,61 +4,168 @@ import '../error/exceptions.dart';
 import '../network/supabase_client.dart';
 import '../utils/app_logger.dart';
 
-/// Billing cadence for a subscription.
-enum PlanTerm { monthly, yearly }
+/// Plan tier — controls included data points, features, and pricing.
+enum PlanTier { starter, growth, pro }
 
-/// SaaS pricing (mirrors supabase/migrations/20260812_subscriptions.sql and
-/// the subscription-checkout Edge Function).
+/// Billing cadence for a subscription.
+enum PlanTerm { monthly, quarterly, yearly }
+
+/// Bank details for NEFT/RTGS payment.
+class BankDetails {
+  BankDetails._();
+
+  static const String accountName = 'Brilliants';
+  static const String accountNumber = '09288100004458';
+  static const String ifsc = 'BARB0HINGAN';
+  static const String bankName = 'Bank of Baroda';
+}
+
+/// 3-tier SaaS pricing — mirrors supabase migrations and Edge Functions.
 class SubscriptionConfig {
   SubscriptionConfig._();
 
-  /// Meters included in both the monthly and yearly base plans.
-  static const int includedMeters = 5;
+  // ---- Trial ----
+  /// Free-tier trial length (30 days for all plans).
+  static const int trialDays = 30;
 
-  // ---- Monthly plan ----
-  /// Monthly base price (covers 5 meters).
-  static const int monthlyBasePrice = 2500;
-
-  /// Extra meter on the monthly plan, per month.
-  static const int monthlyMeterPrice = 499;
-
-  // ---- Yearly plan ----
-  /// Yearly base price (covers 5 meters).
-  static const int yearlyBasePrice = 25500;
-
-  /// Extra meter on the yearly plan, per month (billed across the year).
-  static const int yearlyMeterPrice = 499;
-
-  /// Free-tier trial length.
-  static const int trialDays = 60;
-
-  /// Grace window after a paid plan expires before the account is fully
-  /// locked to read-only. Data stays intact and renewal remains possible.
+  /// Grace window after a paid plan expires before full read-only lock.
   static const int graceDays = 7;
 
-  /// Annualised cost of the monthly plan for [extraMeters] beyond the base.
-  static int monthlyAnnualised(int extraMeters) =>
-      (monthlyBasePrice + extraMeters * monthlyMeterPrice) * 12;
+  /// Maximum extra data points a user can add beyond their plan.
+  static const int maxExtraDataPoints = 20;
 
-  /// Total yearly-plan cost for [extraMeters] beyond the base.
-  static int yearlyTotal(int extraMeters) =>
-      yearlyBasePrice + extraMeters * yearlyMeterPrice * 12;
+  // ---- Plan definitions ----
+  static const Map<PlanTier, _PlanPricing> plans = {
+    PlanTier.starter: _PlanPricing(
+      name: 'Starter',
+      includedDataPoints: 2,
+      monthlyPrice: 999,
+      quarterlyPrice: 2697,
+      yearlyPrice: 9990,
+      extraMonthlyRate: 299,
+      extraQuarterlyRate: 249,
+      extraYearlyRate: 199,
+    ),
+    PlanTier.growth: _PlanPricing(
+      name: 'Growth',
+      includedDataPoints: 5,
+      monthlyPrice: 2500,
+      quarterlyPrice: 6750,
+      yearlyPrice: 25500,
+      extraMonthlyRate: 499,
+      extraQuarterlyRate: 399,
+      extraYearlyRate: 299,
+    ),
+    PlanTier.pro: _PlanPricing(
+      name: 'Pro',
+      includedDataPoints: 10,
+      monthlyPrice: 5000,
+      quarterlyPrice: 13500,
+      yearlyPrice: 50000,
+      extraMonthlyRate: 799,
+      extraQuarterlyRate: 649,
+      extraYearlyRate: 499,
+    ),
+  };
 
-  /// Savings of the yearly plan vs 12× the monthly plan (base-focused).
-  static int yearlySavings(int extraMeters) =>
-      monthlyAnnualised(extraMeters) - yearlyTotal(extraMeters);
-
-  /// Savings percentage of the yearly plan vs 12× the monthly plan.
-  static double yearlySavingsPct(int extraMeters) {
-    final annual = monthlyAnnualised(extraMeters);
-    if (annual == 0) return 0;
-    return (yearlySavings(extraMeters) / annual) * 100;
+  /// Total price for [tier] + [term] + [extraDataPoints] additional data points.
+  static int totalAmount(PlanTier tier, PlanTerm term, int extraDataPoints) {
+    final p = plans[tier]!;
+    final base = switch (term) {
+      PlanTerm.monthly => p.monthlyPrice,
+      PlanTerm.quarterly => p.quarterlyPrice,
+      PlanTerm.yearly => p.yearlyPrice,
+    };
+    final extraRate = switch (term) {
+      PlanTerm.monthly => p.extraMonthlyRate,
+      PlanTerm.quarterly => p.extraQuarterlyRate,
+      PlanTerm.yearly => p.extraYearlyRate,
+    };
+    return base + extraDataPoints * extraRate;
   }
 
-  /// Callback landing after addon (extra-meter) payment — the Razorpay
-  /// payment-link redirects here, and the in-app WebView treats it as done.
+  /// Base price for a given term (no extra data points).
+  static int baseAmount(PlanTier tier, PlanTerm term) {
+    final p = plans[tier]!;
+    return switch (term) {
+      PlanTerm.monthly => p.monthlyPrice,
+      PlanTerm.quarterly => p.quarterlyPrice,
+      PlanTerm.yearly => p.yearlyPrice,
+    };
+  }
+
+  /// Per-extra-data-point rate for a given term.
+  static int extraDPRate(PlanTier tier, PlanTerm term) {
+    final p = plans[tier]!;
+    return switch (term) {
+      PlanTerm.monthly => p.extraMonthlyRate,
+      PlanTerm.quarterly => p.extraQuarterlyRate,
+      PlanTerm.yearly => p.extraYearlyRate,
+    };
+  }
+
+  /// Total included data points for a tier.
+  static int includedDataPoints(PlanTier tier) =>
+      plans[tier]!.includedDataPoints;
+
+  /// Label for a plan tier.
+  static String planName(PlanTier tier) => plans[tier]!.name;
+
+  /// Term label for display.
+  static String termLabel(PlanTerm term) => switch (term) {
+        PlanTerm.monthly => '/mo',
+        PlanTerm.quarterly => '/qtr',
+        PlanTerm.yearly => '/yr',
+      };
+
+  /// Convert a string plan name to PlanTier.
+  static PlanTier? tierFromString(String? name) {
+    if (name == null) return null;
+    for (final t in PlanTier.values) {
+      if (t.name == name) return t;
+    }
+    return null;
+  }
+
+  /// Convert a string term to PlanTerm.
+  static PlanTerm? termFromString(String? term) {
+    if (term == null) return null;
+    for (final t in PlanTerm.values) {
+      if (t.name == term) return t;
+    }
+    return null;
+  }
+
+  /// Razorpay callback landing page — the payment-link redirects here.
   static const String paymentDoneUrl =
       'https://app.brilliants.in/payment-done.html';
+
+  /// Bank transfer payment page — opens in new browser tab on web.
+  static const String bankPaymentUrl =
+      'https://app.brilliants.in/bank-payment.html';
+}
+
+/// Internal pricing data for a single plan tier.
+class _PlanPricing {
+  final String name;
+  final int includedDataPoints;
+  final int monthlyPrice;
+  final int quarterlyPrice;
+  final int yearlyPrice;
+  final int extraMonthlyRate;
+  final int extraQuarterlyRate;
+  final int extraYearlyRate;
+
+  const _PlanPricing({
+    required this.name,
+    required this.includedDataPoints,
+    required this.monthlyPrice,
+    required this.quarterlyPrice,
+    required this.yearlyPrice,
+    required this.extraMonthlyRate,
+    required this.extraQuarterlyRate,
+    required this.extraYearlyRate,
+  });
 }
 
 /// Server-computed entitlement for the signed-in user
@@ -77,9 +184,10 @@ class Entitlement {
   final DateTime? ownerAccessUntil;
   final String subscriptionStatus;
   final String referralCode;
+  final String planName;
   final String planTerm;
-  final int metersAllowed;
-  final int extraMeters;
+  final int dataPointsAllowed;
+  final int extraDataPoints;
   final int freeMonthsCredit;
 
   const Entitlement({
@@ -96,11 +204,15 @@ class Entitlement {
     this.ownerAccessUntil,
     required this.subscriptionStatus,
     required this.referralCode,
+    this.planName = 'growth',
     this.planTerm = 'monthly',
-    required this.metersAllowed,
-    required this.extraMeters,
+    required this.dataPointsAllowed,
+    required this.extraDataPoints,
     required this.freeMonthsCredit,
   });
+
+  /// Backward-compatible alias — data points allowed = meters allowed.
+  int get metersAllowed => dataPointsAllowed;
 
   factory Entitlement.fromJson(Map<String, dynamic> json) {
     DateTime? parse(String? key) {
@@ -116,16 +228,23 @@ class Entitlement {
       creditActive: json['credit_active'] == true,
       readOnly: json['read_only'] == true,
       inGrace: json['in_grace'] == true,
-       trialEnd: parse('trial_end'),
-       creditEnd: parse('credit_end'),
-       currentPeriodEnd: parse('current_period_end'),
-       graceEnd: parse('grace_end'),
-       ownerAccessUntil: parse('owner_access_until'),
-       subscriptionStatus: (json['subscription_status'] ?? 'none') as String,
-       referralCode: (json['referral_code'] ?? '') as String,
-       planTerm: (json['plan_term'] ?? 'monthly') as String,
-      metersAllowed: (json['meters_allowed'] as num?)?.toInt() ?? 1,
-      extraMeters: (json['extra_meters'] as num?)?.toInt() ?? 0,
+      trialEnd: parse('trial_end'),
+      creditEnd: parse('credit_end'),
+      currentPeriodEnd: parse('current_period_end'),
+      graceEnd: parse('grace_end'),
+      ownerAccessUntil: parse('owner_access_until'),
+      subscriptionStatus: (json['subscription_status'] ?? 'none') as String,
+      referralCode: (json['referral_code'] ?? '') as String,
+      planName: (json['plan_name'] ?? json['meters_allowed'] != null
+          ? 'growth'
+          : 'growth') as String,
+      planTerm: (json['plan_term'] ?? 'monthly') as String,
+      dataPointsAllowed: (json['data_points_allowed'] ??
+              json['meters_allowed'] as num?)
+          ?.toInt() ?? 1,
+      extraDataPoints: (json['extra_data_points'] ??
+              json['extra_meters'] as num?)
+          ?.toInt() ?? 0,
       freeMonthsCredit: (json['free_months_credit'] as num?)?.toInt() ?? 0,
     );
   }
@@ -146,8 +265,6 @@ class Entitlement {
 class RedeemResult {
   final bool ok;
   final String error;
-
-  /// When full access expires (6 months from redemption).
   final DateTime? until;
 
   const RedeemResult({required this.ok, this.error = '', this.until});
@@ -155,14 +272,9 @@ class RedeemResult {
   String get message => error;
 }
 
-/// Result of starting a checkout: either a full Razorpay subscription
-/// (₹2,500 base incl. 5 meters + ₹149 × extra meters) or a one-time
-/// extra-meter top-up payment link (₹149 × delta) for active subscribers.
+/// Result of starting a Razorpay checkout.
 class CheckoutResult {
   final String mode;
-
-  /// 'full' — new subscription; 'addon' — extra-meter payment link;
-  /// 'noop' — no change needed (already at the requested meter count).
   final String subscriptionId;
   final String paymentUrl;
   final String paymentLinkId;
@@ -233,11 +345,11 @@ class SubscriptionStore {
     _cached = null;
   }
 
-  /// Start (or re-create, on extra-meter change) a Razorpay subscription.
-  /// [planTerm] selects the monthly or yearly Razorpay plan.
-  /// Returns the hosted payment page URL for the user to pay.
+  /// Start (or re-create, on extra-data-point change) a Razorpay subscription.
+  /// [planTerm] selects the billing cadence; [planName] selects the tier.
   static Future<CheckoutResult> startCheckout({
-    required int extraMeters,
+    required PlanTier planTier,
+    required int extraDataPoints,
     required PlanTerm planTerm,
   }) async {
     try {
@@ -245,8 +357,9 @@ class SubscriptionStore {
           .invoke(
             'subscription-checkout',
             body: {
-              'extra_meters': extraMeters,
-              'plan_term': planTerm == PlanTerm.yearly ? 'yearly' : 'monthly',
+              'plan_name': planTier.name,
+              'extra_data_points': extraDataPoints,
+              'plan_term': planTerm.name,
             },
           )
           .timeout(const Duration(seconds: 30));
@@ -274,7 +387,45 @@ class SubscriptionStore {
     }
   }
 
-  /// Link the signed-in account to a referrer's code (once, server-validated).
+  /// Submit a UTR payment for auto-verification.
+  static Future<Map<String, dynamic>> submitUTR({
+    required String utrNumber,
+    required int amountPaid,
+    required PlanTier planTier,
+    required PlanTerm planTerm,
+    required int extraDataPoints,
+    required String bankName,
+  }) async {
+    try {
+      final res = await SupabaseClientManager.client.functions
+          .invoke(
+            'verify-utr',
+            body: {
+              'utr_number': utrNumber.trim(),
+              'amount_paid': amountPaid,
+              'plan_name': planTier.name,
+              'plan_term': planTerm.name,
+              'extra_data_points': extraDataPoints,
+              'bank_name': bankName,
+            },
+          )
+          .timeout(const Duration(seconds: 30));
+      final data = (res.data as Map?)?.cast<String, dynamic>() ?? {};
+      if (data['verified'] == true) invalidateCache();
+      return data;
+    } on TimeoutException {
+      throw const SubscriptionException(
+        'Verification timed out. Check your connection and try again.',
+      );
+    } catch (e) {
+      AppLogger.e('UTR verification failed', e);
+      throw const SubscriptionException(
+        'Could not verify payment. Try again in a moment.',
+      );
+    }
+  }
+
+  /// Link the signed-in account to a referrer's code.
   static Future<bool> claimReferral(String code) async {
     final ok = await SupabaseClientManager.client
         .rpc('claim_referral', params: {'p_code': code.trim()});
@@ -302,8 +453,6 @@ class SubscriptionStore {
     }
   }
 
-  /// Remember a referral code entered at signup so it can be claimed after
-  /// the user signs in (survives app restarts via secure storage).
   static Future<void> setPendingReferral(String code) async {
     final trimmed = code.trim();
     if (trimmed.isEmpty) return;
@@ -326,8 +475,6 @@ class SubscriptionStore {
     }
   }
 
-  /// Claim the pending referral code (called after login). Idempotent —
-  /// safe to call repeatedly; the server ignores invalid/duplicate claims.
   static Future<void> claimPendingReferral() async {
     try {
       final code = await getPendingReferral();
@@ -339,20 +486,22 @@ class SubscriptionStore {
     }
   }
 
-  /// True when the signed-in user is allowed to create another meter.
-  static Future<bool> canAddMeter({required int currentMeterCount}) async {
+  /// True when the signed-in user is allowed to create another data point.
+  static Future<bool> canAddDataPoint({
+    required int currentDataPointCount,
+  }) async {
     try {
       final ent = await getEntitlement();
-      return currentMeterCount < ent.metersAllowed;
+      return currentDataPointCount < ent.dataPointsAllowed;
     } catch (_) {
-      // Unknown → allow; the server trigger is the hard gate.
       return true;
     }
   }
 
-  /// Persist the add-on payment link id so the app can re-confirm the payment
-  /// after the checkout page closes/refreshes (webhook delivery is unreliable,
-  /// payment-status is the source of truth).
+  /// Backward-compatible alias.
+  static Future<bool> canAddMeter({required int currentMeterCount}) =>
+      canAddDataPoint(currentDataPointCount: currentMeterCount);
+
   static Future<void> setPendingCheckoutLink(String paymentLinkId) async {
     if (paymentLinkId.isEmpty) return;
     try {
@@ -379,8 +528,6 @@ class SubscriptionStore {
   }
 
   /// Ask the payment-status Edge Function whether the payment went through.
-  /// Returns true only when Razorpay confirms it; not a local optimization.
-  /// Pass [paymentLinkId] for add-on links or [subscriptionId] for base plans.
   static Future<bool> isPaymentDone({
     String? paymentLinkId,
     String? subscriptionId,

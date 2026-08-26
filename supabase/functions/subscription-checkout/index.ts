@@ -1,30 +1,70 @@
 // SaaS subscription checkout: creates/updates a Razorpay subscription for the
 // signed-in user and returns the hosted payment-page URL (UPI/cards/autopay).
 //
-// Pricing: base INR 2500/mo (includes 5 meters) + INR 499/mo per extra meter.
+// 3-tier pricing: Starter ₹999 | Growth ₹2500 | Pro ₹5000 (monthly)
+//   + quarterly and yearly variants + extra data points.
 //
 // Deploy: supabase functions deploy subscription-checkout --no-verify-jwt
 // Env secrets: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET (set via `supabase secrets set`)
-//
-// Test: curl -H "Authorization: Bearer <access-token>" -H "Content-Type: application/json" \
-//         -d '{"extra_meters": 1}' \
-//         https://onfovsadlqeebguuswzg.functions.supabase.co/subscription-checkout
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID") ?? "";
 const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET") ?? "";
-const BASE_AMOUNT = 2500; // INR / month (covers 5 meters)
-const METER_RATE = 499; // INR / month per extra meter (monthly plan)
-const YEARLY_AMOUNT = 25500; // INR / year (covers 5 meters)
-const YEARLY_METER_RATE = 499; // INR / month per extra meter (yearly plan)
-const TOTAL_COUNT = 24; // rolling 2-year mandate
-const PAYMENT_DONE_URL =
-  "https://app.brilliants.in/payment-done.html";
+const PAYMENT_DONE_URL = "https://app.brilliants.in/payment-done.html";
 
-// Browser (GitHub Pages web build) calls this edge function directly, so it
-// must answer CORS preflights and attach the permissive CORS header on every
-// response — otherwise the browser blocks the fetch and checkout fails.
+// 3-tier pricing (must match subscription_config.dart exactly)
+const PLANS: Record<
+  string,
+  {
+    monthly: number;
+    quarterly: number;
+    yearly: number;
+    extraMonthly: number;
+    extraQuarterly: number;
+    extraYearly: number;
+    dataPoints: number;
+    razorpayMonthly: string;
+    razorpayYearly: string;
+  }
+> = {
+  starter: {
+    monthly: 999,
+    quarterly: 2697,
+    yearly: 9990,
+    extraMonthly: 299,
+    extraQuarterly: 249,
+    extraYearly: 199,
+    dataPoints: 2,
+    razorpayMonthly: "PowerEMS Starter Monthly",
+    razorpayYearly: "PowerEMS Starter Yearly",
+  },
+  growth: {
+    monthly: 2500,
+    quarterly: 6750,
+    yearly: 25500,
+    extraMonthly: 499,
+    extraQuarterly: 399,
+    extraYearly: 299,
+    dataPoints: 5,
+    razorpayMonthly: "PowerEMS Growth Monthly",
+    razorpayYearly: "PowerEMS Growth Yearly",
+  },
+  pro: {
+    monthly: 5000,
+    quarterly: 13500,
+    yearly: 50000,
+    extraMonthly: 799,
+    extraQuarterly: 649,
+    extraYearly: 499,
+    dataPoints: 10,
+    razorpayMonthly: "PowerEMS Pro Monthly",
+    razorpayYearly: "PowerEMS Pro Yearly",
+  },
+};
+
+const TOTAL_COUNT = 24; // rolling 2-year mandate
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -36,26 +76,39 @@ const rzp = (path: string, init?: RequestInit) =>
   fetch(`https://api.razorpay.com/v1${path}`, {
     ...init,
     headers: {
-      Authorization: "Basic " + btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`),
+      Authorization:
+        "Basic " + btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`),
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
     },
   });
 
-async function getOrCreateBasePlan(): Promise<string> {
+async function getOrCreatePlan(
+  planName: string,
+  term: string,
+): Promise<string> {
+  const plan = PLANS[planName];
+  if (!plan) throw new Error(`Unknown plan: ${planName}`);
+
+  const razorpayName =
+    term === "yearly" ? plan.razorpayYearly : plan.razorpayMonthly;
+  const amount =
+    (term === "yearly" ? plan.yearly : plan.monthly) * 100; // paise
+
   const res = await rzp("/plans?count=100");
   const { items } = await res.json();
   const existing = items?.find(
     (p: { item?: { name?: string }; amount?: number }) =>
-      p.item?.name === "PowerEMS Base" && p.amount === BASE_AMOUNT * 100,
+      p.item?.name === razorpayName && p.amount === amount,
   );
   if (existing) return existing.id;
+
   const created = await rzp("/plans", {
     method: "POST",
     body: JSON.stringify({
-      period: "monthly",
+      period: term === "yearly" ? "yearly" : "monthly",
       interval: 1,
-      item: { name: "PowerEMS Base", amount: BASE_AMOUNT * 100, currency: "INR" },
+      item: { name: razorpayName, amount, currency: "INR" },
     }),
   });
   const body = await created.json();
@@ -63,56 +116,44 @@ async function getOrCreateBasePlan(): Promise<string> {
   return body.id;
 }
 
-async function getOrCreateYearlyPlan(): Promise<string> {
-  const res = await rzp("/plans?count=100");
-  const { items } = await res.json();
-  const existing = items?.find(
-    (p: { item?: { name?: string }; amount?: number }) =>
-      p.item?.name === "PowerEMS Yearly" && p.amount === YEARLY_AMOUNT * 100,
-  );
-  if (existing) return existing.id;
-  const created = await rzp("/plans", {
-    method: "POST",
-    body: JSON.stringify({
-      period: "yearly",
-      interval: 1,
-      item: { name: "PowerEMS Yearly", amount: YEARLY_AMOUNT * 100, currency: "INR" },
-    }),
-  });
-  const body = await created.json();
-  if (!body.id) throw new Error(`yearly plan create failed: ${JSON.stringify(body)}`);
-  return body.id;
-}
-
 async function cancelOpenSubscription(subscriptionId: string) {
   try {
     await rzp(`/subscriptions/${subscriptionId}/cancel`, { method: "POST" });
   } catch {
-    // already cancelled / completed — ignore
+    // already cancelled / completed
   }
 }
 
-async function createExtraMeterLink(
+async function createExtraDPAddonLink(
   user: { id: string; email: string },
+  planName: string,
   delta: number,
   planTerm: string,
 ) {
-  const ratePerMonth = planTerm === "yearly" ? YEARLY_METER_RATE : METER_RATE;
-  const amount = delta * ratePerMonth * (planTerm === "yearly" ? 12 : 1) * 100;
+  const plan = PLANS[planName];
+  const ratePerMonth =
+    planTerm === "yearly"
+      ? plan.extraYearly
+      : planTerm === "quarterly"
+        ? plan.extraQuarterly
+        : plan.extraMonthly;
+  const months = planTerm === "yearly" ? 12 : planTerm === "quarterly" ? 3 : 1;
+  const amount = delta * ratePerMonth * months * 100;
+
   const res = await rzp("/payment_links", {
     method: "POST",
     body: JSON.stringify({
       amount,
       currency: "INR",
       accept_partial: false,
-      description:
-        `PowerEMS extra meter${delta > 1 ? "s" : ""} (x${delta}) add-on (${planTerm})`,
+      description: `PowerEMS ${planName} extra data point${delta > 1 ? "s" : ""} (x${delta}) — ${planTerm}`,
       customer: { email: user.email },
       notes: {
         user_id: user.id,
-        delta_meters: delta,
+        plan_name: planName,
+        delta_data_points: delta,
         plan_term: planTerm,
-        action: "extra_meter_addon",
+        action: "extra_dp_addon",
       },
       callback_url: PAYMENT_DONE_URL,
       callback_method: "get",
@@ -120,11 +161,14 @@ async function createExtraMeterLink(
     }),
   });
   const link = await res.json();
-  if (!link.id) throw new Error(`payment link create failed: ${JSON.stringify(link)}`);
+  if (!link.id)
+    throw new Error(`payment link create failed: ${JSON.stringify(link)}`);
   return link;
 }
 
-async function getSubscriptionShortUrl(subscriptionId: string): Promise<string> {
+async function getSubscriptionShortUrl(
+  subscriptionId: string,
+): Promise<string> {
   try {
     const res = await rzp(`/subscriptions/${subscriptionId}`);
     const sub = await res.json();
@@ -149,49 +193,54 @@ serve(async (req) => {
       status,
       headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     });
+
   const authHeader = req.headers.get("Authorization") ?? "";
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY")!,
     { global: { headers: { Authorization: authHeader } } },
   );
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return json({ error: "unauthorized" }, 401);
   if (user.email === "demo@powerems.com") {
     return json({ error: "demo account is free" }, 400);
   }
 
-  let extraMeters = 0;
+  let planName = "growth";
+  let extraDP = 0;
   let planTerm = "monthly";
   try {
     const body = await req.json();
-    extraMeters = Math.max(0, Math.min(50, Number(body.extra_meters) || 0));
-    if (body.plan_term === "yearly") planTerm = "yearly";
+    planName = String(body.plan_name ?? "growth").toLowerCase();
+    extraDP = Math.max(0, Math.min(20, Number(body.extra_data_points) || 0));
+    planTerm = String(body.plan_term ?? "monthly").toLowerCase();
   } catch {
-    // default 0 extra meters, monthly plan
+    // defaults
   }
 
-  const planId = planTerm === "yearly"
-    ? await getOrCreateYearlyPlan()
-    : await getOrCreateBasePlan();
+  if (!PLANS[planName]) {
+    return json({ error: `Unknown plan: ${planName}` }, 400);
+  }
+
+  const planId = await getOrCreatePlan(planName, planTerm);
 
   const { data: existing } = await supabase
     .from("subscriptions")
-    .select("razorpay_subscription_id, status, extra_meters")
+    .select("razorpay_subscription_id, status, extra_data_points, extra_meters")
     .eq("user_id", user.id)
     .single();
 
   const existingStatus = existing?.status ?? "none";
   const isPaidBase = ["authenticated", "active"].includes(existingStatus);
 
-  // Base plan active: extra meters are a one-time top-up payment link;
-  // the webhook applies the delta on payment. Never re-charge the base plan.
+  // Already subscribed: extra data points are a one-time addon
   if (isPaidBase) {
-    const currentExtras = existing?.extra_meters ?? 0;
-    const delta = extraMeters - currentExtras;
+    const currentExtras =
+      existing?.extra_data_points ?? existing?.extra_meters ?? 0;
+    const delta = extraDP - currentExtras;
     if (delta <= 0) {
-      // Backward-compatible noop: include the existing subscription's hosted
-      // page URL so older app versions still open a payment page.
       const shortUrl = existing?.razorpay_subscription_id
         ? await getSubscriptionShortUrl(existing.razorpay_subscription_id)
         : "";
@@ -204,22 +253,28 @@ serve(async (req) => {
         status: existingStatus,
       });
     }
-    const link = await createExtraMeterLink(user, delta, planTerm);
-    // Persist the link id on the subscription row BEFORE handing it to the
-    // user: it is the idempotency key for applying the paid add-on (webhook
-    // and/or payment-status fallback), since Razorpay delivery can be flaky.
-    // paid_at is RESET to null here so a NEW add-on purchase is never
-    // mistaken for an already-applied one (paid_at is the applied-flag).
+    const link = await createExtraDPAddonLink(user, planName, delta, planTerm);
     try {
-      await supabase.from("subscriptions").update({
-        payment_link_id: link.id,
-        paid_at: null,
-        updated_at: new Date().toISOString(),
-      }).eq("user_id", user.id);
+      await supabase
+        .from("subscriptions")
+        .update({
+          payment_link_id: link.id,
+          paid_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
     } catch (e) {
       console.error("addon link persist failed:", String(e));
     }
-    const ratePerMonth = planTerm === "yearly" ? YEARLY_METER_RATE : METER_RATE;
+    const plan = PLANS[planName];
+    const ratePerMonth =
+      planTerm === "yearly"
+        ? plan.extraYearly
+        : planTerm === "quarterly"
+          ? plan.extraQuarterly
+          : plan.extraMonthly;
+    const months =
+      planTerm === "yearly" ? 12 : planTerm === "quarterly" ? 3 : 1;
     return json({
       mode: "addon",
       payment_link_id: link.id,
@@ -227,13 +282,13 @@ serve(async (req) => {
       short_url: link.short_url,
       subscription_id: "",
       delta_meters: delta,
-      amount: delta * ratePerMonth * (planTerm === "yearly" ? 12 : 1),
+      amount: delta * ratePerMonth * months,
       extra_meters: currentExtras + delta,
       status: existingStatus,
     });
   }
 
-  // No active base plan: full checkout for the selected plan term.
+  // No active plan: full Razorpay subscription checkout
   if (
     existing?.razorpay_subscription_id &&
     existingStatus === "created"
@@ -241,20 +296,30 @@ serve(async (req) => {
     await cancelOpenSubscription(existing.razorpay_subscription_id);
   }
 
-  const baseAmount = planTerm === "yearly" ? YEARLY_AMOUNT : BASE_AMOUNT;
-  const meterRate = planTerm === "yearly" ? YEARLY_METER_RATE : METER_RATE;
-  const addonUnit = meterRate * (planTerm === "yearly" ? 12 : 1) * 100;
+  const plan = PLANS[planName];
+  const baseAmount =
+    planTerm === "yearly" ? plan.yearly : plan.monthly;
+  const extraRate =
+    planTerm === "yearly"
+      ? plan.extraYearly
+      : planTerm === "quarterly"
+        ? plan.extraQuarterly
+        : plan.extraMonthly;
+  const addonUnit = extraRate * (planTerm === "yearly" ? 12 : planTerm === "quarterly" ? 3 : 1) * 100;
 
-  const addons = extraMeters > 0
-    ? [{
-        item: {
-          name: `Extra meter${extraMeters > 1 ? "s" : ""} (x${extraMeters})`,
-          amount: addonUnit,
-          currency: "INR",
-        },
-        quantity: extraMeters,
-      }]
-    : [];
+  const addons =
+    extraDP > 0
+      ? [
+          {
+            item: {
+              name: `Extra data point${extraDP > 1 ? "s" : ""} (x${extraDP})`,
+              amount: addonUnit,
+              currency: "INR",
+            },
+            quantity: extraDP,
+          },
+        ]
+      : [];
 
   const created = await rzp("/subscriptions", {
     method: "POST",
@@ -262,7 +327,12 @@ serve(async (req) => {
       plan_id: planId,
       total_count: TOTAL_COUNT,
       customer_notify: 1,
-      notes: { user_id: user.id, email: user.email, plan_term: planTerm },
+      notes: {
+        user_id: user.id,
+        email: user.email,
+        plan_name: planName,
+        plan_term: planTerm,
+      },
       addons,
     }),
   });
@@ -275,10 +345,12 @@ serve(async (req) => {
     user_id: user.id,
     razorpay_subscription_id: sub.id,
     status: sub.status ?? "created",
-    extra_meters: extraMeters,
-    base_amount: baseAmount,
-    meter_rate: meterRate,
+    plan_name: planName,
     plan_term: planTerm,
+    extra_data_points: extraDP,
+    extra_meters: extraDP,
+    base_amount: baseAmount,
+    meter_rate: extraRate,
   });
 
   if (upsertError) {
@@ -290,9 +362,11 @@ serve(async (req) => {
     subscription_id: sub.id,
     short_url: sub.short_url,
     status: sub.status,
-    extra_meters: extraMeters,
+    extra_meters: extraDP,
+    amount: baseAmount,
     base_amount: baseAmount,
-    meter_rate: meterRate,
+    meter_rate: extraRate,
+    plan_name: planName,
     plan_term: planTerm,
   });
 });

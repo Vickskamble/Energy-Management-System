@@ -649,10 +649,10 @@ class _MeterListState extends State<_MeterList> {
       builder: (ctx) => AlertDialog(
         title: const Text('Meter limit reached'),
         content: Text(
-          'Your plan covers $currentCount meter(s). '
-          'Subscribe for ₹${SubscriptionConfig.monthlyBasePrice}/month '
-          '(includes ${SubscriptionConfig.includedMeters} meters) and add extra meters at just '
-          '₹${SubscriptionConfig.monthlyMeterPrice}/month each.',
+          'Your plan covers $currentCount data point(s). '
+          'Subscribe for ₹${SubscriptionConfig.baseAmount(PlanTier.growth, PlanTerm.monthly)}/month '
+          '(includes ${SubscriptionConfig.includedDataPoints(PlanTier.growth)} data points) and add extra at just '
+          '₹${SubscriptionConfig.extraDPRate(PlanTier.growth, PlanTerm.monthly)}/month each.',
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         actions: [
