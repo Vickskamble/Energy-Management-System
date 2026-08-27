@@ -90,12 +90,15 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       setState(() {
         _entitlement = ent;
         _loading = false;
-        // Restore current plan selection from entitlement
-        final tier = SubscriptionConfig.tierFromString(ent.planName);
-        if (tier != null) _selectedTier = tier;
-        final term = SubscriptionConfig.termFromString(ent.planTerm);
-        if (term != null) _selectedTerm = term;
-        _extraDataPoints = ent.extraDataPoints;
+        if (!silent) {
+          // Restore current plan selection from entitlement (initial load only,
+          // so the 30s poll never overrides a plan the user picked).
+          final tier = SubscriptionConfig.tierFromString(ent.planName);
+          if (tier != null) _selectedTier = tier;
+          final term = SubscriptionConfig.termFromString(ent.planTerm);
+          if (term != null) _selectedTerm = term;
+          _extraDataPoints = ent.extraDataPoints;
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -468,10 +471,52 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
               const SizedBox(height: AppSpacing.md),
               _buildTermToggle(),
               const SizedBox(height: AppSpacing.sm),
-              ...PlanTier.values.map((tier) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _buildPlanCard(tier, ent),
-                  )),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 640;
+                  if (wide) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final tier in PlanTier.values) ...[
+                          Expanded(child: _buildPlanCard(tier, ent)),
+                          if (tier != PlanTier.values.last)
+                            const SizedBox(width: 12),
+                        ],
+                      ],
+                    );
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SegmentedButton<PlanTier>(
+                        segments: const [
+                          ButtonSegment(
+                            value: PlanTier.starter,
+                            label: Text('Starter'),
+                          ),
+                          ButtonSegment(
+                            value: PlanTier.growth,
+                            label: Text('Growth'),
+                          ),
+                          ButtonSegment(
+                            value: PlanTier.pro,
+                            label: Text('Pro'),
+                          ),
+                        ],
+                        selected: {_selectedTier},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (set) => setState(() {
+                          _selectedTier = set.first;
+                          if (!ent.subActive) _extraDataPoints = 0;
+                        }),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildPlanCard(_selectedTier, ent),
+                    ],
+                  );
+                },
+              ),
               const SizedBox(height: AppSpacing.md),
               _buildPaymentSection(ent),
               const SizedBox(height: AppSpacing.md),
@@ -670,9 +715,9 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
             ? AppColors.primary.withValues(alpha: 0.06)
             : null,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Plan name + radio
+            // Plan name + radio + ACTIVE badge
             Row(
               children: [
                 Icon(
@@ -681,16 +726,17 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
                   size: 20,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  plan.name,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: isSelected ? AppColors.primary : null,
+                Expanded(
+                  child: Text(
+                    plan.name,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected ? AppColors.primary : null,
+                    ),
                   ),
                 ),
                 if (isActivePlan) ...[
-                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
@@ -707,44 +753,38 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
                     ),
                   ),
                 ],
-                const Spacer(),
-                Text(
-                  '₹$basePrice$_termLabel',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: isSelected ? AppColors.primary : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Data points
-            Row(
-              children: [
-                Icon(Icons.hub_outlined, size: 16, color: AppColors.dim(context)),
-                const SizedBox(width: 6),
-                Text(
-                  '${plan.includedDataPoints} data points included',
-                  style: TextStyle(fontSize: 13, color: AppColors.dim(context)),
-                ),
               ],
             ),
             const SizedBox(height: 6),
-            // Extra DP pricing
-            Row(
-              children: [
-                Icon(Icons.add_circle_outline, size: 16, color: AppColors.dim(context)),
-                const SizedBox(width: 6),
-                Text(
-                  'Extra: ₹$dpRate$_termLabel per data point',
-                  style: TextStyle(fontSize: 13, color: AppColors.dim(context)),
-                ),
-              ],
+            // Base price
+            Text(
+              '₹$basePrice$_termLabel',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: isSelected ? AppColors.primary : null,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Data points + extra rate
+            _planRow(Icons.hub_outlined, '${plan.includedDataPoints} data points included'),
+            const SizedBox(height: 4),
+            _planRow(Icons.add_circle_outline, 'Extra data point: ₹$dpRate$_termLabel'),
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            // Complete plan details
+            ..._planFeatures(tier).map(
+              (feature) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _planRow(Icons.check_rounded, feature),
+              ),
             ),
             // Extra DP counter (only on selected plan for non-active users)
             if (isSelected && !ent.subActive) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Text('Extra data points', style: TextStyle(fontSize: 13, color: AppColors.dim(context))),
@@ -768,12 +808,15 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
                 ],
               ),
               if (_extraDataPoints > 0)
-                Text(
-                  '+ ₹${_extraDataPoints * dpRate} extra = ₹$total total',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.dim(context),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    '+ ₹${_extraDataPoints * dpRate} extra = ₹$total total',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.dim(context),
+                    ),
                   ),
                 ),
             ],
@@ -783,13 +826,54 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
     );
   }
 
+  Widget _planRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppColors.dim(context)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 12.5, color: AppColors.dim(context)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Complete "what's included" list for a plan tier (all billing terms).
+  List<String> _planFeatures(PlanTier tier) {
+    final plan = SubscriptionConfig.plans[tier]!;
+    return [
+      '30-day free trial',
+      'MSEDCL-accurate ToD billing',
+      'Solar export tracking',
+      'Reports & PDF quotation',
+      'Extra: ₹${plan.extraMonthlyRate}/mo, ₹${plan.extraQuarterlyRate}/qtr, ₹${plan.extraYearlyRate}/yr',
+      'Up to ${SubscriptionConfig.maxExtraDataPoints} extra data points',
+      'Referral → +1 free month',
+    ];
+  }
+
   // ---------------------------------------------------------------------------
   // Payment section (Razorpay + Bank Transfer)
   // ---------------------------------------------------------------------------
 
   Widget _buildPaymentSection(Entitlement ent) {
     final isActive = ent.subActive;
-    final hasExtra = isActive && _extraDataPoints > ent.extraDataPoints;
+    final currentTier = SubscriptionConfig.tierFromString(ent.planName);
+    final currentTerm = SubscriptionConfig.termFromString(ent.planTerm);
+    final upToDate = isActive &&
+        currentTier == _selectedTier &&
+        currentTerm == _selectedTerm &&
+        _extraDataPoints <= ent.extraDataPoints;
+    final hasExtra = isActive &&
+        currentTier == _selectedTier &&
+        currentTerm == _selectedTerm &&
+        _extraDataPoints > ent.extraDataPoints;
+    final currentPlanName = currentTier != null
+        ? SubscriptionConfig.planName(currentTier)
+        : (ent.planName.isEmpty ? 'Growth' : ent.planName);
 
     return AppCard(
       child: Column(
@@ -806,14 +890,17 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 16),
 
-          // Razorpay button
+          // Razorpay button (UPI / cards) — always available, enabled whenever
+          // the selection differs from the current plan.
           AppButton(
-            label: isActive
-                ? hasExtra
-                    ? 'Pay ₹${_totalPrice - SubscriptionConfig.baseAmount(ent.subActive ? SubscriptionConfig.tierFromString(ent.planName)! : _selectedTier, _selectedTerm)} for $_extraDataPoints extra'
-                    : 'No payment needed — you are on $planNameLabel'
-                : 'Pay ₹$_totalPrice via Razorpay',
-            onPressed: _busy || (isActive && !hasExtra) ? null : _subscribeRazorpay,
+            label: !isActive
+                ? 'Pay ₹$_totalPrice via Razorpay'
+                : upToDate
+                    ? 'No payment needed — you are on $currentPlanName'
+                    : hasExtra
+                        ? 'Pay ₹${_totalPrice - SubscriptionConfig.baseAmount(_selectedTier, _selectedTerm)} for $_extraDataPoints extra'
+                        : 'Pay ₹$_totalPrice via Razorpay — switch to $planNameLabel',
+            onPressed: _busy || upToDate ? null : _subscribeRazorpay,
             loading: _busy,
             expanded: true,
             icon: Icons.payment_rounded,
