@@ -228,15 +228,19 @@ serve(async (req) => {
 
   const { data: existing } = await supabase
     .from("subscriptions")
-    .select("razorpay_subscription_id, status, extra_data_points, extra_meters")
+    .select(
+      "razorpay_subscription_id, status, plan_name, plan_term, extra_data_points, extra_meters",
+    )
     .eq("user_id", user.id)
     .single();
 
   const existingStatus = existing?.status ?? "none";
   const isPaidBase = ["authenticated", "active"].includes(existingStatus);
+  const samePlan = (existing?.plan_name ?? "") === planName;
+  const sameTerm = (existing?.plan_term ?? "") === planTerm;
 
-  // Already subscribed: extra data points are a one-time addon
-  if (isPaidBase) {
+  // Same plan + same term: extra data points are a one-time addon (or noop).
+  if (isPaidBase && samePlan && sameTerm) {
     const currentExtras =
       existing?.extra_data_points ?? existing?.extra_meters ?? 0;
     const delta = extraDP - currentExtras;
@@ -288,11 +292,10 @@ serve(async (req) => {
     });
   }
 
-  // No active plan: full Razorpay subscription checkout
-  if (
-    existing?.razorpay_subscription_id &&
-    existingStatus === "created"
-  ) {
+  // Plan change (upgrade/downgrade), term change, or no active plan:
+  // cancel any open/old Razorpay subscription, then start a fresh full checkout
+  // for the newly requested plan.
+  if (existing?.razorpay_subscription_id) {
     await cancelOpenSubscription(existing.razorpay_subscription_id);
   }
 

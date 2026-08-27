@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/config/subscription_config.dart';
+import '../../core/network/supabase_client.dart';
 import '../../core/services/quotation_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -321,11 +322,12 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
 
   Future<void> _shareQuotation() async {
     final number = QuotationService.generateQuotationNumber();
-    await QuotationService.share(
+    await QuotationService.download(
       quotationNumber: number,
       planTier: _selectedTier,
       planTerm: _selectedTerm,
       extraDataPoints: _extraDataPoints,
+      customerEmail: SupabaseClientManager.client.auth.currentUser?.email,
     );
   }
 
@@ -1020,15 +1022,13 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
             label: Text(_showUtrEntry ? 'Hide UTR entry' : 'Paid via bank transfer? Enter UTR'),
           ),
 
-          // Quotation
-          if (!isActive) ...[
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: _shareQuotation,
-              icon: const Icon(Icons.description_outlined, size: 18),
-              label: const Text('Download / share quotation PDF'),
-            ),
-          ],
+          // Quotation — always available for the selected plan
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _shareQuotation,
+            icon: const Icon(Icons.description_outlined, size: 18),
+            label: const Text('Download quotation PDF'),
+          ),
         ],
       ),
     );
