@@ -547,6 +547,8 @@ class _MeterListState extends State<_MeterList> {
                               ),
                               onPressed: () async {
                                 final repo = context.read<MeterRepository>();
+                                final messenger =
+                                    ScaffoldMessenger.of(context);
                                 final confirmed = await showDialog<bool>(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
@@ -578,7 +580,6 @@ class _MeterListState extends State<_MeterList> {
                                 );
                                 if (confirmed != true) return;
                                 if (!mounted) return;
-                                final messenger = ScaffoldMessenger.of(context);
                                 try {
                                   await repo.deleteMeter(meter.id);
                                 } catch (e) {

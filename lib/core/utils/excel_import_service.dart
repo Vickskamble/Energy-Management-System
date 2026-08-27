@@ -350,7 +350,7 @@ class ExcelImportService {
           has(h, ['md', 'demand', 'mdi'])) {
         if (map.md == null || h.contains('kva')) map.md = i;
       } else if (isGeneration) {
-        if (map.generationKwh == null) map.generationKwh = i;
+        map.generationKwh ??= i;
       } else if (isExport) {
         if (isKvah && map.exportKvah == null) {
           map.exportKvah = i;

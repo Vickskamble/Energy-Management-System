@@ -121,7 +121,7 @@ class PdfReportService {
   }
 
   static pw.Widget _costBreakdown(BillBreakdown b) {
-    final currencyFmt = (double v) => '₹${v.toStringAsFixed(0)}';
+    String currencyFmt(double v) => '₹${v.toStringAsFixed(0)}';
     final rows = <(String, double)>[
       ('Energy Charges', b.energyCharges),
       ('Demand Charges', b.demandCharges),

@@ -35,8 +35,8 @@ class SubscriptionConfig {
   static const int maxExtraDataPoints = 20;
 
   // ---- Plan definitions ----
-  static const Map<PlanTier, _PlanPricing> plans = {
-    PlanTier.starter: _PlanPricing(
+  static const Map<PlanTier, PlanPricing> plans = {
+    PlanTier.starter: PlanPricing(
       name: 'Starter',
       includedDataPoints: 2,
       monthlyPrice: 999,
@@ -46,7 +46,7 @@ class SubscriptionConfig {
       extraQuarterlyRate: 249,
       extraYearlyRate: 199,
     ),
-    PlanTier.growth: _PlanPricing(
+    PlanTier.growth: PlanPricing(
       name: 'Growth',
       includedDataPoints: 5,
       monthlyPrice: 2500,
@@ -56,7 +56,7 @@ class SubscriptionConfig {
       extraQuarterlyRate: 399,
       extraYearlyRate: 299,
     ),
-    PlanTier.pro: _PlanPricing(
+    PlanTier.pro: PlanPricing(
       name: 'Pro',
       includedDataPoints: 10,
       monthlyPrice: 5000,
@@ -146,7 +146,7 @@ class SubscriptionConfig {
 }
 
 /// Internal pricing data for a single plan tier.
-class _PlanPricing {
+class PlanPricing {
   final String name;
   final int includedDataPoints;
   final int monthlyPrice;
@@ -156,7 +156,7 @@ class _PlanPricing {
   final int extraQuarterlyRate;
   final int extraYearlyRate;
 
-  const _PlanPricing({
+  const PlanPricing({
     required this.name,
     required this.includedDataPoints,
     required this.monthlyPrice,
@@ -235,9 +235,7 @@ class Entitlement {
       ownerAccessUntil: parse('owner_access_until'),
       subscriptionStatus: (json['subscription_status'] ?? 'none') as String,
       referralCode: (json['referral_code'] ?? '') as String,
-      planName: (json['plan_name'] ?? json['meters_allowed'] != null
-          ? 'growth'
-          : 'growth') as String,
+      planName: (json['plan_name'] ?? 'growth') as String,
       planTerm: (json['plan_term'] ?? 'monthly') as String,
       dataPointsAllowed: (json['data_points_allowed'] ??
               json['meters_allowed'] as num?)
