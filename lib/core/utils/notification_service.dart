@@ -1,10 +1,9 @@
-import 'dart:js_interop';
-
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:web/web.dart' as web;
 
 import '../services/email_alert_service.dart';
+import 'notification_service_stub.dart'
+    if (dart.library.js_interop) 'notification_service_web.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._();
@@ -83,9 +82,6 @@ class NotificationService {
 
     _initialized = true;
   }
-
-  /// Whether browser notification permission has been requested yet.
-  bool _webPermissionRequested = false;
 
   Future<void> showAlert({
     required int id,
@@ -200,24 +196,8 @@ class NotificationService {
         : 'Meter "$meterName" (Site: $s): ';
   }
 
-  /// Browser Notification API for web — shows a native browser notification.
-  /// Falls back silently if permission denied or API unavailable.
   void _showWebNotification(String title, String body) {
-    try {
-      // Request permission on first call.
-      if (!_webPermissionRequested) {
-        _webPermissionRequested = true;
-        web.Notification.requestPermission().toDart;
-      }
-      // Check current permission.
-      final permission = web.Notification.permission;
-      if (permission == 'granted') {
-        final options = web.NotificationOptions(body: body);
-        web.Notification(title, options);
-      }
-    } catch (_) {
-      // Browser Notification API not available or blocked — silently skip.
-    }
+    showWebBrowserNotification(title, body);
   }
 
   Future<void> showSyncCompleteAlert(int count) async {
