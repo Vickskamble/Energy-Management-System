@@ -1,5 +1,13 @@
 # Agent Instructions
 
+## Deployment (MANDATORY — user rule)
+- After code changes pass tests, do WEB DEPLOY ONLY:
+  1. `dart analyze lib/` must be "No issues found!" (exit 0) before anything.
+  2. `flutter test` must pass.
+  3. Commit + push `main` (GitHub Actions auto-deploys GitHub Pages).
+  4. `flutter build web --release` → robocopy `build/web` -> `C:\Users\PC3\powerems-web` (exclude `.git`) → commit + push `master` (Vercel auto-deploy → app.brilliants.in).
+- Do NOT build APK or Windows installer after every change. Build them ONLY when the user explicitly asks.
+
 ## Lint / Typecheck Commands
 - `dart analyze lib/` — quick Dart analysis of `lib/` only (faster)
 - `flutter pub get` — resolve dependencies
