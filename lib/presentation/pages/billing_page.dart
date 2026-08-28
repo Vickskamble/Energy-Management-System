@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -10,6 +11,9 @@ import '../../core/network/supabase_client.dart';
 import '../../core/services/quotation_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/web_navigation_stub.dart'
+    if (dart.library.js_interop) '../../core/utils/web_navigation_web.dart'
+    as webnav;
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import 'razorpay_checkout_page.dart';
@@ -181,6 +185,18 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
           _load();
         }
         _startPaymentPolling(result);
+      } else if (kIsWeb) {
+        // Web: navigate the browser tab to the hosted checkout page. A fresh
+        // full-tab navigation (instead of a new tab/window) avoids popup
+        // blockers blocking the page after the async await gap. The page
+        // redirects back to payment-done.html after payment.
+        final webUri = result.isAddon
+            ? result.paymentUrl
+            : _webCheckoutUri(result).toString();
+        _startPaymentPolling(result);
+        SubscriptionStore.invalidateCache();
+        webnav.navigateToUrl(webUri);
+        return;
       } else {
         final paymentUri = result.isAddon
             ? Uri.parse(result.paymentUrl)
@@ -215,7 +231,15 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   String get planNameLabel => SubscriptionConfig.planName(_selectedTier);
 
   Uri _webCheckoutUri(CheckoutResult result) {
-    final page = Uri.base.resolve('checkout.html');
+    // Build the checkout URL from the page origin (root), ignoring the current
+    // app route, so hash/nested routing never breaks the hosted checkout.html.
+    final base = Uri.base;
+    final origin = base
+        .replace(path: '/', query: '', fragment: '')
+        .resolve('checkout.html');
+    final page = kIsWeb && origin.isScheme('https')
+        ? origin
+        : base.resolve('checkout.html');
     return page.replace(
       queryParameters: {
         'key': dotenv.env['RAZORPAY_KEY_ID'] ?? '',
