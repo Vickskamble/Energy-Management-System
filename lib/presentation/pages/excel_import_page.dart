@@ -566,6 +566,21 @@ class _ExcelImportPreviewDialogState extends State<ExcelImportPreviewDialog> {
       return;
     }
 
+    final flagged = _editors.where((e) => e.issueNote != null).toList();
+    if (flagged.isNotEmpty) {
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${flagged.length} row(s) have kWh > kVAh (meter reading error) — '
+            'fix the values before importing.',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+
     try {
       final count = await context
           .read<EnergyRepository>()
@@ -672,6 +687,28 @@ class _ExcelImportPreviewDialogState extends State<ExcelImportPreviewDialog> {
                   ),
               ],
             ),
+            if (e.issueNote != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 18,
+                    color: AppColors.warning,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      e.issueNote!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.warningText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               key: ValueKey('meter-$index-${e.meterName}'),
@@ -965,6 +1002,15 @@ class ExcelDraftEditor {
   /// Importable when it has consumption or an actual reading, plus MD.
   /// Opening rows (0 consumption, real reading) anchor the reading chain.
   bool get valid => (kwh > 0 || currentKwh != null) && md > 0;
+
+  /// kWh > kVAh is physically impossible for import energy (kVAh² = kWh² +
+  /// kVARh²) — a flagged row is a meter-reading error, not a valid reading.
+  bool get hasInvertedEnergy => kwh > 0 && kvah > 0 && kwh > kvah;
+
+  String? get issueNote => hasInvertedEnergy
+      ? 'Energy (kWh $kwh) cannot exceed kVAh ($kvah) — possible meter '
+          'reading error'
+      : null;
 
   DateTime get loggedAt {
     final m = RegExp(

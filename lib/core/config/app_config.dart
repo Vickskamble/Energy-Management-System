@@ -173,6 +173,14 @@ class AppConfig {
     _todZoneSharesWinter = Map.of(value);
   }
 
+  /// Display clock windows for each ToD zone (single source for reports).
+  static const Map<String, String> todZoneTimeLabels = {
+    'A': '00-06',
+    'B': '06-09',
+    'C': '09-17',
+    'D': '17-24',
+  };
+
   /// Billing-demand floor / ratchet rules (editable via Settings → Billing).
   static double _billingDemandFloorPct =
       AppConstants.billingDemandFloorPercent * 100;

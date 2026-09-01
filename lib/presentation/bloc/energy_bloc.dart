@@ -250,5 +250,13 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
         'Current reading must be greater than previous reading.',
       );
     }
+    // kVAh² = kWh² + kVARh² → apparent energy can never be less than active
+    // energy for import. kWh > kVAh means the reading itself is corrupt.
+    if (consumedKwh > consumedKvah) {
+      throw ValidationException(
+        'Consumed kWh ($consumedKwh) cannot exceed kVAh ($consumedKvah) — '
+        'possible meter reading error. Verify the current/previous readings.',
+      );
+    }
   }
 }
