@@ -33,8 +33,7 @@ class PdfReportService {
     final breakdown = logs.isNotEmpty
         ? BillCalculator.calculate(logs: logs)
         : null;
-    final intelligence =
-        (logs.isNotEmpty && breakdown != null)
+    final intelligence = (logs.isNotEmpty && breakdown != null)
         ? EnergyIntelligence.from(logs, breakdown)
         : null;
 
@@ -72,40 +71,52 @@ class PdfReportService {
               ),
             ),
           pw.SizedBox(height: 8),
+          // PAGE 1 · Executive pack
           if (intelligence != null) ...[
             _managementSummary(intelligence, logs),
             pw.SizedBox(height: 16),
             _findingsSection(intelligence),
           ],
+          // PAGE 2 · Trust checks, PF health and anomalies
+          if (intelligence != null || breakdown != null) pw.NewPage(),
           if (breakdown != null) ...[
-            pw.SizedBox(height: 16),
             _validationSection(logs, breakdown),
             if (intelligence != null) ...[
               pw.SizedBox(height: 16),
               _pfTrendSection(intelligence),
               pw.SizedBox(height: 16),
               _anomaliesSection(intelligence),
-              pw.SizedBox(height: 16),
-              _topDaysSection(intelligence),
-              pw.SizedBox(height: 16),
-              _costEfficiencySection(intelligence),
-              pw.SizedBox(height: 16),
-              _incentivesSection(intelligence),
-              pw.SizedBox(height: 16),
-              _opportunitiesSection(intelligence),
             ],
+          ],
+          // PAGE 3 · Consumption and money picture
+          if (intelligence != null) pw.NewPage(),
+          if (intelligence != null) ...[
+            _topDaysSection(intelligence),
             pw.SizedBox(height: 16),
+            _costEfficiencySection(intelligence),
+            pw.SizedBox(height: 16),
+            _incentivesSection(intelligence),
+          ],
+          // PAGE 4 · Bill waterfall and ToD shape
+          if (breakdown != null) pw.NewPage(),
+          if (breakdown != null) ...[
             _costBreakdown(breakdown),
             pw.SizedBox(height: 16),
-            _demandPfAnalysis(breakdown, intelligence),
-            pw.SizedBox(height: 16),
             _todDistribution(breakdown),
-            if (intelligence != null) ...[
+          ],
+          // PAGE 5 · Recommendations and demand deep-dive
+          if (intelligence != null) pw.NewPage(),
+          if (intelligence != null) ...[
+            _opportunitiesSection(intelligence),
+            if (breakdown != null) ...[
+              pw.SizedBox(height: 16),
+              _demandPfAnalysis(breakdown, intelligence),
               pw.SizedBox(height: 16),
               _conclusionSection(intelligence, breakdown),
             ],
           ],
-          pw.SizedBox(height: 20),
+          // PAGE 6+ · Reading history (spanning table, safe to split)
+          pw.NewPage(),
           pw.Text(
             'Reading History',
             style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
@@ -143,14 +154,17 @@ class PdfReportService {
     for (final l in logs) {
       final inverted = l.kwh > 0 && l.kvah > 0 && l.kwh > l.kvah;
       final ratio = l.kwh > 0 && l.kvah > 0 ? l.kwh / l.kvah : null;
-      final pfDiverges = ratio != null &&
+      final pfDiverges =
+          ratio != null &&
           l.powerFactor > 0 &&
           (l.powerFactor - ratio).abs() > 0.05;
       if (inverted || pfDiverges) flagged++;
     }
 
-    final waterfallSum =
-        b.toCategoryMap().values.fold<double>(0, (s, v) => s + v);
+    final waterfallSum = b.toCategoryMap().values.fold<double>(
+      0,
+      (s, v) => s + v,
+    );
     final check1Pass = true;
     final check2Pass = flagged == 0;
     final check3Pass = (waterfallSum - b.netBill).abs() <= 1;
@@ -160,15 +174,8 @@ class PdfReportService {
     final confidence = failed
         ? 'LOW'
         : (check1Pass && check2Pass && check3Pass && check5Pass
-            ? 'HIGH'
-            : 'MEDIUM');
-
-    String badge(bool pass, bool isInfo) =>
-        isInfo ? 'INFO' : (pass ? 'PASS' : 'FAIL');
-
-    PdfColor badgeColor(bool pass, bool isInfo) => isInfo
-        ? PdfColors.blueGrey700
-        : (pass ? PdfColors.green700 : PdfColors.red700);
+              ? 'HIGH'
+              : 'MEDIUM');
 
     return pw.Container(
       decoration: pw.BoxDecoration(
@@ -188,7 +195,10 @@ class PdfReportService {
             children: [
               pw.Text(
                 'Data Validation',
-                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 11,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
               pw.Text(
                 'Overall: $overall  ·  Confidence: $confidence',
@@ -211,56 +221,73 @@ class PdfReportService {
           pw.SizedBox(height: 6),
           _checkRow(
             '1 · Daily kWh sum',
-            true,
-            false,
+            'PASS',
+            PdfColors.green700,
             '${sumKwh.toStringAsFixed(1)} kWh = summary (readings added up)',
-            badge, badgeColor,
           ),
           _checkRow(
             '2 · PF vs kWh/kVAh',
-            check2Pass,
-            false,
+            check2Pass ? 'PASS' : 'FAIL',
+            check2Pass ? PdfColors.green700 : PdfColors.red700,
             check2Pass
                 ? 'all rows consistent'
                 : '$flagged flagged reading(s) - kWh > kVAh or PF mismatch',
-            badge, badgeColor,
           ),
           _checkRow(
             '3 · Waterfall = Net Total',
-            check3Pass,
-            false,
+            check3Pass ? 'PASS' : 'FAIL',
+            check3Pass ? PdfColors.green700 : PdfColors.red700,
             check3Pass
                 ? 'components reconcile'
                 : 'component sum ${waterfallSum.toStringAsFixed(0)} vs net ${b.netBill.toStringAsFixed(0)}',
-            badge, badgeColor,
           ),
           _checkRow(
             '4 · ToD basis',
-            true,
-            true,
+            'INFO',
+            PdfColors.blueGrey700,
             'billed units (kVAh × MF) = ${b.totalUnits.toStringAsFixed(0)}; '
-            '"Total kWh" = raw active kWh (no MF)',
-            badge, badgeColor,
+                '"Total kWh" = raw active kWh (no MF)',
           ),
           _checkRow(
             '5 · Peak MD',
-            check5Pass,
-            false,
+            'PASS',
+            PdfColors.green700,
             '${peakMd.toStringAsFixed(1)} kVA = max reading MD',
-            badge, badgeColor,
           ),
         ],
       ),
     );
   }
 
+  /// Small colored dot + label used for PASS / FAIL / INFO status markers.
+  static pw.Widget _badgeChip(String label, PdfColor color) {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.center,
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        pw.Container(
+          width: 6,
+          height: 6,
+          decoration: pw.BoxDecoration(color: color, shape: pw.BoxShape.circle),
+        ),
+        pw.SizedBox(width: 3),
+        pw.Text(
+          label,
+          style: pw.TextStyle(
+            fontSize: 7,
+            fontWeight: pw.FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
   static pw.Widget _checkRow(
     String label,
-    bool pass,
-    bool isInfo,
+    String badge,
+    PdfColor badgeColor,
     String detail,
-    String Function(bool, bool) badge,
-    PdfColor Function(bool, bool) badgeColor,
   ) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
@@ -273,18 +300,7 @@ class PdfReportService {
               style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
             ),
           ),
-          pw.Expanded(
-            flex: 1,
-            child: pw.Text(
-              badge(pass, isInfo),
-              style: pw.TextStyle(
-                fontSize: 7,
-                fontWeight: pw.FontWeight.bold,
-                color: badgeColor(pass, isInfo),
-              ),
-              textAlign: pw.TextAlign.center,
-            ),
-          ),
+          pw.Expanded(flex: 1, child: _badgeChip(badge, badgeColor)),
           pw.Expanded(
             flex: 5,
             child: pw.Text(
@@ -299,8 +315,9 @@ class PdfReportService {
   }
 
   static pw.Widget _costBreakdown(BillBreakdown b) {
-    String currencyFmt(double v) =>
-        v < 0 ? '-Rs. ${v.abs().toStringAsFixed(0)}' : 'Rs. ${v.toStringAsFixed(0)}';
+    String currencyFmt(double v) => v < 0
+        ? '-Rs. ${v.abs().toStringAsFixed(0)}'
+        : 'Rs. ${v.toStringAsFixed(0)}';
 
     // Full waterfall — every component appears exactly once (signed) so the
     // rows always reconcile to the Net Total (TOD, PPD, ICR, subsidies …).
@@ -325,7 +342,9 @@ class PdfReportService {
             fontWeight: pw.FontWeight.bold,
             color: PdfColors.white,
           ),
-          headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+          headerDecoration: const pw.BoxDecoration(
+            color: PdfColors.blueGrey800,
+          ),
           cellStyle: pw.TextStyle(fontSize: 8),
           cellAlignments: {
             0: pw.Alignment.centerLeft,
@@ -357,12 +376,12 @@ class PdfReportService {
           style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
         ),
         pw.SizedBox(height: 6),
-        _infoRow(
-          'Measured Peak Demand (EMS)',
-          peakDisplay,
-        ),
+        _infoRow('Measured Peak Demand (EMS)', peakDisplay),
         _infoRow('Billing Demand', billingDisplay),
-        _infoRow('Contract Demand', '${b.contractDemand.toStringAsFixed(0)} kVA'),
+        _infoRow(
+          'Contract Demand',
+          '${b.contractDemand.toStringAsFixed(0)} kVA',
+        ),
         if (peakUtilDisplay != null)
           _infoRow('EMS Peak Utilization', peakUtilDisplay),
         _infoRow('Billing Demand Utilization', utilDisplay),
@@ -560,8 +579,14 @@ class PdfReportService {
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(label, style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
-          pw.Text(value, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            label,
+            style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+          ),
+          pw.Text(
+            value,
+            style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -590,7 +615,8 @@ class PdfReportService {
     String statusFor(EnergyLogEntity l) {
       final inverted = l.kwh > 0 && l.kvah > 0 && l.kwh > l.kvah;
       final ratio = l.kwh > 0 && l.kvah > 0 ? l.kwh / l.kvah : null;
-      final pfDiverges = ratio != null &&
+      final pfDiverges =
+          ratio != null &&
           l.powerFactor > 0 &&
           (l.powerFactor - ratio).abs() > 0.05;
       return inverted || pfDiverges ? 'FLAG' : 'OK';
@@ -653,8 +679,18 @@ class PdfReportService {
   }
 
   static const List<String> _monthNames = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   static String _fmtDate(DateTime d) {
@@ -670,23 +706,45 @@ class PdfReportService {
 
   static String projMonth(EnergyIntelligence i) {
     final months = const [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     if (i.logs.isEmpty) return 'This period';
     final d = i.logs.first.loggedAt;
     return '${months[d.month - 1]} ${d.year}';
   }
 
-  static pw.Widget _managementSummary(EnergyIntelligence i, List<EnergyLogEntity> logs) {
+  static pw.Widget _managementSummary(
+    EnergyIntelligence i,
+    List<EnergyLogEntity> logs,
+  ) {
     final month = projMonth(i);
     final topRow = <pw.Widget>[
       _summaryItem('Readings', '${logs.length}'),
       _summaryItem('Total Consumption', '${i.totalKwh.toStringAsFixed(1)} kWh'),
       _summaryItem('Average PF', i.avgPf.toStringAsFixed(3)),
-      _summaryItem('Billing Demand', '${i.billingDemand.toStringAsFixed(0)} kVA'),
-      _summaryItem('Contract Demand', '${i.contractDemand.toStringAsFixed(0)} kVA'),
-      _summaryItem('Energy Charges', 'Rs. ${i.b.energyCharges.toStringAsFixed(0)}'),
+      _summaryItem(
+        'Billing Demand',
+        '${i.billingDemand.toStringAsFixed(0)} kVA',
+      ),
+      _summaryItem(
+        'Contract Demand',
+        '${i.contractDemand.toStringAsFixed(0)} kVA',
+      ),
+      _summaryItem(
+        'Energy Charges',
+        'Rs. ${i.b.energyCharges.toStringAsFixed(0)}',
+      ),
       _summaryItem('Total Bill', 'Rs. ${i.b.netBill.toStringAsFixed(0)}'),
     ];
 
@@ -731,12 +789,15 @@ class PdfReportService {
             padding: const pw.EdgeInsets.symmetric(vertical: 2),
             child: pw.Row(
               children: [
-                pw.Text(_sig(f.status), style: pw.TextStyle(fontSize: 9)),
-                pw.SizedBox(width: 6),
+                _statusDot(f.status),
+                pw.SizedBox(width: 7),
                 pw.Expanded(
                   child: pw.Text(
                     f.text,
-                    style: pw.TextStyle(fontSize: 8.5, color: PdfColors.grey800),
+                    style: pw.TextStyle(
+                      fontSize: 8.5,
+                      color: PdfColors.grey800,
+                    ),
                   ),
                 ),
               ],
@@ -746,11 +807,43 @@ class PdfReportService {
     );
   }
 
-  static String _sig(SigStatus s) => switch (s) {
-        SigStatus.green => 'GREEN',
-        SigStatus.yellow => 'YELLOW',
-        SigStatus.red => 'RED',
-      };
+  /// Traffic-light status color.
+  static PdfColor _statusColor(SigStatus s) => switch (s) {
+    SigStatus.green => PdfColors.green700,
+    SigStatus.yellow => PdfColors.amber600,
+    SigStatus.red => PdfColors.red700,
+  };
+
+  /// Traffic-light icon (colored circle) used instead of GREEN/YELLOW/RED text.
+  static pw.Widget _statusDot(SigStatus s) {
+    return pw.Container(
+      width: 7,
+      height: 7,
+      decoration: pw.BoxDecoration(
+        color: _statusColor(s),
+        shape: pw.BoxShape.circle,
+      ),
+    );
+  }
+
+  /// Status cell for table rows: colored dot + label.
+  static pw.Widget _statusCell(SigStatus s, String label) {
+    return pw.Row(
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        _statusDot(s),
+        pw.SizedBox(width: 4),
+        pw.Text(
+          label,
+          style: pw.TextStyle(
+            fontSize: 7.5,
+            fontWeight: pw.FontWeight.bold,
+            color: _statusColor(s),
+          ),
+        ),
+      ],
+    );
+  }
 
   static pw.Widget _pfTrendSection(EnergyIntelligence i) {
     final pwWidgets = <pw.Widget>[
@@ -825,7 +918,7 @@ class PdfReportService {
           distinctDays.isEmpty
               ? 'No PF readings available for a trend.'
               : 'At least two readings on different days are needed for a '
-                  'trend chart.',
+                    'trend chart.',
           style: pw.TextStyle(fontSize: 8.5, color: PdfColors.grey700),
         ),
       );
@@ -865,9 +958,13 @@ class PdfReportService {
               padding: const pw.EdgeInsets.symmetric(vertical: 2),
               child: pw.Row(
                 children: [
-                  pw.Text('${e.date.day.toString().padLeft(2, '0')} '
-                      '${_monthNames[e.date.month - 1]}',
-                    style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                  pw.Text(
+                    '${e.date.day.toString().padLeft(2, '0')} '
+                    '${_monthNames[e.date.month - 1]}',
+                    style: pw.TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
                   ),
                   pw.SizedBox(width: 8),
                   pw.Expanded(
@@ -946,14 +1043,20 @@ class PdfReportService {
           headers: ['Area', 'Amount', 'Share'],
           data: [
             for (final c in i.costShare)
-              ['${c.label} ', 'Rs. ${c.amount.toStringAsFixed(0)}', '${c.percent.toStringAsFixed(1)}%'],
+              [
+                '${c.label} ',
+                'Rs. ${c.amount.toStringAsFixed(0)}',
+                '${c.percent.toStringAsFixed(1)}%',
+              ],
           ],
           headerStyle: pw.TextStyle(
             fontSize: 8,
             fontWeight: pw.FontWeight.bold,
             color: PdfColors.white,
           ),
-          headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+          headerDecoration: const pw.BoxDecoration(
+            color: PdfColors.blueGrey800,
+          ),
           cellStyle: pw.TextStyle(fontSize: 8),
           cellAlignments: {
             0: pw.Alignment.centerLeft,
@@ -1007,31 +1110,57 @@ class PdfReportService {
           style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
         ),
         pw.SizedBox(height: 6),
-        pw.TableHelper.fromTextArray(
-          headers: ['Area', 'Status', 'Potential', 'Detail'],
-          data: [
-            for (final o in i.opportunities)
-              [
-                o.area,
-                '${_sig(o.status)} ${o.statusLabel}',
-                o.potential,
-                o.note,
-              ],
-          ],
-          headerStyle: pw.TextStyle(
-            fontSize: 8,
-            fontWeight: pw.FontWeight.bold,
-            color: PdfColors.white,
-          ),
-          headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
-          cellStyle: pw.TextStyle(fontSize: 7.5),
-          cellAlignments: {
-            0: pw.Alignment.centerLeft,
-            1: pw.Alignment.centerLeft,
-            2: pw.Alignment.centerLeft,
-            3: pw.Alignment.centerLeft,
-          },
+        pw.Table(
           border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+          columnWidths: {
+            0: pw.FlexColumnWidth(1.4),
+            1: pw.FlexColumnWidth(1.2),
+            2: pw.FlexColumnWidth(1.1),
+            3: pw.FlexColumnWidth(5),
+          },
+          children: [
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+              children: [
+                for (final h in ['Area', 'Status', 'Potential', 'Detail'])
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(
+                      h,
+                      style: pw.TextStyle(
+                        fontSize: 8,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            for (final o in i.opportunities)
+              pw.TableRow(
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(o.area, style: pw.TextStyle(fontSize: 7.5)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: _statusCell(o.status, o.statusLabel),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(
+                      o.potential,
+                      style: pw.TextStyle(fontSize: 7.5),
+                    ),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(o.note, style: pw.TextStyle(fontSize: 7.5)),
+                  ),
+                ],
+              ),
+          ],
         ),
       ],
     );
@@ -1042,28 +1171,34 @@ class PdfReportService {
     final confidenceLabel = i.confidenceScore >= 90
         ? 'HIGH'
         : i.confidenceScore >= 70
-            ? 'MEDIUM'
-            : 'REVIEW REQUIRED';
+        ? 'MEDIUM'
+        : 'REVIEW REQUIRED';
 
     final sb = StringBuffer()
       ..write('Overall energy performance during $month was ')
-      ..write(i.avgPf >= EnergyIntelligence.pfLowWarn
-          ? 'stable based on the available readings, with an average PF of '
-              '${i.avgPf.toStringAsFixed(3)}. '
-          : 'mixed, with an average PF of ${i.avgPf.toStringAsFixed(3)} and '
-              'low-PF events observed. ')
-      ..write('Billing demand utilization was approximately '
-          '${i.billingUtilPct.toStringAsFixed(0)}% of contract demand '
-          '(${i.billingDemand.toStringAsFixed(0)} kVA of '
-          '${i.contractDemand.toStringAsFixed(0)} kVA). ');
+      ..write(
+        i.avgPf >= EnergyIntelligence.pfLowWarn
+            ? 'stable based on the available readings, with an average PF of '
+                  '${i.avgPf.toStringAsFixed(3)}. '
+            : 'mixed, with an average PF of ${i.avgPf.toStringAsFixed(3)} and '
+                  'low-PF events observed. ',
+      )
+      ..write(
+        'Billing demand utilization was approximately '
+        '${i.billingUtilPct.toStringAsFixed(0)}% of contract demand '
+        '(${i.billingDemand.toStringAsFixed(0)} kVA of '
+        '${i.contractDemand.toStringAsFixed(0)} kVA). ',
+      );
     if (i.flaggedInvalid > 0 || i.missingDayCount > 0) {
       sb.write(
-          'Consumption and TOD figures should be validated for consistency '
-          'before using this report for financial decision-making.');
+        'Consumption and TOD figures should be validated for consistency '
+        'before using this report for financial decision-making.',
+      );
     } else {
       sb.write(
-          'Consumption and TOD figures are internally consistent and can be '
-          'used with confidence.');
+        'Consumption and TOD figures are internally consistent and can be '
+        'used with confidence.',
+      );
     }
 
     return pw.Container(
@@ -1102,7 +1237,9 @@ class PdfReportService {
                 style: pw.TextStyle(
                   fontSize: 8,
                   fontWeight: pw.FontWeight.bold,
-                  color: i.confidenceScore >= 90 ? PdfColors.green800 : PdfColors.amber900,
+                  color: i.confidenceScore >= 90
+                      ? PdfColors.green800
+                      : PdfColors.amber900,
                 ),
               ),
             ],

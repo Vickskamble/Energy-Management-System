@@ -140,8 +140,9 @@ class EnergyIntelligence {
       worstPf = measured.map((s) => s.pf).reduce((a, x) => (x < a ? x : a));
     }
 
-    final lowPfEvents =
-        measured.where((s) => s.pf > 0 && s.pf < EnergyIntelligence.pfLowWarn).toList();
+    final lowPfEvents = measured
+        .where((s) => s.pf > 0 && s.pf < EnergyIntelligence.pfLowWarn)
+        .toList();
 
     // Aggregate PF — utility billing method (ΣkWh ÷ ΣkVAh).
     final avgPf = totalKvah > 0 ? (totalKwh / totalKvah).clamp(0.0, 1.0) : 0.0;
@@ -165,13 +166,18 @@ class EnergyIntelligence {
     for (final l in logs) {
       final d = DateTime(l.loggedAt.year, l.loggedAt.month, l.loggedAt.day);
       final key = d.toIso8601String();
-      byDay.update(key, (v) => v + l.kwh * l.multiplyingFactor,
-          ifAbsent: () => l.kwh * l.multiplyingFactor);
+      byDay.update(
+        key,
+        (v) => v + l.kwh * l.multiplyingFactor,
+        ifAbsent: () => l.kwh * l.multiplyingFactor,
+      );
     }
     final days = byDay.entries.toList()
       ..sort((a, x) => x.value.compareTo(a.value));
-    final topDays =
-        days.take(5).map((e) => TopDay(DateTime.parse(e.key), e.value)).toList();
+    final topDays = days
+        .take(5)
+        .map((e) => TopDay(DateTime.parse(e.key), e.value))
+        .toList();
 
     // Calendar gaps in the recorded window (only meaningful when a daily
     // reading model is present — at least 2 distinct days in the window).
@@ -200,14 +206,14 @@ class EnergyIntelligence {
       if (b.fixedCharge != 0) CostShareRow('Fixed Charge', b.fixedCharge, 0),
       if (b.arrearsDpc != 0) CostShareRow('Arrears/DPC', b.arrearsDpc, 0),
     ];
-    final grossTotal =
-        costShare.fold<double>(0, (s, c) => s + c.amount);
+    final grossTotal = costShare.fold<double>(0, (s, c) => s + c.amount);
     for (final c in costShare) {
       c.percent = grossTotal > 0 ? c.amount / grossTotal * 100 : 0.0;
     }
 
     // ── Incentives earned (rebates that reduce the bill) ──────────
-    final incentivesTotal = b.pfRebate +
+    final incentivesTotal =
+        b.pfRebate +
         b.lfIncentive +
         b.icrRebate +
         b.ppdRebate +
@@ -229,98 +235,151 @@ class EnergyIntelligence {
     // ── Management findings ───────────────────────────────────────
     final findings = <IntelligenceFinding>[];
     if (avgPf >= EnergyIntelligence.pfLowWarn) {
-      findings.add(IntelligenceFinding(
-          SigStatus.green, 'PF performance generally healthy (${avgPf.toStringAsFixed(3)})'));
+      findings.add(
+        IntelligenceFinding(
+          SigStatus.green,
+          'PF performance generally healthy (${avgPf.toStringAsFixed(3)})',
+        ),
+      );
     } else {
-      findings.add(IntelligenceFinding(
-          SigStatus.yellow, 'Intermittent low-PF events detected (worst ${worstPf.toStringAsFixed(3)})'));
+      findings.add(
+        IntelligenceFinding(
+          SigStatus.yellow,
+          'Intermittent low-PF events detected (worst ${worstPf.toStringAsFixed(3)})',
+        ),
+      );
     }
     if (billingUtilPct >= 85) {
-      findings.add(IntelligenceFinding(SigStatus.red,
-          'Demand utilization ${billingUtilPct.toStringAsFixed(0)}% - close to contract'));
+      findings.add(
+        IntelligenceFinding(
+          SigStatus.red,
+          'Demand utilization ${billingUtilPct.toStringAsFixed(0)}% - close to contract',
+        ),
+      );
     } else if (billingUtilPct >= 65) {
-      findings.add(IntelligenceFinding(SigStatus.yellow,
-          'Demand utilization ${billingUtilPct.toStringAsFixed(0)}%'));
+      findings.add(
+        IntelligenceFinding(
+          SigStatus.yellow,
+          'Demand utilization ${billingUtilPct.toStringAsFixed(0)}%',
+        ),
+      );
     } else {
-      findings.add(IntelligenceFinding(SigStatus.green,
-          'Demand utilization ${billingUtilPct.toStringAsFixed(0)}% - headroom available'));
+      findings.add(
+        IntelligenceFinding(
+          SigStatus.green,
+          'Demand utilization ${billingUtilPct.toStringAsFixed(0)}% - headroom available',
+        ),
+      );
     }
     if (flaggedInvalid > 0) {
-      findings.add(IntelligenceFinding(
-          SigStatus.red, '$flaggedInvalid reading(s) with kWh > kVAh - requires validation'));
+      findings.add(
+        IntelligenceFinding(
+          SigStatus.red,
+          '$flaggedInvalid reading(s) with kWh > kVAh - requires validation',
+        ),
+      );
     } else if (missingDayCount > 0) {
-      findings.add(IntelligenceFinding(SigStatus.yellow,
-          '$missingDayCount calendar day(s) without a reading - gaps in consumption record'));
+      findings.add(
+        IntelligenceFinding(
+          SigStatus.yellow,
+          '$missingDayCount calendar day(s) without a reading - gaps in consumption record',
+        ),
+      );
     } else {
-      findings.add(IntelligenceFinding(
-          SigStatus.green, 'Consumption record consistent (no missing readings)'));
+      findings.add(
+        IntelligenceFinding(
+          SigStatus.green,
+          'Consumption record consistent (no missing readings)',
+        ),
+      );
     }
     if (incentivesTotal > 0) {
-      findings.add(IntelligenceFinding(SigStatus.green,
-          'Rs. ${incentivesTotal.toStringAsFixed(0)} incentives/rebates received'));
+      findings.add(
+        IntelligenceFinding(
+          SigStatus.green,
+          'Rs. ${incentivesTotal.toStringAsFixed(0)} incentives/rebates received',
+        ),
+      );
     } else {
-      findings.add(IntelligenceFinding(
-          SigStatus.yellow, 'No rebates/incentives applied this period'));
+      findings.add(
+        IntelligenceFinding(
+          SigStatus.yellow,
+          'No rebates/incentives applied this period',
+        ),
+      );
     }
 
     // ── Opportunities ─────────────────────────────────────────────
     final opportunities = <OpportunityRow>[];
     if (lowPfEvents.isNotEmpty) {
-      opportunities.add(OpportunityRow(
-        area: 'Power Factor',
-        status: SigStatus.red,
-        statusLabel: 'Analyze',
-        potential: 'Potential',
-        note:
-            '${lowPfEvents.length} low-PF event(s) below ${pfLowWarn.toStringAsFixed(2)} - APFC / capacitor check recommended',
-      ));
+      opportunities.add(
+        OpportunityRow(
+          area: 'Power Factor',
+          status: SigStatus.red,
+          statusLabel: 'Analyze',
+          potential: 'Potential',
+          note:
+              '${lowPfEvents.length} low-PF event(s) below ${pfLowWarn.toStringAsFixed(2)} - APFC / capacitor check recommended',
+        ),
+      );
     } else {
-      opportunities.add(OpportunityRow(
-        area: 'Power Factor',
-        status: SigStatus.green,
-        statusLabel: 'Healthy',
-        potential: '—',
-        note: 'Average PF ${avgPf.toStringAsFixed(3)} - no intervention needed',
-      ));
+      opportunities.add(
+        OpportunityRow(
+          area: 'Power Factor',
+          status: SigStatus.green,
+          statusLabel: 'Healthy',
+          potential: 'None',
+          note:
+              'Average PF ${avgPf.toStringAsFixed(3)} - no intervention needed',
+        ),
+      );
     }
     if (peakUtilPct >= 100) {
-      opportunities.add(OpportunityRow(
-        area: 'Peak Demand',
-        status: SigStatus.red,
-        statusLabel: 'Review',
-        potential: 'High',
-        note:
-            'Measured peak ${measuredPeakMd.toStringAsFixed(1)} kVA touches contract ${b.contractDemand.toStringAsFixed(0)} kVA',
-      ));
+      opportunities.add(
+        OpportunityRow(
+          area: 'Peak Demand',
+          status: SigStatus.red,
+          statusLabel: 'Review',
+          potential: 'High',
+          note:
+              'Measured peak ${measuredPeakMd.toStringAsFixed(1)} kVA touches contract ${b.contractDemand.toStringAsFixed(0)} kVA',
+        ),
+      );
     } else if (peakUtilPct >= 80) {
-      opportunities.add(OpportunityRow(
-        area: 'Peak Demand',
-        status: SigStatus.yellow,
-        statusLabel: 'Monitor',
-        potential: 'Potential',
-        note:
-            'Measured peak ${measuredPeakMd.toStringAsFixed(1)} kVA is ${peakUtilPct.toStringAsFixed(0)}% of contract',
-      ));
+      opportunities.add(
+        OpportunityRow(
+          area: 'Peak Demand',
+          status: SigStatus.yellow,
+          statusLabel: 'Monitor',
+          potential: 'Potential',
+          note:
+              'Measured peak ${measuredPeakMd.toStringAsFixed(1)} kVA is ${peakUtilPct.toStringAsFixed(0)}% of contract',
+        ),
+      );
     } else {
-      opportunities.add(OpportunityRow(
-        area: 'Peak Demand',
-        status: SigStatus.green,
-        statusLabel: 'Monitor',
-        potential: 'Low',
-        note:
-            'Peak utilisation ${peakUtilPct.toStringAsFixed(0)}% - room before contract upgrade',
-      ));
+      opportunities.add(
+        OpportunityRow(
+          area: 'Peak Demand',
+          status: SigStatus.green,
+          statusLabel: 'Monitor',
+          potential: 'Low',
+          note:
+              'Peak utilisation ${peakUtilPct.toStringAsFixed(0)}% - room before contract upgrade',
+        ),
+      );
     }
     if (b.todCharges != 0 && grossTotal > 0) {
       final todShare = b.todCharges / grossTotal * 100;
-      opportunities.add(OpportunityRow(
-        area: 'TOD Consumption',
-        status: todShare >= 15 ? SigStatus.yellow : SigStatus.green,
-        statusLabel: todShare >= 15 ? 'Review' : 'OK',
-        potential: todShare >= 15 ? 'Potential' : 'Low',
-        note:
-            'TOD represents ${todShare.toStringAsFixed(1)}% of gross charges - shift load from peak zones where possible',
-      ));
+      opportunities.add(
+        OpportunityRow(
+          area: 'TOD Consumption',
+          status: todShare >= 15 ? SigStatus.yellow : SigStatus.green,
+          statusLabel: todShare >= 15 ? 'Review' : 'OK',
+          potential: todShare >= 15 ? 'Potential' : 'Low',
+          note:
+              'TOD represents ${todShare.toStringAsFixed(1)}% of gross charges - shift load from peak zones where possible',
+        ),
+      );
     }
     if (topDays.length >= 2) {
       final avgDay = totalKwh <= 0 || days.isEmpty
@@ -329,35 +388,41 @@ class EnergyIntelligence {
       final minDay = days.last.value;
       final baseRatio = avgDay > 0 ? minDay / avgDay : 0.0;
       if (baseRatio < 0.5) {
-        opportunities.add(OpportunityRow(
-          area: 'Base Load',
-          status: SigStatus.yellow,
-          statusLabel: 'Monitor',
-          potential: 'Potential',
-          note:
-              'Lowest day is ${(baseRatio * 100).toStringAsFixed(0)}% of average - review non-production base load',
-        ));
+        opportunities.add(
+          OpportunityRow(
+            area: 'Base Load',
+            status: SigStatus.yellow,
+            statusLabel: 'Monitor',
+            potential: 'Potential',
+            note:
+                'Lowest day is ${(baseRatio * 100).toStringAsFixed(0)}% of average - review non-production base load',
+          ),
+        );
       } else {
-        opportunities.add(OpportunityRow(
-          area: 'Base Load',
-          status: SigStatus.green,
-          statusLabel: 'OK',
-          potential: 'Low',
-          note: 'Base load consistent across days',
-        ));
+        opportunities.add(
+          OpportunityRow(
+            area: 'Base Load',
+            status: SigStatus.green,
+            statusLabel: 'OK',
+            potential: 'Low',
+            note: 'Base load consistent across days',
+          ),
+        );
       }
     }
-    opportunities.add(OpportunityRow(
-      area: 'Incentives',
-      status: incentivesTotal > 0 ? SigStatus.green : SigStatus.yellow,
-      statusLabel: incentivesTotal > 0 ? 'Active' : 'Check',
-      potential: incentivesTotal > 0
-          ? 'Rs. ${incentivesTotal.toStringAsFixed(0)}'
-          : 'Potential',
-      note: incentivesTotal > 0
-          ? 'PF + load-factor incentives already credited'
-          : 'Verify eligibility for PF/load-factor rebates',
-    ));
+    opportunities.add(
+      OpportunityRow(
+        area: 'Incentives',
+        status: incentivesTotal > 0 ? SigStatus.green : SigStatus.yellow,
+        statusLabel: incentivesTotal > 0 ? 'Active' : 'Check',
+        potential: incentivesTotal > 0
+            ? 'Rs. ${incentivesTotal.toStringAsFixed(0)}'
+            : 'Potential',
+        note: incentivesTotal > 0
+            ? 'PF + load-factor incentives already credited'
+            : 'Verify eligibility for PF/load-factor rebates',
+      ),
+    );
 
     return EnergyIntelligence._(
       logs: logs,
