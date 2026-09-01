@@ -3,6 +3,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../../domain/entities/energy_log_entity.dart';
 import '../calculation/bill_breakdown.dart';
 import '../calculation/bill_calculator.dart';
+import '../calculation/energy_intelligence.dart';
 import '../config/app_config.dart';
 import 'export_service_io.dart'
     if (dart.library.js_interop) 'export_service_web.dart'
@@ -19,6 +20,10 @@ class PdfReportService {
     final doc = pw.Document();
     final breakdown = logs.isNotEmpty
         ? BillCalculator.calculate(logs: logs)
+        : null;
+    final intelligence =
+        (logs.isNotEmpty && breakdown != null)
+        ? EnergyIntelligence.from(logs, breakdown)
         : null;
 
     doc.addPage(
@@ -55,16 +60,38 @@ class PdfReportService {
               ),
             ),
           pw.SizedBox(height: 8),
-          _summaryTable(logs, breakdown),
+          if (intelligence != null) ...[
+            _managementSummary(intelligence, logs),
+            pw.SizedBox(height: 16),
+            _findingsSection(intelligence),
+          ],
           if (breakdown != null) ...[
-            pw.SizedBox(height: 12),
+            pw.SizedBox(height: 16),
             _validationSection(logs, breakdown),
+            if (intelligence != null) ...[
+              pw.SizedBox(height: 16),
+              _pfTrendSection(intelligence),
+              pw.SizedBox(height: 16),
+              _anomaliesSection(intelligence),
+              pw.SizedBox(height: 16),
+              _topDaysSection(intelligence),
+              pw.SizedBox(height: 16),
+              _costEfficiencySection(intelligence),
+              pw.SizedBox(height: 16),
+              _incentivesSection(intelligence),
+              pw.SizedBox(height: 16),
+              _opportunitiesSection(intelligence),
+            ],
             pw.SizedBox(height: 16),
             _costBreakdown(breakdown),
             pw.SizedBox(height: 16),
-            _demandPfAnalysis(breakdown),
+            _demandPfAnalysis(breakdown, intelligence),
             pw.SizedBox(height: 16),
             _todDistribution(breakdown),
+            if (intelligence != null) ...[
+              pw.SizedBox(height: 16),
+              _conclusionSection(intelligence, breakdown),
+            ],
           ],
           pw.SizedBox(height: 20),
           pw.Text(
@@ -85,62 +112,6 @@ class PdfReportService {
 
     final bytes = await doc.save();
     await save.saveBytes(bytes, 'ems_report.pdf', 'application/pdf');
-  }
-
-  static pw.Widget _summaryTable(
-    List<EnergyLogEntity> logs,
-    BillBreakdown? breakdown,
-  ) {
-    final totalKwh = logs.fold<double>(0, (sum, l) => sum + l.kwh);
-    final totalBill = breakdown?.netBill ?? 0;
-    final peakMd = logs.fold<double>(
-      0,
-      (peak, l) => l.mdRecorded * l.multiplyingFactor > peak
-          ? l.mdRecorded * l.multiplyingFactor
-          : peak,
-    );
-    final totalKvah = logs.fold<double>(0, (sum, l) => sum + l.kvah);
-    final avgPf = (logs.isEmpty || totalKvah <= 0)
-        ? 0.0
-        : (totalKwh / totalKvah).clamp(0.0, 1.0);
-
-    return pw.Container(
-      decoration: pw.BoxDecoration(
-        color: PdfColors.blueGrey50,
-        borderRadius: pw.BorderRadius.circular(6),
-      ),
-      padding: const pw.EdgeInsets.all(12),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            'Executive Summary',
-            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 6),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              _summaryItem('Readings', '${logs.length}'),
-              _summaryItem('Total kWh', totalKwh.toStringAsFixed(1)),
-              _summaryItem('Peak MD (kVA)', peakMd.toStringAsFixed(1)),
-              _summaryItem('Avg PF', avgPf.toStringAsFixed(3)),
-              _summaryItem(
-                'Net Bill',
-                'Rs. ${totalBill.toStringAsFixed(0)}',
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 6),
-          pw.Text(
-            'Basis: billed units (kVAh × MF) = ${breakdown?.totalUnits.toStringAsFixed(0) ?? '-'}. '
-            '"Total kWh" above is raw active kWh WITHOUT the meter factor — '
-            'a different basis, not an error.',
-            style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
-          ),
-        ],
-      ),
-    );
   }
 
   /// Auto checks run before the report is trusted. Failures produce an
@@ -355,7 +326,18 @@ class PdfReportService {
     );
   }
 
-  static pw.Widget _demandPfAnalysis(BillBreakdown b) {
+  static pw.Widget _demandPfAnalysis(BillBreakdown b, EnergyIntelligence? i) {
+    final peakDisplay = i != null
+        ? '${i.measuredPeakMd.toStringAsFixed(1)} kVA (EMS measured)'
+        : '${b.billingDemand.toStringAsFixed(1)} kVA';
+    final billingDisplay = '${b.billingDemand.toStringAsFixed(1)} kVA';
+    final utilDisplay = i != null
+        ? '${i.billingUtilPct.toStringAsFixed(1)}% (billing demand ÷ contract demand)'
+        : '${((b.billingDemand / b.contractDemand) * 100).clamp(0, 999).toStringAsFixed(1)}%';
+    final peakUtilDisplay = i != null
+        ? '${i.peakUtilPct.toStringAsFixed(1)}% (EMS peak ÷ contract demand)'
+        : null;
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -365,20 +347,40 @@ class PdfReportService {
         ),
         pw.SizedBox(height: 6),
         _infoRow(
-          'Billing Demand',
-          '${b.billingDemand.toStringAsFixed(1)} kVA (contract floor)',
+          'Measured Peak Demand (EMS)',
+          peakDisplay,
         ),
+        _infoRow('Billing Demand', billingDisplay),
         _infoRow('Contract Demand', '${b.contractDemand.toStringAsFixed(0)} kVA'),
-        _infoRow(
-          'Demand Utilization',
-          '${((b.billingDemand / b.contractDemand) * 100).clamp(0, 999).toStringAsFixed(1)}% '
-          '(headroom ${(b.contractDemand - b.billingDemand).toStringAsFixed(0)} kVA)',
-        ),
+        if (peakUtilDisplay != null)
+          _infoRow('EMS Peak Utilization', peakUtilDisplay),
+        _infoRow('Billing Demand Utilization', utilDisplay),
+        if (i != null && (b.billingDemand - i.measuredPeakMd).abs() > 1) ...[
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 6, bottom: 6),
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(8),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.amber50,
+                borderRadius: pw.BorderRadius.circular(6),
+              ),
+              child: pw.Text(
+                'Why billing demand ($billingDisplay) differs from EMS peak '
+                '($peakDisplay):\n'
+                'Billing demand may differ from the EMS measured peak due to '
+                'the utility billing methodology, billing-period maximum '
+                'demand (ratchet/contract floor), meter synchronization, or '
+                'measurement intervals.',
+                style: pw.TextStyle(fontSize: 7.5, color: PdfColors.amber900),
+              ),
+            ),
+          ),
+        ],
         _infoRow('Combined PF', b.powerFactor.toStringAsFixed(3)),
         _infoRow('Load Factor', '${(b.loadFactor * 100).toStringAsFixed(1)}%'),
         _infoRow(
           'Avg Unit Cost',
-          'Rs. ${b.averageUnitCost.toStringAsFixed(2)}/unit (÷ billed units)',
+          'Rs. ${b.averageUnitCost.toStringAsFixed(2)}/billed unit',
         ),
       ],
     );
@@ -652,4 +654,433 @@ class PdfReportService {
 
   static String _meterLabel(String name) =>
       name.replaceAll('MainFeeder', 'Main Feeder');
+
+  // ── Energy Intelligence sections ────────────────────────────────
+
+  static String projMonth(EnergyIntelligence i) {
+    final months = const [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    if (i.logs.isEmpty) return 'This period';
+    final d = i.logs.first.loggedAt;
+    return '${months[d.month - 1]} ${d.year}';
+  }
+
+  static pw.Widget _managementSummary(EnergyIntelligence i, List<EnergyLogEntity> logs) {
+    final month = projMonth(i);
+    final topRow = <pw.Widget>[
+      _summaryItem('Readings', '${logs.length}'),
+      _summaryItem('Total Consumption', '${i.totalKwh.toStringAsFixed(1)} kWh'),
+      _summaryItem('Average PF', i.avgPf.toStringAsFixed(3)),
+      _summaryItem('Billing Demand', '${i.billingDemand.toStringAsFixed(0)} kVA'),
+      _summaryItem('Contract Demand', '${i.contractDemand.toStringAsFixed(0)} kVA'),
+      _summaryItem('Energy Charges', 'Rs. ${i.b.energyCharges.toStringAsFixed(0)}'),
+      _summaryItem('Total Bill', 'Rs. ${i.b.netBill.toStringAsFixed(0)}'),
+    ];
+
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        color: PdfColors.blueGrey50,
+        borderRadius: pw.BorderRadius.circular(6),
+      ),
+      padding: const pw.EdgeInsets.all(12),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            '$month Energy Performance',
+            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Wrap(spacing: 24, runSpacing: 8, children: topRow),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'Basis: billed units (kVAh × MF) = ${i.billedUnits.toStringAsFixed(0)}. '
+            '"Total Consumption" is raw active kWh WITHOUT the meter factor — '
+            'a different basis, not an error.',
+            style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _findingsSection(EnergyIntelligence i) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Management Findings',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 6),
+        for (final f in i.findings)
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 2),
+            child: pw.Row(
+              children: [
+                pw.Text(_sig(f.status), style: pw.TextStyle(fontSize: 9)),
+                pw.SizedBox(width: 6),
+                pw.Expanded(
+                  child: pw.Text(
+                    f.text,
+                    style: pw.TextStyle(fontSize: 8.5, color: PdfColors.grey800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  static String _sig(SigStatus s) => switch (s) {
+        SigStatus.green => 'GREEN',
+        SigStatus.yellow => 'YELLOW',
+        SigStatus.red => 'RED',
+      };
+
+  static pw.Widget _pfTrendSection(EnergyIntelligence i) {
+    final pwWidgets = <pw.Widget>[
+      pw.Text(
+        'Power Factor Trend (per reading)',
+        style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+      ),
+      pw.SizedBox(height: 6),
+    ];
+
+    if (i.pfSeries.isNotEmpty) {
+      final data = <pw.PointChartValue>[
+        for (final s in i.pfSeries)
+          pw.PointChartValue(s.date.day.toDouble(), s.pf),
+      ];
+      final dayTicks = i.pfSeries.length <= 8
+          ? (i.pfSeries.map((s) => s.date.day).toSet().toList()..sort())
+          : <int>[1];
+
+      pwWidgets.add(
+        pw.Container(
+          height: 140,
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(
+            color: PdfColors.white,
+            borderRadius: pw.BorderRadius.circular(6),
+          ),
+          child: pw.Chart(
+            grid: pw.CartesianGrid(
+              xAxis: pw.FixedAxis<int>(
+                dayTicks,
+                divisions: true,
+                ticks: true,
+                format: (v) => v.toString(),
+              ),
+              yAxis: pw.FixedAxis<double>(
+                const [0.0, 0.50, 0.70, 0.80, 0.90, 0.95, 1.0],
+                divisions: true,
+                ticks: true,
+              ),
+            ),
+            datasets: [
+              pw.LineDataSet<pw.PointChartValue>(
+                data: data,
+                legend: 'PF',
+                color: PdfColors.blue,
+                pointColor: PdfColors.blue,
+                pointSize: 3,
+                lineWidth: 2,
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      pwWidgets.add(
+        pw.Text(
+          'No PF readings available for a trend.',
+          style: pw.TextStyle(fontSize: 8.5, color: PdfColors.grey700),
+        ),
+      );
+    }
+
+    pwWidgets.addAll([
+      pw.SizedBox(height: 8),
+      _infoRow('Best PF', i.bestPf.toStringAsFixed(3)),
+      _infoRow('Worst PF', i.worstPf.toStringAsFixed(3)),
+      _infoRow('Average PF', i.avgPf.toStringAsFixed(3)),
+      _infoRow('Low PF Events', '${i.lowPfEvents.length}'),
+    ]);
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: pwWidgets,
+    );
+  }
+
+  static pw.Widget _anomaliesSection(EnergyIntelligence i) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Detected Anomalies',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 6),
+        if (i.lowPfEvents.isEmpty && i.flaggedInvalid == 0)
+          pw.Text(
+            'No anomalies detected in the available readings.',
+            style: pw.TextStyle(fontSize: 8.5, color: PdfColors.grey700),
+          )
+        else ...[
+          for (final e in i.lowPfEvents)
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 2),
+              child: pw.Row(
+                children: [
+                  pw.Text('${e.date.day.toString().padLeft(2, '0')} '
+                      '${_monthNames[e.date.month - 1]}',
+                    style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.SizedBox(width: 8),
+                  pw.Expanded(
+                    child: pw.Text(
+                      'PF dropped to ${e.pf.toStringAsFixed(3)}',
+                      style: pw.TextStyle(fontSize: 8.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (i.flaggedInvalid > 0)
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 2),
+              child: pw.Text(
+                'ALERT: ${i.flaggedInvalid} reading(s) report kWh greater than kVAh (physically invalid)',
+                style: pw.TextStyle(fontSize: 8.5, color: PdfColors.red800),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  static pw.Widget _topDaysSection(EnergyIntelligence i) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Top Energy Consumption Days',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 6),
+        for (final t in i.topDays)
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 2),
+            child: pw.Row(
+              children: [
+                pw.Text(
+                  '${t.date.day.toString().padLeft(2, '0')} '
+                  '${_monthNames[t.date.month - 1]}',
+                  style: pw.TextStyle(
+                    fontSize: 8.5,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(width: 8),
+                pw.Expanded(
+                  child: pw.Text(
+                    '${t.kwh.toStringAsFixed(1)} kWh',
+                    style: pw.TextStyle(fontSize: 8.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  static pw.Widget _costEfficiencySection(EnergyIntelligence i) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Energy Cost Efficiency',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 6),
+        _infoRow(
+          'Avg Unit Cost',
+          'Rs. ${i.b.averageUnitCost.toStringAsFixed(2)}/billed unit',
+        ),
+        pw.SizedBox(height: 6),
+        pw.TableHelper.fromTextArray(
+          headers: ['Area', 'Amount', 'Share'],
+          data: [
+            for (final c in i.costShare)
+              ['${c.label} ', 'Rs. ${c.amount.toStringAsFixed(0)}', '${c.percent.toStringAsFixed(1)}%'],
+          ],
+          headerStyle: pw.TextStyle(
+            fontSize: 8,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.white,
+          ),
+          headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+          cellStyle: pw.TextStyle(fontSize: 8),
+          cellAlignments: {
+            0: pw.Alignment.centerLeft,
+            1: pw.Alignment.centerRight,
+            2: pw.Alignment.centerRight,
+          },
+          border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Text(
+          'Where your money goes — largest share of gross charges first.',
+          style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _incentivesSection(EnergyIntelligence i) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Incentives Earned',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 6),
+        _infoRow(
+          'Total Incentives',
+          i.incentivesTotal > 0
+              ? 'Rs. ${i.incentivesTotal.toStringAsFixed(0)}'
+              : 'None this period',
+        ),
+        if (i.incentivesTotal > 0) ...[
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'PF + load-factor incentives reduced the monthly bill by '
+            'Rs. ${i.incentivesTotal.toStringAsFixed(0)}.',
+            style: pw.TextStyle(fontSize: 8, color: PdfColors.green800),
+          ),
+        ],
+      ],
+    );
+  }
+
+  static pw.Widget _opportunitiesSection(EnergyIntelligence i) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Cost Optimization Opportunities',
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 6),
+        pw.TableHelper.fromTextArray(
+          headers: ['Area', 'Status', 'Potential', 'Detail'],
+          data: [
+            for (final o in i.opportunities)
+              [
+                o.area,
+                '${_sig(o.status)} ${o.statusLabel}',
+                o.potential,
+                o.note,
+              ],
+          ],
+          headerStyle: pw.TextStyle(
+            fontSize: 8,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.white,
+          ),
+          headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+          cellStyle: pw.TextStyle(fontSize: 7.5),
+          cellAlignments: {
+            0: pw.Alignment.centerLeft,
+            1: pw.Alignment.centerLeft,
+            2: pw.Alignment.centerLeft,
+            3: pw.Alignment.centerLeft,
+          },
+          border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _conclusionSection(EnergyIntelligence i, BillBreakdown b) {
+    final month = projMonth(i);
+    final confidenceLabel = i.confidenceScore >= 90
+        ? 'HIGH'
+        : i.confidenceScore >= 70
+            ? 'MEDIUM'
+            : 'REVIEW REQUIRED';
+
+    final sb = StringBuffer()
+      ..write('Overall energy performance during $month was ')
+      ..write(i.avgPf >= EnergyIntelligence.pfLowWarn
+          ? 'stable based on the available readings, with an average PF of '
+              '${i.avgPf.toStringAsFixed(3)}. '
+          : 'mixed, with an average PF of ${i.avgPf.toStringAsFixed(3)} and '
+              'low-PF events observed. ')
+      ..write('Billing demand utilization was approximately '
+          '${i.billingUtilPct.toStringAsFixed(0)}% of contract demand '
+          '(${i.billingDemand.toStringAsFixed(0)} kVA of '
+          '${i.contractDemand.toStringAsFixed(0)} kVA). ');
+    if (i.flaggedInvalid > 0 || i.missingDayCount > 0) {
+      sb.write(
+          'Consumption and TOD figures should be validated for consistency '
+          'before using this report for financial decision-making.');
+    } else {
+      sb.write(
+          'Consumption and TOD figures are internally consistent and can be '
+          'used with confidence.');
+    }
+
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        color: PdfColors.green50,
+        borderRadius: pw.BorderRadius.circular(6),
+        border: pw.Border.all(color: PdfColors.green300, width: 0.5),
+      ),
+      padding: const pw.EdgeInsets.all(10),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'PowerEMS Recommendation',
+            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            sb.toString(),
+            style: pw.TextStyle(fontSize: 8, color: PdfColors.grey800),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                'Report Confidence',
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.Text(
+                'Data Quality: ${i.confidenceScore.toStringAsFixed(0)}% '
+                '($confidenceLabel)',
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                  color: i.confidenceScore >= 90 ? PdfColors.green800 : PdfColors.amber900,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
