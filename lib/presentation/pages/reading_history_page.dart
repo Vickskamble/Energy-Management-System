@@ -20,6 +20,7 @@ class ReadingHistoryPage extends StatefulWidget {
 
 class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
   List<EnergyLogEntity> _allLogs = [];
+  String? _selectedMeter;
   int? _selectedYear;
   int? _selectedMonth;
   int? _selectedDay;
@@ -54,16 +55,29 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
 
   List<int> get _availableYears {
     final years = <int>{DateTime.now().year};
-    for (final l in _filteredByYear) {
+    for (final l in _filteredByMeter) {
       years.add(l.loggedAt.year);
     }
     final list = years.toList()..sort((a, b) => b.compareTo(a));
     return list;
   }
 
+  List<EnergyLogEntity> get _filteredByMeter {
+    if (_selectedMeter == null) return _allLogs;
+    return _allLogs.where((l) => l.meterName == _selectedMeter).toList();
+  }
+
+  List<String> get _availableMeters {
+    final meters = <String>{};
+    for (final l in _allLogs) {
+      meters.add(l.meterName);
+    }
+    return meters.toList()..sort();
+  }
+
   List<EnergyLogEntity> get _filteredByYear {
-    if (_selectedYear == null) return _allLogs;
-    return _allLogs.where((l) => l.loggedAt.year == _selectedYear).toList();
+    if (_selectedYear == null) return _filteredByMeter;
+    return _filteredByMeter.where((l) => l.loggedAt.year == _selectedYear).toList();
   }
 
   List<int> get _availableMonths {
@@ -183,6 +197,19 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
       spacing: 12,
       runSpacing: 8,
       children: [
+        _dropdown<String>(
+          label: 'Meter',
+          value: _selectedMeter,
+          items: _availableMeters,
+          labelBuilder: (v) => v,
+          onChanged: (v) => setState(() {
+            _selectedMeter = v;
+            _selectedYear = null;
+            _selectedMonth = null;
+            _selectedDay = null;
+            _visibleCount = _pageSize;
+          }),
+        ),
         _dropdown<int>(
           label: 'Year',
           value: _selectedYear,
@@ -260,6 +287,35 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
     final actualKvah = log.kvah * mf;
     final pf = log.kvah > 0 ? (log.kwh / log.kvah).clamp(0.0, 1.0) : 0.0;
 
+    final issues = <_Issue>[];
+    if (log.kwh > 0 && log.kvah > 0 && log.kwh > log.kvah) {
+      issues.add(_Issue(
+        'Invalid (kWh > kVAh)',
+        AppColors.danger,
+        AppColors.danger.withValues(alpha: 0.1),
+      ));
+    }
+    if (log.kwh > 0 && log.kvah > 0 && pf < 0.9) {
+      issues.add(_Issue(
+        'Low PF (${pf.toStringAsFixed(3)} \u2014 penalty risk)',
+        AppColors.warning,
+        AppColors.warning.withValues(alpha: 0.1),
+      ));
+    } else if (log.kwh > 0 && log.kvah > 0 && pf < 0.95) {
+      issues.add(_Issue(
+        'PF Watch (${pf.toStringAsFixed(3)})',
+        AppColors.warning,
+        AppColors.warning.withValues(alpha: 0.06),
+      ));
+    }
+    if (log.kvah > 0 && log.kwh == 0 && log.powerFactor == 0) {
+      issues.add(_Issue(
+        'No PF data',
+        AppColors.textSecondary,
+        AppColors.surface2Light.withValues(alpha: 0.5),
+      ));
+    }
+
     return AppCard(
       margin: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -309,6 +365,46 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
                 _chip('MF', '${mf}x'),
               ],
             ),
+            if (issues.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final issue in issues)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: issue.bg,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            issue.color == AppColors.danger
+                                ? Icons.error_outline
+                                : issue.color == AppColors.warning
+                                    ? Icons.warning_amber_rounded
+                                    : Icons.info_outline,
+                            size: 12,
+                            color: issue.color,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            issue.text,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: issue.color,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -605,4 +701,11 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
       ),
     );
   }
+}
+
+class _Issue {
+  final String text;
+  final Color color;
+  final Color bg;
+  const _Issue(this.text, this.color, this.bg);
 }
