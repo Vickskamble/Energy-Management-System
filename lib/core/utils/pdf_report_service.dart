@@ -17,6 +17,18 @@ class PdfReportService {
     required String title,
     String? subtitle,
   }) async {
+    final doc = buildDocument(logs: logs, title: title, subtitle: subtitle);
+    final bytes = await doc.save();
+    await save.saveBytes(bytes, 'ems_report.pdf', 'application/pdf');
+  }
+
+  /// Builds the full report document (kept separate from the save so it can
+  /// be exercised in tests / web).
+  static pw.Document buildDocument({
+    required List<EnergyLogEntity> logs,
+    required String title,
+    String? subtitle,
+  }) {
     final doc = pw.Document();
     final breakdown = logs.isNotEmpty
         ? BillCalculator.calculate(logs: logs)
@@ -110,8 +122,7 @@ class PdfReportService {
       ),
     );
 
-    final bytes = await doc.save();
-    await save.saveBytes(bytes, 'ems_report.pdf', 'application/pdf');
+    return doc;
   }
 
   /// Auto checks run before the report is trusted. Failures produce an
@@ -192,7 +203,7 @@ class PdfReportService {
           if (failed) ...[
             pw.SizedBox(height: 4),
             pw.Text(
-              'ALERT: Data validation required — some reading(s) were '
+              'ALERT: Data validation required - some reading(s) were '
               'flagged. Review them before using these billing figures.',
               style: pw.TextStyle(fontSize: 8, color: PdfColors.red800),
             ),
@@ -211,7 +222,7 @@ class PdfReportService {
             false,
             check2Pass
                 ? 'all rows consistent'
-                : '$flagged flagged reading(s) — kWh > kVAh or PF mismatch',
+                : '$flagged flagged reading(s) - kWh > kVAh or PF mismatch',
             badge, badgeColor,
           ),
           _checkRow(
@@ -697,7 +708,7 @@ class PdfReportService {
           pw.SizedBox(height: 8),
           pw.Text(
             'Basis: billed units (kVAh × MF) = ${i.billedUnits.toStringAsFixed(0)}. '
-            '"Total Consumption" is raw active kWh WITHOUT the meter factor — '
+            '"Total Consumption" is raw active kWh WITHOUT the meter factor - '
             'a different basis, not an error.',
             style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
           ),
@@ -750,14 +761,28 @@ class PdfReportService {
       pw.SizedBox(height: 6),
     ];
 
-    if (i.pfSeries.isNotEmpty) {
+    // Distinct calendar days — the FixedAxis x-axis MUST span at least two
+    // different values or the pdf chart divides by zero (NaN crash).
+    final distinctDays = i.pfSeries.map((s) => s.date.day).toSet().toList()
+      ..sort();
+
+    if (distinctDays.length >= 2) {
       final data = <pw.PointChartValue>[
         for (final s in i.pfSeries)
           pw.PointChartValue(s.date.day.toDouble(), s.pf),
       ];
-      final dayTicks = i.pfSeries.length <= 8
-          ? (i.pfSeries.map((s) => s.date.day).toSet().toList()..sort())
-          : <int>[1];
+
+      // 2-4 evenly spaced ticks across the reading span (always >= 2 distinct).
+      final minDay = distinctDays.first;
+      final maxDay = distinctDays.last;
+      final span = maxDay - minDay;
+      final dayTicks = (() {
+        final ticks = <int>{};
+        for (var k = 0; k <= 3; k++) {
+          ticks.add(minDay + (span * k / 3).round());
+        }
+        return ticks.toList()..sort();
+      })();
 
       pwWidgets.add(
         pw.Container(
@@ -797,7 +822,10 @@ class PdfReportService {
     } else {
       pwWidgets.add(
         pw.Text(
-          'No PF readings available for a trend.',
+          distinctDays.isEmpty
+              ? 'No PF readings available for a trend.'
+              : 'At least two readings on different days are needed for a '
+                  'trend chart.',
           style: pw.TextStyle(fontSize: 8.5, color: PdfColors.grey700),
         ),
       );
@@ -936,7 +964,7 @@ class PdfReportService {
         ),
         pw.SizedBox(height: 6),
         pw.Text(
-          'Where your money goes — largest share of gross charges first.',
+          'Where your money goes - largest share of gross charges first.',
           style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
         ),
       ],
