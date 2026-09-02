@@ -189,6 +189,7 @@ class EnergyLogRemoteDatasource {
         isSynced: log.isSynced,
         userId: log.userId,
         multiplyingFactor: newMf,
+        mdValues: log.mdValues,
       );
     }).toList();
 

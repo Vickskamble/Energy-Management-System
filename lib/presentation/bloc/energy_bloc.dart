@@ -149,6 +149,13 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
         // Meter lookup failed — fall back to the global default.
       }
 
+      // When T1-T4 phase values are supplied (multi-MD feature), the recorded
+      // MD is the MAX of the four. md_recorded always stores the max so all
+      // existing calculations, charts and bills keep working unchanged.
+      final mdRecorded = (event.mdValues != null && event.mdValues!.isNotEmpty)
+          ? event.mdValues!.reduce((a, b) => a > b ? a : b)
+          : event.mdRecorded;
+
       final model = EnergyLogModel.create(
         meterName: event.meterName,
         kwh: consumedKwh,
@@ -158,13 +165,14 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
         rkvarhLag: event.rkvarhLag,
         rkvarhLead: event.rkvarhLead,
         powerFactor: powerFactor,
-        mdRecorded: event.mdRecorded,
+        mdRecorded: mdRecorded,
         contractDemand: AppConfig.contractDemandKva,
         loggedAt: event.loggedAt,
         multiplyingFactor: meterMf,
         exportKwh: event.exportKwh,
         exportKvah: event.exportKvah,
         generationKwh: event.generationKwh,
+        mdValues: event.mdValues,
       );
 
       // ── Step 6: Persist locally (offline-first, is_synced = false) ──────
@@ -230,6 +238,13 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
     }
     if (event.mdRecorded < 0) {
       throw const ValidationException('MD Recorded cannot be negative');
+    }
+    if (event.mdValues != null) {
+      for (final v in event.mdValues!) {
+        if (v < 0) {
+          throw const ValidationException('MD values cannot be negative');
+        }
+      }
     }
     if (event.loggedAt.isAfter(DateTime.now())) {
       throw const ValidationException('Reading date cannot be in the future');

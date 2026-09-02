@@ -279,6 +279,7 @@ class EnergyRepository {
                   loggedAt: r.loggedAt,
                   isSynced: r.isSynced,
                   multiplyingFactor: r.multiplyingFactor,
+                  mdValues: r.mdValues,
                 ),
               );
             }

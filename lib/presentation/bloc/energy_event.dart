@@ -37,5 +37,6 @@ sealed class EnergyEvent with _$EnergyEvent {
     double? exportKwh,
     double? exportKvah,
     double? generationKwh,
+    List<double>? mdValues,
   }) = SubmitManualReadingForm;
 }

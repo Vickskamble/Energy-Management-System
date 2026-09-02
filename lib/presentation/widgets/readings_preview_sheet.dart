@@ -164,6 +164,24 @@ class _ReadingCard extends StatelessWidget {
                 label: 'MD',
                 value: '${log.actualMd.toStringAsFixed(1)} kVA',
               ),
+              if (log.mdValues != null && log.mdValues!.length >= 4) ...[
+                _Stat(
+                  label: 'MD T1',
+                  value: '${log.mdValues![0].toStringAsFixed(1)} kVA',
+                ),
+                _Stat(
+                  label: 'MD T2',
+                  value: '${log.mdValues![1].toStringAsFixed(1)} kVA',
+                ),
+                _Stat(
+                  label: 'MD T3',
+                  value: '${log.mdValues![2].toStringAsFixed(1)} kVA',
+                ),
+                _Stat(
+                  label: 'MD T4',
+                  value: '${log.mdValues![3].toStringAsFixed(1)} kVA',
+                ),
+              ],
               _Stat(
                 label: 'PF',
                 value: log.powerFactor.toStringAsFixed(2),

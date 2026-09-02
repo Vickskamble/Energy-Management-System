@@ -45,6 +45,10 @@ class EnergyLogEntity {
   final double avgUnitCost;
   final double multiplyingFactor;
 
+  /// Individual MD phase values [T1, T2, T3, T4] — only populated for
+  /// users with the multi-MD feature enabled. NULL for standard users.
+  final List<double>? mdValues;
+
   /// ACTUAL demand in kVA — the raw MD recorded by the meter (Excel/manual)
   /// scaled by the meter's multiplying factor (CT/PT ratio). All displays and
   /// calculations use this value; [mdRecorded] stays the raw meter reading.
@@ -83,6 +87,7 @@ class EnergyLogEntity {
     this.loadFactor = 0,
     this.avgUnitCost = 0,
     this.multiplyingFactor = 1.0,
+    this.mdValues,
   });
 
   EnergyLogEntity copyWith({
@@ -118,6 +123,7 @@ class EnergyLogEntity {
     double? billingDemand,
     double? loadFactor,
     double? avgUnitCost,
+    List<double>? mdValues,
   }) {
     return EnergyLogEntity(
       id: id ?? this.id,
@@ -152,6 +158,7 @@ class EnergyLogEntity {
       loadFactor: loadFactor ?? this.loadFactor,
       avgUnitCost: avgUnitCost ?? this.avgUnitCost,
       multiplyingFactor: multiplyingFactor ?? this.multiplyingFactor,
+      mdValues: mdValues ?? this.mdValues,
     );
   }
 

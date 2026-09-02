@@ -272,6 +272,11 @@ class AppConfig {
   /// Empty string means email alerts are disabled.
   static String alertEmail = '';
 
+  /// Multi-MD mode: when true the reading form shows 4 separate MD fields
+  /// (T1-T4) and stores the max in [md_recorded]. Per-user feature flag
+  /// stored in user_settings.data['use_multi_md'].
+  static bool useMultiMd = false;
+
   /// Per-month FAC rates (₹/unit) — keyed "YYYY-MM". Falls back to
   /// [facRatePerUnit] for months without an explicit rate.
   static Map<String, double> _facRatesByMonth = {};
@@ -346,6 +351,7 @@ class AppConfig {
     billOnKvah = AppConstants.billOnKvah;
     _facRatesByMonth = {};
     alertEmail = '';
+    useMultiMd = false;
   }
 }
 
@@ -484,6 +490,9 @@ class TariffStore {
     if (map['alert_email'] is String) {
       AppConfig.alertEmail = map['alert_email'] as String;
     }
+    if (map['use_multi_md'] is bool) {
+      AppConfig.useMultiMd = map['use_multi_md'] as bool;
+    }
   }
 
   static Future<void> saveAll({
@@ -505,6 +514,18 @@ class TariffStore {
       throw const RemoteStorageException('You must be signed in to save settings.');
     }
     try {
+      // Preserve feature flags (e.g. use_multi_md) that are set via SQL
+      // and not managed by the settings UI. Without this, saveAll() would
+      // overwrite the entire JSONB blob and lose those flags.
+      final existing = await SupabaseClientManager.client
+          .from(_table)
+          .select('data')
+          .eq('user_id', uid)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 10));
+      final existingData = (existing?['data'] as Map?)
+          ?.cast<String, Object?>() ?? {};
+
       final data = {
         'tariff_per_unit': tariffPerUnit,
         'demand_charge_per_kva': demandChargePerKva,
@@ -543,6 +564,7 @@ class TariffStore {
         'lf_rate_pct': AppConfig.lfRatePct,
         'lf_sealing_pct': AppConfig.lfSealingPct,
         'alert_email': AppConfig.alertEmail,
+        'use_multi_md': existingData['use_multi_md'] ?? false,
       };
       await SupabaseClientManager.client.from(_table).upsert({
         'user_id': uid,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/app_logger.dart';
@@ -361,6 +362,12 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
                 _chip('kWh', actualKwh.toStringAsFixed(1)),
                 _chip('kVAh', actualKvah.toStringAsFixed(1)),
                 _chip('MD', '${actualMd.toStringAsFixed(1)} kVA'),
+                if (log.mdValues != null && log.mdValues!.length >= 4) ...[
+                  _chip('T1', log.mdValues![0].toStringAsFixed(1)),
+                  _chip('T2', log.mdValues![1].toStringAsFixed(1)),
+                  _chip('T3', log.mdValues![2].toStringAsFixed(1)),
+                  _chip('T4', log.mdValues![3].toStringAsFixed(1)),
+                ],
                 _chip('PF', pf.toStringAsFixed(3)),
                 _chip('MF', '${mf}x'),
               ],
@@ -499,6 +506,26 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
     final mdCtrl = TextEditingController(
       text: log.mdRecorded.toStringAsFixed(2),
     );
+    final mdT1Ctrl = TextEditingController(
+      text: log.mdValues != null && log.mdValues!.length >= 4
+          ? log.mdValues![0].toStringAsFixed(2)
+          : '',
+    );
+    final mdT2Ctrl = TextEditingController(
+      text: log.mdValues != null && log.mdValues!.length >= 4
+          ? log.mdValues![1].toStringAsFixed(2)
+          : '',
+    );
+    final mdT3Ctrl = TextEditingController(
+      text: log.mdValues != null && log.mdValues!.length >= 4
+          ? log.mdValues![2].toStringAsFixed(2)
+          : '',
+    );
+    final mdT4Ctrl = TextEditingController(
+      text: log.mdValues != null && log.mdValues!.length >= 4
+          ? log.mdValues![3].toStringAsFixed(2)
+          : '',
+    );
     final formKey = GlobalKey<FormState>();
 
     await showDialog<void>(
@@ -546,21 +573,98 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: mdCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'MD Recorded (kVA)',
-                        prefixIcon: Icon(Icons.trending_up),
+                    if (AppConfig.useMultiMd && log.mdValues != null) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: mdT1Ctrl,
+                              decoration: const InputDecoration(
+                                labelText: 'MD T1 (kVA)',
+                                prefixIcon: Icon(Icons.trending_up),
+                              ),
+                              keyboardType: TextInputType.number,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) return null;
+                                return double.tryParse(v.trim()) == null
+                                    ? 'Enter a valid number'
+                                    : null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              controller: mdT2Ctrl,
+                              decoration: const InputDecoration(
+                                labelText: 'MD T2 (kVA)',
+                                prefixIcon: Icon(Icons.trending_up),
+                              ),
+                              keyboardType: TextInputType.number,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) return null;
+                                return double.tryParse(v.trim()) == null
+                                    ? 'Enter a valid number'
+                                    : null;
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                      keyboardType: TextInputType.number,
-                      validator: (v) {
-                        final val = double.tryParse(v ?? '');
-                        if (val == null || val <= 0) {
-                          return 'Enter a positive value';
-                        }
-                        return null;
-                      },
-                    ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: mdT3Ctrl,
+                              decoration: const InputDecoration(
+                                labelText: 'MD T3 (kVA)',
+                                prefixIcon: Icon(Icons.trending_up),
+                              ),
+                              keyboardType: TextInputType.number,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) return null;
+                                return double.tryParse(v.trim()) == null
+                                    ? 'Enter a valid number'
+                                    : null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              controller: mdT4Ctrl,
+                              decoration: const InputDecoration(
+                                labelText: 'MD T4 (kVA)',
+                                prefixIcon: Icon(Icons.trending_up),
+                              ),
+                              keyboardType: TextInputType.number,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) return null;
+                                return double.tryParse(v.trim()) == null
+                                    ? 'Enter a valid number'
+                                    : null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else
+                      TextFormField(
+                        controller: mdCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'MD Recorded (kVA)',
+                          prefixIcon: Icon(Icons.trending_up),
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (v) {
+                          final val = double.tryParse(v ?? '');
+                          if (val == null || val <= 0) {
+                            return 'Enter a positive value';
+                          }
+                          return null;
+                        },
+                      ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -648,6 +752,21 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
               TextButton(
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
+                  final isMultiMd =
+                      AppConfig.useMultiMd && log.mdValues != null;
+                  List<double>? mdValues;
+                  double mdRecorded;
+                  if (isMultiMd) {
+                    mdValues = [
+                      double.tryParse(mdT1Ctrl.text.trim()) ?? 0,
+                      double.tryParse(mdT2Ctrl.text.trim()) ?? 0,
+                      double.tryParse(mdT3Ctrl.text.trim()) ?? 0,
+                      double.tryParse(mdT4Ctrl.text.trim()) ?? 0,
+                    ];
+                    mdRecorded = mdValues.reduce((a, b) => a > b ? a : b);
+                  } else {
+                    mdRecorded = double.parse(mdCtrl.text.trim());
+                  }
                   final updatedModel = EnergyLogModel.create(
                     id: log.id,
                     meterName: log.meterName,
@@ -657,12 +776,13 @@ class _ReadingHistoryPageState extends State<ReadingHistoryPage> {
                     currentKvah: log.currentKvah,
                     rkvarhLag: double.tryParse(rkvarhLagCtrl.text.trim()) ?? 0,
                     rkvarhLead: double.tryParse(rkvarhLeadCtrl.text.trim()) ?? 0,
-                    mdRecorded: double.parse(mdCtrl.text.trim()),
+                    mdRecorded: mdRecorded,
                     loggedAt: date,
                     contractDemand: log.contractDemand,
                     userId: log.userId,
                     isSynced: log.isSynced,
                     multiplyingFactor: log.multiplyingFactor,
+                    mdValues: mdValues ?? log.mdValues,
                   );
                   Navigator.pop(dialogCtx);
                   try {

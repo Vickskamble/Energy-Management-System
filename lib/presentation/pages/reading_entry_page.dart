@@ -41,6 +41,10 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
   final _rkvarhLagCtrl = TextEditingController();
   final _rkvarhLeadCtrl = TextEditingController();
   final _mdRecordedCtrl = TextEditingController();
+  final _mdT1Ctrl = TextEditingController();
+  final _mdT2Ctrl = TextEditingController();
+  final _mdT3Ctrl = TextEditingController();
+  final _mdT4Ctrl = TextEditingController();
   final _exportKwhCtrl = TextEditingController();
   final _exportKvahCtrl = TextEditingController();
   final _generationKwhCtrl = TextEditingController();
@@ -59,6 +63,10 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
       _rkvarhLagCtrl.text.isNotEmpty ||
       _rkvarhLeadCtrl.text.isNotEmpty ||
       _mdRecordedCtrl.text.isNotEmpty ||
+      _mdT1Ctrl.text.isNotEmpty ||
+      _mdT2Ctrl.text.isNotEmpty ||
+      _mdT3Ctrl.text.isNotEmpty ||
+      _mdT4Ctrl.text.isNotEmpty ||
       _exportKwhCtrl.text.isNotEmpty ||
       _exportKvahCtrl.text.isNotEmpty ||
       _generationKwhCtrl.text.isNotEmpty;
@@ -71,6 +79,10 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
     // Live consumption (difference) preview as the user types.
     _currentKwhCtrl.addListener(_onValuesChanged);
     _currentKvahCtrl.addListener(_onValuesChanged);
+    _mdT1Ctrl.addListener(_onValuesChanged);
+    _mdT2Ctrl.addListener(_onValuesChanged);
+    _mdT3Ctrl.addListener(_onValuesChanged);
+    _mdT4Ctrl.addListener(_onValuesChanged);
   }
 
   void _onValuesChanged() {
@@ -89,6 +101,21 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
     return cur - _prevCumulativeKvah;
   }
 
+  /// Max of the T1-T4 MD values (multi-MD feature) — NULL when empty.
+  double? get _multiMdMax {
+    final values = [_mdT1Ctrl, _mdT2Ctrl, _mdT3Ctrl, _mdT4Ctrl]
+        .map((c) => AppInputFormatters.parseNumber(c.text.trim()))
+        .whereType<double>()
+        .toList();
+    if (values.isEmpty) return null;
+    return values.reduce((a, b) => a > b ? a : b);
+  }
+
+  /// Parsed T1-T4 values, defaulting to 0 for blanks (multi-MD feature).
+  List<double> get _multiMdValues => [_mdT1Ctrl, _mdT2Ctrl, _mdT3Ctrl, _mdT4Ctrl]
+      .map((c) => AppInputFormatters.parseNumber(c.text.trim()) ?? 0)
+      .toList();
+
   @override
   void dispose() {
     context.read<MeterRepository>().removeListener(_loadMeters);
@@ -97,6 +124,10 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
     _rkvarhLagCtrl.dispose();
     _rkvarhLeadCtrl.dispose();
     _mdRecordedCtrl.dispose();
+    _mdT1Ctrl.dispose();
+    _mdT2Ctrl.dispose();
+    _mdT3Ctrl.dispose();
+    _mdT4Ctrl.dispose();
     _exportKwhCtrl.dispose();
     _exportKvahCtrl.dispose();
     _generationKwhCtrl.dispose();
@@ -202,6 +233,10 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
     _rkvarhLagCtrl.clear();
     _rkvarhLeadCtrl.clear();
     _mdRecordedCtrl.clear();
+    _mdT1Ctrl.clear();
+    _mdT2Ctrl.clear();
+    _mdT3Ctrl.clear();
+    _mdT4Ctrl.clear();
     _exportKwhCtrl.clear();
     _exportKvahCtrl.clear();
     _generationKwhCtrl.clear();
@@ -277,6 +312,12 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
     final generationKwh = AppInputFormatters.parseNumber(
       _generationKwhCtrl.text.trim(),
     );
+    final useMultiMd = AppConfig.useMultiMd;
+    // Multi-MD: mdRecorded = max of T1-T4; mdValues keeps the breakdown.
+    final mdValues = useMultiMd ? _multiMdValues : null;
+    final mdRecorded = useMultiMd
+        ? _multiMdMax ?? 0
+        : AppInputFormatters.parseNumber(_mdRecordedCtrl.text.trim()) ?? 0;
     bloc.add(
       SubmitManualReadingForm(
         meterName: _selectedMeter,
@@ -290,13 +331,13 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
             AppInputFormatters.parseNumber(_rkvarhLagCtrl.text.trim()) ?? 0,
         rkvarhLead:
             AppInputFormatters.parseNumber(_rkvarhLeadCtrl.text.trim()) ?? 0,
-        mdRecorded:
-            AppInputFormatters.parseNumber(_mdRecordedCtrl.text.trim()) ?? 0,
+        mdRecorded: mdRecorded,
         powerFactor: null,
         loggedAt: _loggedAt,
         exportKwh: exportKwh,
         exportKvah: exportKvah,
         generationKwh: generationKwh,
+        mdValues: mdValues,
       ),
     );
   }
@@ -709,17 +750,129 @@ class ReadingEntryPageState extends State<ReadingEntryPage> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            AppTextField(
-                              controller: _mdRecordedCtrl,
-                              label: 'MD Recorded (kVA) — optional',
-                              hint: 'Leave blank if not available',
-                              prefixIcon: Icons.trending_up,
-                              keyboardType: TextInputType.numberWithOptions(
-                                decimal: true,
+                            if (AppConfig.useMultiMd) ...[
+                              Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      'MD Recorded (kVA) — enter all 4 phases',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  if (_multiMdMax != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        'Max: ${_multiMdMax!.toStringAsFixed(1)}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
-                              inputFormatters: [AppInputFormatters.numeric],
-                              validator: _optionalNumberValidator,
-                            ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: AppTextField(
+                                      controller: _mdT1Ctrl,
+                                      label: 'MD T1 (kVA)',
+                                      hint: 'Phase 1',
+                                      prefixIcon: Icons.trending_up,
+                                      keyboardType:
+                                          TextInputType.numberWithOptions(
+                                            decimal: true,
+                                          ),
+                                      inputFormatters: [
+                                        AppInputFormatters.numeric,
+                                      ],
+                                      validator: _optionalNumberValidator,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: AppTextField(
+                                      controller: _mdT2Ctrl,
+                                      label: 'MD T2 (kVA)',
+                                      hint: 'Phase 2',
+                                      prefixIcon: Icons.trending_up,
+                                      keyboardType:
+                                          TextInputType.numberWithOptions(
+                                            decimal: true,
+                                          ),
+                                      inputFormatters: [
+                                        AppInputFormatters.numeric,
+                                      ],
+                                      validator: _optionalNumberValidator,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: AppTextField(
+                                      controller: _mdT3Ctrl,
+                                      label: 'MD T3 (kVA)',
+                                      hint: 'Phase 3',
+                                      prefixIcon: Icons.trending_up,
+                                      keyboardType:
+                                          TextInputType.numberWithOptions(
+                                            decimal: true,
+                                          ),
+                                      inputFormatters: [
+                                        AppInputFormatters.numeric,
+                                      ],
+                                      validator: _optionalNumberValidator,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: AppTextField(
+                                      controller: _mdT4Ctrl,
+                                      label: 'MD T4 (kVA)',
+                                      hint: 'Phase 4',
+                                      prefixIcon: Icons.trending_up,
+                                      keyboardType:
+                                          TextInputType.numberWithOptions(
+                                            decimal: true,
+                                          ),
+                                      inputFormatters: [
+                                        AppInputFormatters.numeric,
+                                      ],
+                                      validator: _optionalNumberValidator,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ] else
+                              AppTextField(
+                                controller: _mdRecordedCtrl,
+                                label: 'MD Recorded (kVA) — optional',
+                                hint: 'Leave blank if not available',
+                                prefixIcon: Icons.trending_up,
+                                keyboardType: TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
+                                inputFormatters: [AppInputFormatters.numeric],
+                                validator: _optionalNumberValidator,
+                              ),
                            ],
                         ),
                       ),

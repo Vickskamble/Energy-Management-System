@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -50,6 +51,9 @@ class EnergyLogModel {
   final double avgUnitCost;
   final double multiplyingFactor;
 
+  /// Individual MD phase values [T1, T2, T3, T4] — only for multi-MD users.
+  final List<double>? mdValues;
+
   const EnergyLogModel({
     required this.id,
     required this.meterName,
@@ -83,6 +87,7 @@ class EnergyLogModel {
     this.loadFactor = 0,
     this.avgUnitCost = 0,
     this.multiplyingFactor = 1.0,
+    this.mdValues,
   });
 
   EnergyLogEntity toEntity() => EnergyLogEntity(
@@ -118,6 +123,7 @@ class EnergyLogModel {
     loadFactor: loadFactor,
     avgUnitCost: avgUnitCost,
     multiplyingFactor: multiplyingFactor,
+    mdValues: mdValues,
   );
 
   factory EnergyLogModel.fromEntity(EnergyLogEntity entity) => EnergyLogModel(
@@ -153,6 +159,7 @@ class EnergyLogModel {
     loadFactor: entity.loadFactor,
     avgUnitCost: entity.avgUnitCost,
     multiplyingFactor: entity.multiplyingFactor,
+    mdValues: entity.mdValues,
   );
 
   Map<String, Object?> toMap() => {
@@ -189,6 +196,7 @@ class EnergyLogModel {
     'load_factor': _toPrecision(loadFactor, 4),
     'avg_unit_cost': _toPrecision(avgUnitCost, 2),
     'multiplying_factor': _toPrecision(multiplyingFactor, 4),
+    if (mdValues != null) 'md_values': mdValues,
   };
 
   factory EnergyLogModel.fromMap(Map<String, Object?> map) {
@@ -225,6 +233,7 @@ class EnergyLogModel {
       loadFactor: _parseDouble(map['load_factor']),
       avgUnitCost: _parseDouble(map['avg_unit_cost']),
       multiplyingFactor: _parseDouble(map['multiplying_factor']),
+      mdValues: _parseMdValues(map['md_values']),
     );
   }
 
@@ -261,6 +270,8 @@ class EnergyLogModel {
     'load_factor': (loadFactor * 1000).round() / 1000,
     'avg_unit_cost': (avgUnitCost * 100).round() / 100,
     'multiplying_factor': (multiplyingFactor * 1000).round() / 1000,
+    if (mdValues != null)
+      'md_values': mdValues!.map((v) => (v * 100).round() / 100).toList(),
   };
 
   factory EnergyLogModel.fromJson(Map<String, dynamic> json) {
@@ -297,6 +308,7 @@ class EnergyLogModel {
       avgUnitCost: (json['avg_unit_cost'] as num?)?.toDouble() ?? 0,
       multiplyingFactor:
           (json['multiplying_factor'] as num?)?.toDouble() ?? 1.0,
+      mdValues: _parseMdValues(json['md_values']),
     );
   }
 
@@ -319,6 +331,7 @@ class EnergyLogModel {
     double? exportKwh,
     double? exportKvah,
     double? generationKwh,
+    List<double>? mdValues,
   }) {
     final pf = powerFactor ?? CalculationEngine.calculatePowerFactor(kwh, kvah);
     final totalUnits = kwh * multiplyingFactor;
@@ -431,6 +444,8 @@ class EnergyLogModel {
       loadFactor: 0,
       avgUnitCost: (avgUnitCost * 100).round() / 100,
       multiplyingFactor: (multiplyingFactor * 1000).round() / 1000,
+      mdValues:
+          mdValues?.map((v) => (v * 100).round() / 100).toList(),
     );
   }
 
@@ -474,8 +489,7 @@ class EnergyLogModel {
       }
       if (m.currentKwh != null && m.currentKvah != null) return m;
       return EnergyLogModel(
-        id: m.id,
-        meterName: m.meterName,
+        id: m.id,        meterName: m.meterName,
         kwh: m.kwh,
         kvah: m.kvah,
         currentKwh: kwhAt,
@@ -506,6 +520,7 @@ class EnergyLogModel {
         loadFactor: m.loadFactor,
         avgUnitCost: m.avgUnitCost,
         multiplyingFactor: m.multiplyingFactor,
+        mdValues: m.mdValues,
       );
     }).toList();
   }
@@ -535,5 +550,41 @@ class EnergyLogModel {
   static double _toPrecision(double value, int decimals) {
     final factor = pow(10, decimals).toDouble();
     return (value * factor).round() / factor;
+  }
+
+  static List<double>? _parseMdValues(Object? value) {
+    if (value == null) return null;
+    if (value is List) {
+      final parsed = value
+          .map((e) => e is num
+              ? e.toDouble()
+              : e is String
+                  ? double.tryParse(e) ?? 0.0
+                  : 0.0)
+          .toList();
+      return parsed.isEmpty ? null : parsed;
+    }
+    if (value is String) {
+      final decoded = _tryDecodeJsonList(value);
+      if (decoded != null) return decoded;
+    }
+    return null;
+  }
+
+  static List<double>? _tryDecodeJsonList(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        final parsed = decoded
+            .map((e) => e is num
+                ? e.toDouble()
+                : e is String
+                    ? double.tryParse(e) ?? 0.0
+                    : 0.0)
+            .toList();
+        return parsed.isEmpty ? null : parsed;
+      }
+    } catch (_) {}
+    return null;
   }
 }
