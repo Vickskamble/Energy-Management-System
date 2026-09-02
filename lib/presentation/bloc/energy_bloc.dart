@@ -134,14 +134,21 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
           );
 
       // ── Step 5: Build domain model ───────────────────────────────────────
-      // Multiplying factor comes from the meter's CT/PT ratio (default
-      // AppConstants.multiplyingFactor when no meter with ratios configured).
+      // Multiplying factor AND contract demand come from the meter's own
+      // configuration (CT/PT ratio + contract_demand_kw). Only when no meter
+      // matches do we fall back to the global defaults — so the stored
+      // contract_demand always reflects the meter's sanctioned demand instead
+      // of the app-wide default.
       double meterMf = AppConstants.multiplyingFactor;
+      double meterContractKva = AppConfig.contractDemandKva;
       try {
         final meters = await _meterRepository.getAllMeters();
         for (final meter in meters) {
           if (meter.name == event.meterName.trim()) {
             meterMf = meter.multiplyingFactor;
+            if (meter.contractDemandKw > 0) {
+              meterContractKva = meter.contractDemandKw;
+            }
             break;
           }
         }
@@ -166,7 +173,7 @@ class EnergyBloc extends Bloc<EnergyEvent, EnergyState> {
         rkvarhLead: event.rkvarhLead,
         powerFactor: powerFactor,
         mdRecorded: mdRecorded,
-        contractDemand: AppConfig.contractDemandKva,
+        contractDemand: meterContractKva,
         loggedAt: event.loggedAt,
         multiplyingFactor: meterMf,
         exportKwh: event.exportKwh,
