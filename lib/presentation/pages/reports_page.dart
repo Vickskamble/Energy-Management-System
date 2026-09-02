@@ -216,6 +216,15 @@ class _ReportsContentState extends State<_ReportsContent> {
                             subtitle:
                                 '${entities.length} reading(s) — '
                                 '${_selection.label}${_meter != null ? ', $_meter' : ''}',
+                            ratchetLogs: _allEntities,
+                            facRate: entities.isNotEmpty
+                                ? AppConfig.facRateForMonth(
+                                    _monthKey(
+                                      entities.first.loggedAt.year,
+                                      entities.first.loggedAt.month,
+                                    ),
+                                  )
+                                : null,
                           );
                         } catch (e) {
                           AppLogger.e('PDF export failed', e);
@@ -271,6 +280,15 @@ class _ReportsContentState extends State<_ReportsContent> {
                         subtitle:
                             '${entities.length} reading(s) — '
                             '${_selection.label}${_meter != null ? ', $_meter' : ''}',
+                        ratchetLogs: _allEntities,
+                        facRate: entities.isNotEmpty
+                            ? AppConfig.facRateForMonth(
+                                _monthKey(
+                                  entities.first.loggedAt.year,
+                                  entities.first.loggedAt.month,
+                                ),
+                              )
+                            : null,
                       );
                     } catch (e) {
                       AppLogger.e('PDF export failed', e);

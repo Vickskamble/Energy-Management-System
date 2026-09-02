@@ -329,6 +329,12 @@ class _AnalysisContentState extends State<_AnalysisContent> {
               title: 'Analysis Report',
               subtitle:
                   '${_filtered.length} reading(s) — ${_selection.label}',
+              ratchetLogs: _entities,
+              facRate: _filtered.isNotEmpty
+                  ? AppConfig.facRateForMonth(
+                      '${_filtered.first.loggedAt.year.toString().padLeft(4, '0')}-${_filtered.first.loggedAt.month.toString().padLeft(2, '0')}',
+                    )
+                  : null,
             );
           } catch (e) {
             AppLogger.e('Analysis PDF export failed', e);

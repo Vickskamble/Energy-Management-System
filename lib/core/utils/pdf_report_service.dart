@@ -16,8 +16,16 @@ class PdfReportService {
     required List<EnergyLogEntity> logs,
     required String title,
     String? subtitle,
+    List<EnergyLogEntity>? ratchetLogs,
+    double? facRate,
   }) async {
-    final doc = buildDocument(logs: logs, title: title, subtitle: subtitle);
+    final doc = buildDocument(
+      logs: logs,
+      title: title,
+      subtitle: subtitle,
+      ratchetLogs: ratchetLogs,
+      facRate: facRate,
+    );
     final bytes = await doc.save();
     await save.saveBytes(bytes, 'ems_report.pdf', 'application/pdf');
   }
@@ -28,10 +36,16 @@ class PdfReportService {
     required List<EnergyLogEntity> logs,
     required String title,
     String? subtitle,
+    List<EnergyLogEntity>? ratchetLogs,
+    double? facRate,
   }) {
     final doc = pw.Document();
     final breakdown = logs.isNotEmpty
-        ? BillCalculator.calculate(logs: logs)
+        ? BillCalculator.calculate(
+            logs: logs,
+            ratchetLogs: ratchetLogs,
+            facRate: facRate,
+          )
         : null;
     final intelligence = (logs.isNotEmpty && breakdown != null)
         ? EnergyIntelligence.from(logs, breakdown)
