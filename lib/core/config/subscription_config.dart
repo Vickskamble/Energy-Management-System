@@ -52,7 +52,7 @@ class SubscriptionConfig {
       monthlyPrice: 2500,
       quarterlyPrice: 6750,
       yearlyPrice: 25500,
-      extraMonthlyRate: 499,
+      extraMonthlyRate: 399,
       extraQuarterlyRate: 399,
       extraYearlyRate: 299,
     ),
@@ -62,7 +62,7 @@ class SubscriptionConfig {
       monthlyPrice: 5000,
       quarterlyPrice: 13500,
       yearlyPrice: 50000,
-      extraMonthlyRate: 799,
+      extraMonthlyRate: 299,
       extraQuarterlyRate: 649,
       extraYearlyRate: 499,
     ),
@@ -388,7 +388,7 @@ class SubscriptionStore {
   /// Submit a UTR payment for auto-verification.
   static Future<Map<String, dynamic>> submitUTR({
     required String utrNumber,
-    required int amountPaid,
+    required num amountPaid,
     required PlanTier planTier,
     required PlanTerm planTerm,
     required int extraDataPoints,

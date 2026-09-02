@@ -11,6 +11,7 @@ import '../../core/network/supabase_client.dart';
 import '../../core/services/quotation_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/app_logger.dart';
 import '../../core/utils/web_navigation_stub.dart'
     if (dart.library.js_interop) '../../core/utils/web_navigation_web.dart'
     as webnav;
@@ -129,6 +130,13 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
           : 'month';
   int get _dpTotal =>
       SubscriptionConfig.includedDataPoints(_selectedTier) + _extraDataPoints;
+
+  /// Monthly-equivalent of a quarterly/yearly price (for display only).
+  String _monthlyEquivalent(int price) {
+    final months = _selectedTerm == PlanTerm.yearly ? 12 : 3;
+    final nf = NumberFormat('#,##,##0', 'en_IN');
+    return nf.format(price ~/ months);
+  }
 
   // ---------------------------------------------------------------------------
   // Razorpay checkout
@@ -273,7 +281,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
         _load();
         return;
       }
-      if (ticks >= 240) {
+      if (ticks >= 100) {
         _paymentPollTimer?.cancel();
         if (!mounted) return;
         setState(() => _paymentPending = false);
@@ -300,9 +308,9 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       setState(() => _utrResult = 'Enter the amount you paid.');
       return;
     }
-    final amountPaid = int.tryParse(amountText);
+    final amountPaid = double.tryParse(amountText);
     if (amountPaid == null || amountPaid <= 0) {
-      setState(() => _utrResult = 'Enter a valid amount (e.g. 2500).');
+      setState(() => _utrResult = 'Enter a valid amount (e.g. 2500.50).');
       return;
     }
     setState(() {
@@ -320,17 +328,17 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
       );
       if (!mounted) return;
       if (res['verified'] == true) {
-        setState(() => _utrResult = '✅ Payment verified! Your plan is now active.');
+        setState(() => _utrResult = 'Payment verified! Your plan is now active.');
         _load();
       } else if (res['error'] == 'DUPLICATE_UTR') {
-        setState(() => _utrResult = '⚠ This UTR has already been used.');
+        setState(() => _utrResult = 'This UTR has already been used.');
       } else if (res['error'] == 'AMOUNT_MISMATCH') {
         setState(
-          () => _utrResult = '⚠ Amount mismatch — expected ₹${res['expected']}, '
+          () => _utrResult = 'Amount mismatch - expected ₹${res['expected']}, '
               'got ₹${res['received']}. Please check and re-enter.',
         );
       } else {
-        setState(() => _utrResult = 'UTR submitted — pending verification.');
+        setState(() => _utrResult = 'UTR submitted - pending verification.');
       }
     } catch (e) {
       if (!mounted) return;
@@ -345,24 +353,36 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   Future<void> _shareQuotation() async {
-    final number = QuotationService.generateQuotationNumber();
-    await QuotationService.download(
-      quotationNumber: number,
-      planTier: _selectedTier,
-      planTerm: _selectedTerm,
-      extraDataPoints: _extraDataPoints,
-      customerEmail: SupabaseClientManager.client.auth.currentUser?.email,
-    );
+    try {
+      final number = QuotationService.generateQuotationNumber();
+      await QuotationService.download(
+        quotationNumber: number,
+        planTier: _selectedTier,
+        planTerm: _selectedTerm,
+        extraDataPoints: _extraDataPoints,
+        customerEmail: SupabaseClientManager.client.auth.currentUser?.email,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showStatus('Could not generate the quotation PDF. Try again.', Colors.red.shade700);
+      AppLogger.e('Quotation download failed', e);
+    }
   }
 
   Future<void> _openBankPaymentPage() async {
-    final url = SubscriptionConfig.bankPaymentUrl;
-    final opened = await launchUrl(
-      Uri.parse(url),
-      mode: LaunchMode.externalApplication,
-    );
-    if (!opened && mounted) {
-      _showStatus('Could not open bank payment page.', Colors.orange);
+    try {
+      final url = SubscriptionConfig.bankPaymentUrl;
+      final opened = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && mounted) {
+        _showStatus('Could not open bank payment page.', Colors.orange);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showStatus('Could not open bank payment page. Try again.', Colors.orange);
+      AppLogger.e('Bank payment page open failed', e);
     }
   }
 
@@ -481,7 +501,24 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
   }
 
   Widget _buildContent() {
-    final ent = _entitlement!;
+    final ent = _entitlement;
+    if (ent == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.danger),
+              const SizedBox(height: 12),
+              const Text('Could not load your plan details.'),
+              const SizedBox(height: 16),
+              AppButton(label: 'Retry', onPressed: _load),
+            ],
+          ),
+        ),
+      );
+    }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.page),
       child: Center(
@@ -782,7 +819,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
               ],
             ),
             const SizedBox(height: 6),
-            // Base price
+            // Base price + monthly-equivalent hint
             Text(
               '₹$basePrice$_termLabel',
               style: TextStyle(
@@ -791,6 +828,13 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
                 color: isSelected ? AppColors.primary : null,
               ),
             ),
+            if (_selectedTerm != PlanTerm.monthly) ...[
+              const SizedBox(height: 2),
+              Text(
+                '= ₹${_monthlyEquivalent(basePrice)}/mo (billed ${_periodLabel}ly)',
+                style: TextStyle(fontSize: 12, color: AppColors.dim(context)),
+              ),
+            ],
             const SizedBox(height: 8),
             // Data points + extra rate
             _planRow(Icons.hub_outlined, '${plan.includedDataPoints} data points included'),
@@ -869,15 +913,29 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
 
   /// Complete "what's included" list for a plan tier (all billing terms).
   List<String> _planFeatures(PlanTier tier) {
-    final plan = SubscriptionConfig.plans[tier]!;
+    final report = switch (tier) {
+      PlanTier.starter => 'Simple report (basic energy data)',
+      PlanTier.growth => 'Analytics report (trends + insights)',
+      PlanTier.pro => 'Advanced analytics report',
+    };
+    final support = switch (tier) {
+      PlanTier.starter => 'Standard support - 48 hr response',
+      PlanTier.growth => 'Priority support - 24 hr response',
+      PlanTier.pro => 'Premium support - 12 hr response',
+    };
+    final alert = switch (tier) {
+      PlanTier.starter => 'Basic alert',
+      PlanTier.growth => 'Smart alert',
+      PlanTier.pro => 'Premium alert',
+    };
     return [
       '30-day free trial',
       'MSEDCL-accurate ToD billing',
       'Solar export tracking',
-      'Reports & PDF quotation',
-      'Extra: ₹${plan.extraMonthlyRate}/mo, ₹${plan.extraQuarterlyRate}/qtr, ₹${plan.extraYearlyRate}/yr',
-      'Up to ${SubscriptionConfig.maxExtraDataPoints} extra data points',
-      'Referral → +1 free month',
+      report,
+      alert,
+      support,
+      'Referral - +1 free month',
     ];
   }
 
@@ -1005,7 +1063,7 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
               controller: _utrAmountCtrl,
               decoration: InputDecoration(
                 labelText: 'Amount Paid (₹)',
-                hintText: 'e.g. 2500',
+                hintText: 'e.g. 2500.50',
                 isDense: true,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -1024,9 +1082,10 @@ class _BillingPageState extends State<BillingPage> with WidgetsBindingObserver {
                 _utrResult!,
                 style: TextStyle(
                   fontSize: 13,
-                  color: _utrResult!.startsWith('✅')
+                  color: _utrResult!.toLowerCase().contains('verified')
                       ? AppColors.success
-                      : _utrResult!.startsWith('⚠')
+                      : (_utrResult!.toLowerCase().contains('mismatch') ||
+                              _utrResult!.toLowerCase().contains('already'))
                           ? AppColors.warning
                           : AppColors.dim(context),
                   fontWeight: FontWeight.w600,

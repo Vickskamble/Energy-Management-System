@@ -74,8 +74,6 @@ class BillCalculator {
     double totalExportKwh = 0;
     double totalGenerationKwh = 0;
     double peakMd = 0;
-    double sumMd = 0;
-    int mdCount = 0;
 
     for (final log in logs) {
       // Applying each meter's CT/PT ratio keeps the combined PF correct when
@@ -95,8 +93,6 @@ class BillCalculator {
 
       final actualMd = log.mdRecorded * log.multiplyingFactor;
       if (actualMd > peakMd) peakMd = actualMd;
-      sumMd += actualMd;
-      mdCount++;
     }
 
     // Aggregate monthly PF = total active energy ÷ total apparent energy
@@ -129,8 +125,11 @@ class BillCalculator {
       floorPercentOfContract: AppConfig.billingDemandFloorPct / 100,
       floorPercentOfRatchet: AppConfig.ratchetFloorPctOfRatchet / 100,
     );
-    final avgDemand = mdCount > 0 ? sumMd / mdCount.toDouble() : 0.0;
-    final loadFactor = EnergyCalculator.calculateLoadFactor(avgDemand, peakMd);
+    // Load Factor = current-month peak recorded MD ÷ contract demand.
+    // (Contract-demand utilisation, rather than the avg/peak ratio.)
+    final loadFactor = effectiveContractDemand > 0
+        ? (peakMd / effectiveContractDemand).clamp(0.0, 1.0)
+        : 0.0;
 
     final energyCharges = effectiveSlabs.isNotEmpty
         ? EnergyCalculator.calculateSlabEnergy(totalUnits, effectiveSlabs)
