@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:sembast/sembast.dart';
 
+import '../database/database_factory.dart';
 import '../services/email_alert_service.dart';
 import 'notification_service_stub.dart'
     if (dart.library.js_interop) 'notification_service_web.dart';
@@ -25,6 +27,31 @@ class NotificationService {
   /// (release/ems_installer.iss) — Windows toast notifications need a
   /// Start Menu shortcut with the same AUMID to be deliverable.
   static const String _windowsAppId = 'PowerEMS.EMS';
+
+  static const String _alertFlagsStore = 'alert_flags';
+
+  Future<bool> _alreadyAlertedThisMonth(String meterName, String alertType) async {
+    try {
+      final db = await openMetaDatabase();
+      final store = stringMapStoreFactory.store(_alertFlagsStore);
+      final now = DateTime.now();
+      final key = '${alertType}_${meterName}_${now.year}_${now.month}';
+      final flag = await store.record(key).get(db);
+      return flag != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _markAlertedThisMonth(String meterName, String alertType) async {
+    try {
+      final db = await openMetaDatabase();
+      final store = stringMapStoreFactory.store(_alertFlagsStore);
+      final now = DateTime.now();
+      final key = '${alertType}_${meterName}_${now.year}_${now.month}';
+      await store.record(key).put(db, {'sent': true, 'ts': now.toIso8601String()});
+    } catch (_) {}
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -143,6 +170,8 @@ class NotificationService {
     required String meterName,
     String? site,
   }) async {
+    if (await _alreadyAlertedThisMonth(meterName, 'pf')) return;
+    await _markAlertedThisMonth(meterName, 'pf');
     await showAlert(
       id: 1,
       title: 'Low Power Factor - $meterName',
@@ -167,6 +196,8 @@ class NotificationService {
     required String meterName,
     String? site,
   }) async {
+    if (await _alreadyAlertedThisMonth(meterName, 'md')) return;
+    await _markAlertedThisMonth(meterName, 'md');
     await showAlert(
       id: 2,
       title: 'MD Breach Risk - $meterName',
